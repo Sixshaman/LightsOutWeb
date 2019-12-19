@@ -1,9 +1,12 @@
+// eslint-disable-next-line no-unused-vars
 function main()
 {
     const canvas = document.getElementById("LightsOutCanvas");
     
     const infoText = document.getElementById("LightsOutPuzzleInfo");
     const qpText   = document.getElementById("QuietPatternsInfo");
+
+    const renderModeSelect = document.getElementById("rendermodesel");
 
     const gl = canvas.getContext("webgl2");
     if (!gl)
@@ -14,8 +17,8 @@ function main()
 
     canvas.onmousedown = function(e)
     {
-        var x = e.pageX - canvas.offsetLeft;
-        var y = e.pageY - canvas.offsetTop;
+        let x = e.pageX - canvas.offsetLeft;
+        let y = e.pageY - canvas.offsetTop;
 
         clickAtPoint(x, y, e.ctrlKey);
     };
@@ -24,191 +27,208 @@ function main()
     {
         switch (e.code)
         {
-            case "Equal": //Actually +
+        case "Equal": //Actually +
+        {
+            if(e.shiftKey)
             {
-                if(e.shiftKey)
-                {
-                    changeDomainSize(currentDomainSize + 1);
-                }
-                else
-                {
-                    incrementGameSize();
-                }
-                break;
+                changeDomainSize(currentDomainSize + 1);
             }
-            case "Minus":
+            else
             {
-                if(e.shiftKey)
-                {
-                    changeDomainSize(currentDomainSize - 1);
-                }
-                else
-                {
-                    decrementGameSize();
-                }
-                break;
+                incrementGameSize();
             }
-            case "Digit0":
+            break;
+        }
+        case "Minus":
+        {
+            if(e.shiftKey)
             {
-                resetGameBoard(resetModes.RESET_ZERO, currentGameSize, currentDomainSize);
-                break;
+                changeDomainSize(currentDomainSize - 1);
             }
-            case "Digit1":
+            else
             {
-                resetGameBoard(resetModes.RESET_ONE, currentGameSize, currentDomainSize);
-                break;
+                decrementGameSize();
             }
-            case "KeyO":
+            break;
+        }
+        case "Digit0":
+        {
+            resetGameBoard(resetModes.RESET_ZERO, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "Digit1":
+        {
+            resetGameBoard(resetModes.RESET_ONE, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "KeyO":
+        {
+            resetGameBoard(resetModes.RESET_BORDER, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "KeyB":
+        {
+            resetGameBoard(resetModes.RESET_BLATNOY, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "KeyP":
+        {
+            resetGameBoard(resetModes.RESET_PIETIA, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "KeyF":
+        {
+            resetGameBoard(resetModes.RESET_FULL_RANDOM, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "KeyR":
+        {
+            if(e.shiftKey)
             {
-                resetGameBoard(resetModes.RESET_BORDER, currentGameSize, currentDomainSize);
-                break;
+                enableDefaultClickRule();
             }
-            case "KeyB":
+            else
             {
-                resetGameBoard(resetModes.RESET_BLATNOY, currentGameSize, currentDomainSize);
-                break;
+                resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
             }
-            case "KeyP":
+            break;
+        }
+        case "KeyI":
+        {
+            resetGameBoard(resetModes.RESET_INVERTO, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "KeyE":
+        {
+            resetGameBoard(resetModes.RESET_SOLUTION, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "KeyQ":
+        {
+            updateSolutionMatrixIfNeeded();
+            break;
+        }
+        case "ArrowLeft":
+        {
+            resetGameBoard(resetModes.RESET_LEFT, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "ArrowRight":
+        {
+            resetGameBoard(resetModes.RESET_RIGHT, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "ArrowUp":
+        {
+            resetGameBoard(resetModes.RESET_UP, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "ArrowDown":
+        {
+            resetGameBoard(resetModes.RESET_DOWN, currentGameSize, currentDomainSize);
+            break;
+        }
+        case "KeyW":
+        {
+            showInverseSolution(!flagShowInverseSolution);
+            break;
+        }
+        case "KeyT":
+        {
+            if(e.shiftKey)
             {
-                resetGameBoard(resetModes.RESET_PIETIA, currentGameSize, currentDomainSize);
-                break;
+                enableDefaultToroidClickRule();
             }
-            case "KeyF":
-            {
-                resetGameBoard(resetModes.RESET_FULL_RANDOM, currentGameSize, currentDomainSize);
-                break;
-            }
-            case "KeyR":
-            {
-                if(e.shiftKey)
-                {
-                    enableDefaultClickRule();
-                }
-                else
-                {
-                    resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
-                }
-                break;
-            }
-            case "KeyI":
-            {
-                resetGameBoard(resetModes.RESET_INVERTO, currentGameSize, currentDomainSize);
-                break;
-            }
-            case "KeyE":
-            {
-                resetGameBoard(resetModes.RESET_SOLUTION, currentGameSize, currentDomainSize);
-                break;
-            }
-            case "KeyQ":
+            else
             {
                 updateSolutionMatrixIfNeeded();
-                break;
+                showSolution(!flagShowSolution);
             }
-            case "ArrowLeft":
+            break;
+        }
+        case "KeyA":
+        {
+            if(e.shiftKey)
             {
-                resetGameBoard(resetModes.RESET_LEFT, currentGameSize, currentDomainSize);
-                break;
+                showLitStability(!flagShowLitStability && !flagShowStability);
             }
-            case "ArrowRight":
+            else
             {
-                resetGameBoard(resetModes.RESET_RIGHT, currentGameSize, currentDomainSize);
-                break;
+                showStability(!flagShowLitStability && !flagShowStability);
             }
-            case "ArrowUp":
+            break;
+        }
+        case "KeyS":
+        {
+            if(currentTurnList.length == 0)
             {
-                resetGameBoard(resetModes.RESET_UP, currentGameSize, currentDomainSize);
-                break;
-            }
-            case "ArrowDown":
-            {
-                resetGameBoard(resetModes.RESET_DOWN, currentGameSize, currentDomainSize);
-                break;
-            }
-            case "KeyW":
-            {
-                showInverseSolution(!flagShowInverseSolution);
-                break;
-            }
-            case "KeyT":
-            {
-                if(e.shiftKey)
-                {
-                    enableDefaultToroidClickRule();
-                }
-                else
-                {
-                    updateSolutionMatrixIfNeeded();
-                    showSolution(!flagShowSolution);
-                }
-                break;
-            }
-            case "KeyA":
-            {
-                if(e.shiftKey)
-                {
-                    showLitStability(!flagShowLitStability && !flagShowStability);
-                }
-                else
-                {
-                    showStability(!flagShowLitStability && !flagShowStability);
-                }
-                break;
-            }
-            case "KeyS":
-            {
-                if(currentTurnList.length == 0)
-                {
-                    updateSolutionMatrixIfNeeded();
-                    currentGameSolution = calculateSolution();
-                    updateSolutionTexture();
+                updateSolutionMatrixIfNeeded();
+                currentGameSolution = calculateSolution();
+                updateSolutionTexture();
 
-                    currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
+                currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
 
-                    flagRandomSolving = true;
+                flagRandomSolving = true;
 
-                    flagTickLoop = true;
-                    window.requestAnimationFrame(nextTick);
-                }
-                else
-                {
-                    currentTurnList.length = 0;
-                    flagTickLoop = false;
-                }
-
-                break;
+                flagTickLoop = true;
+                window.requestAnimationFrame(nextTick);
             }
-            case "KeyC":
+            else
             {
-                if(currentTurnList.length == 0)
-                {
-                    updateSolutionMatrixIfNeeded();
-                    currentGameSolution = calculateSolution();
-                    updateSolutionTexture();
-
-                    currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
-
-                    flagRandomSolving = false;
-
-                    flagTickLoop = true;
-                    window.requestAnimationFrame(nextTick);
-                }
-                else
-                {
-                    currentTurnList.length = 0;
-                    flagTickLoop = false;
-                }
-
-                break;
+                currentTurnList.length = 0;
+                flagTickLoop = false;
             }
-            default:
+
+            break;
+        }
+        case "KeyC":
+        {
+            if(currentTurnList.length == 0)
             {
-                break;
+                updateSolutionMatrixIfNeeded();
+                currentGameSolution = calculateSolution();
+                updateSolutionTexture();
+
+                currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
+
+                flagRandomSolving = false;
+
+                flagTickLoop = true;
+                window.requestAnimationFrame(nextTick);
             }
+            else
+            {
+                currentTurnList.length = 0;
+                flagTickLoop = false;
+            }
+
+            break;
+        }
+        default:
+        {
+            break;
+        }
         }
     };
 
-    var boardGenModes =
+    renderModeSelect.onchange = function()
+    {
+        switch(renderModeSelect.value)
+        {
+        case "Circles":
+        {
+            setRenderMode(renderModes.RENDER_CIRCLES);
+            break;
+        }
+        default:
+        {
+            setRenderMode(renderModes.RENDER_SQUARES);
+            break;
+        }
+        }
+    };
+
+    let boardGenModes =
     {
         BOARDGEN_FULL_RANDOM:  1, //Generate a random board
         BOARDGEN_ZERO_ELEMENT: 2, //Generate a fully unlit board
@@ -218,7 +238,7 @@ function main()
         BOARDGEN_BORDER:       6  //Generate a border board
     };
 
-    var resetModes =
+    let resetModes =
     {
         RESET_ONE:                    1, //Fully lit board
         RESET_ZERO:                   2, //Fully unlit board
@@ -236,14 +256,14 @@ function main()
         RESET_DOWN:                  14  //Current board -> Current board moved down
     };
 
-    var workingModes =
+    let workingModes =
     {
         LIT_BOARD:                  1,
         CONSTRUCT_CLICKRULE:        2,
         CONSTRUCT_CLICKRULE_TOROID: 3
     };
 
-    var countingModes =
+    let countingModes =
     {
         COUNT_NONE:                    1,
         COUNT_SOLUTION_PERIOD:         2,
@@ -251,9 +271,14 @@ function main()
         COUNT_SOLUTION_PERIOD_4X:      4
     };
 
-    var renderModes =
+    let renderModes =
     {
-        RENDER_SQUARES: 1
+        RENDER_SQUARES:  1,
+        RENDER_CIRCLES:  2,
+        RENDER_DIAMONDS: 3,
+        RENDER_BEAMS:    4,
+        RENDER_RAIDROPS: 5,
+        RENDER_CHAINS:   6
     };
 
     const minimumBoardSize = 1;
@@ -264,85 +289,88 @@ function main()
 
     const canvasSize = 900;
 
-    var standardWidth  = canvas.clientWidth;
-    var standardHeight = canvas.clientHeight;
+    let standardWidth  = canvas.clientWidth;
+    let standardHeight = canvas.clientHeight;
 
-    var flagRandomSolving       = false;
-    var flagShowSolution        = false;
-    var flagShowInverseSolution = false;
-    var flagShowStability       = false;
-    var flagShowLitStability    = false;
-    var flagPeriodCounting      = false;
-    var flagEigvecCounting      = false;
-    var flagPerio4Counting      = false;
-    var flagPeriodBackCounting  = false;
-    var flagDisplayPeriodCount  = false;
-    var flagToroidBoard         = false;
-    var flagTickLoop            = false;
-    var flagDefaultClickRule    = false;
+    let flagSolutionMatrixComputing = false;
+    let flagRandomSolving           = false;
+    let flagShowSolution            = false;
+    let flagShowInverseSolution     = false;
+    let flagShowStability           = false;
+    let flagShowLitStability        = false;
+    //let flagPeriodCounting          = false; //TODO check
+    //let flagEigvecCounting          = false; //TODO check
+    //let flagPerio4Counting          = false; //TODO check
+    //let flagPeriodBackCounting      = false; //TODO check
+    let flagDisplayPeriodCount      = false;
+    let flagToroidBoard             = false;
+    let flagTickLoop                = false;
+    let flagDefaultClickRule        = false;
 
-    var currentGameClickRule    = null;
-    var currentGameBoard        = null;
-    var currentGameSolution     = null;
-    var currentGameStability    = null;
-    var currentGameLitStability = null;
+    let currentGameClickRule    = null;
+    let currentGameBoard        = null;
+    let currentGameSolution     = null;
+    let currentGameStability    = null;
+    let currentGameLitStability = null;
 
-    var currentCellSize = 20;
+    let currentCellSize = 20;
 
-    var currentClickRuleSize = 3;
-    var currentGameSize      = 15;
-    var currentDomainSize    = 2;
+    let currentClickRuleSize = 3;
+    let currentGameSize      = 15;
+    let currentDomainSize    = 2;
 
-    var currentColorLit     = [0.0, 1.0, 0.0, 1.0];
-    var currentColorUnlit   = [0.0, 0.0, 0.0, 1.0];
-    var currentColorSolved  = [0.0, 0.0, 1.0, 1.0];
-    var currentColorBetween = [0.0, 0.0, 0.0, 1.0];
+    let currentColorLit     = [0.0, 1.0, 0.0, 1.0];
+    let currentColorUnlit   = [0.0, 0.0, 0.0, 1.0];
+    let currentColorSolved  = [0.0, 0.0, 1.0, 1.0];
+    let currentColorBetween = [0.0, 0.0, 0.0, 1.0];
 
-    var currentWorkingMode  = workingModes.LIT_BOARD;
+    let currentWorkingMode  = workingModes.LIT_BOARD;
 
-    var currentSolutionMatrix = [];
+    let currentSolutionMatrix = [];
 
-    var currentSolutionMatrixRelevant = false;
+    let currentSolutionMatrixRelevant = false;
 
-    var currentQuietPatterns = 0;
+    let currentQuietPatterns = 0;
 
-    var currentTurnList = [];
+    let currentTurnList = [];
 
-    var eigvecTurnX = -1;
-    var eigvecTurnY = -1;
+    //TODO check
+    //let eigvecTurnX = -1;
+    //let eigvecTurnY = -1;
 
-    var currentPeriodCount = 0;
+    let currentPeriodCount = 0;
 
-    var currentShaderProgram = null;
+    let currentShaderProgram = null;
 
-    var squaresShaderProgram = null;
+    let squaresShaderProgram = null;
+    let circlesShaderProgram = null;
 
-    var boardTexture     = null;
-    var solutionTexture  = null;
-    var stabilityTexture = null;
+    let boardTexture     = null;
+    let solutionTexture  = null;
+    let stabilityTexture = null;
 
-    var boardTextureUniformLocation     = null;
-    var solutionTextureUniformLocation  = null;
-    var stabilityTextureUniformLocation = null;
+    let boardTextureUniformLocation     = null;
+    let solutionTextureUniformLocation  = null;
+    let stabilityTextureUniformLocation = null;
 
-    var boardSizeUniformLocation  = null;
-    var cellSizeUniformLocation   = null;
-    var domainSizeUniformLocation = null;
-    var flagsUniformLocation      = null;
+    let boardSizeUniformLocation  = null;
+    let cellSizeUniformLocation   = null;
+    let domainSizeUniformLocation = null;
+    let flagsUniformLocation      = null;
 
-    var canvasWidthUniformLocation     = null;
-    var canvasHeightUniformLocation    = null;
-    var viewportXOffsetUniformLocation = null;
-    var viewportYOffsetUniformLocation = null;
+    let canvasWidthUniformLocation     = null;
+    let canvasHeightUniformLocation    = null;
+    let viewportXOffsetUniformLocation = null;
+    let viewportYOffsetUniformLocation = null;
 
-    var colorNoneUniformLocation    = null;
-    var colorEnabledUniformLocation = null;
-    var colorSolvedUniformLocation  = null;
-    var colorBetweenUniformLocation = null;
+    let colorNoneUniformLocation    = null;
+    let colorEnabledUniformLocation = null;
+    let colorSolvedUniformLocation  = null;
+    let colorBetweenUniformLocation = null;
 
-    var drawVertexBuffer = null; //Still don't know about WebGL gl_VertexID support :/
+    let drawVertexBuffer = null; //Still don't know about WebGL gl_VertexID support :/
 
-    var drawVertexBufferAttribLocation = null;
+    let drawVertexBufferAttribLocation = null;
 
     enableDefaultClickRule();
 
@@ -391,13 +419,14 @@ function main()
         currentTurnList.length = 0;
         flagRandomSolving = false;
 
-        eigvecTurnX = -1;
-        eigvecTurnY = -1;
+        //eigvecTurnX = -1;
+        //eigvecTurnY = -1;
 
         currentGameSize = clamp(newSize, minimumBoardSize, maximumBoardSize);
         currentSolutionMatrixRelevant = false;
+        flagSolutionMatrixComputing   = false;
 
-        qpText.textContent = "Quiet patterns: "
+        qpText.textContent = "Quiet patterns: ";
 
         if(currentWorkingMode === workingModes.LIT_BOARD)
         {
@@ -441,11 +470,13 @@ function main()
         currentTurnList.length = 0;
         flagRandomSolving = false;
 
-        eigvecTurnX = -1;
-        eigvecTurnY = -1;
+        //TODO
+        //eigvecTurnX = -1;
+        //eigvecTurnY = -1;
 
         currentDomainSize = clamp(newSize, minimumDomainSize, maximumDomainSize);
         currentSolutionMatrixRelevant = false;
+        flagSolutionMatrixComputing   = false;
 
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
         enableDefaultClickRule();
@@ -461,11 +492,11 @@ function main()
             return;
         }
 
-        var stepX = Math.floor((standardWidth  + 1) / currentGameSize);
-        var stepY = Math.floor((standardHeight + 1) / currentGameSize);
+        let stepX = Math.floor((standardWidth  + 1) / currentGameSize);
+        let stepY = Math.floor((standardHeight + 1) / currentGameSize);
 
-        var modX = Math.floor(x / stepX);
-        var modY = Math.floor(y / stepY);
+        let modX = Math.floor(x / stepX);
+        let modY = Math.floor(y / stepY);
 
         if(currentWorkingMode === workingModes.LIT_BOARD)
         {
@@ -512,8 +543,8 @@ function main()
 
     function enableDefaultClickRule()
     {   
-        var clickRuleValues = [0, 1, 0,
-                               1, 1, 1,
+        let clickRuleValues = [0, 1, 0, //eslint-disable-next-line indent
+                               1, 1, 1, //eslint-disable-next-line indent
                                0, 1, 0];
 
         currentClickRuleSize = 3;
@@ -522,12 +553,13 @@ function main()
         flagToroidBoard               = false;
         flagDefaultClickRule          = true;
         currentSolutionMatrixRelevant = false;
+        flagSolutionMatrixComputing   = false;
     }
 
     function enableDefaultToroidClickRule()
     {   
-        var clickRuleValues = [0, 1, 0,
-                               1, 1, 1,
+        let clickRuleValues = [0, 1, 0, // eslint-disable-next-line indent
+                               1, 1, 1, // eslint-disable-next-line indent
                                0, 1, 0];
 
         currentClickRuleSize = 3;
@@ -536,6 +568,7 @@ function main()
         flagToroidBoard               = true;
         flagDefaultClickRule          = true;
         currentSolutionMatrixRelevant = false;
+        flagSolutionMatrixComputing   = false;
     }
 
     function resetCountedBoard()
@@ -552,12 +585,12 @@ function main()
     function calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid)
     {
         //Generate a normal Lights Out matrix for the click rule
-        var lightsOutMatrix = [];
-        for(var yL = 0; yL < gameSize; yL++)
+        let lightsOutMatrix = [];
+        for(let yL = 0; yL < gameSize; yL++)
         {
-            for(var xL = 0; xL < gameSize; xL++)
+            for(let xL = 0; xL < gameSize; xL++)
             {
-                var matrixRow;
+                let matrixRow;
                 if(isToroid)
                 {
                     matrixRow = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, xL, yL);
@@ -576,49 +609,64 @@ function main()
 
     function calculateSolutionMatrix(clickRule, gameSize, domainSize, clickRuleSize, isToroid)
     {
-        var lightsOutMatrix = calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid);
+        let lightsOutMatrix = calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid);
 
         //Generate a unit matrix. This will eventually become an inverse matrix
-        var invMatrix = [];
-        for(var yI = 0; yI < currentGameSize; yI++)
+        let invMatrix = [];
+        for(let yI = 0; yI < currentGameSize; yI++)
         {
-            for(var xI = 0; xI < currentGameSize; xI++)
+            for(let xI = 0; xI < currentGameSize; xI++)
             {
-                var invMatrixRow = new Uint8Array(gameSize * gameSize);
+                if(!flagSolutionMatrixComputing)
+                {
+                    return {invmatrix: null, quietpats: null};
+                }
+
+                let invMatrixRow = new Uint8Array(gameSize * gameSize);
                 invMatrixRow.fill(0);
 
-                var cellIndex = cellIndexFromPoint(gameSize, xI, yI);
+                let cellIndex = cellIndexFromPoint(gameSize, xI, yI);
                 invMatrixRow[cellIndex] = 1;
 
                 invMatrix.push(invMatrixRow);
             }
         }
 
-        var domainInvs = []; //For optimisation, cache 1/k numbers in the domain
-        for(var d = 0; d < domainSize; d++)
+        let domainInvs = []; //For optimization, cache 1/k numbers in the domain
+        for(let d = 0; d < domainSize; d++)
         {
             domainInvs.push(invModGcdEx(d, domainSize));
         }
         
-        var matrixSize = gameSize * gameSize;
-        for(var iD = 0; iD < matrixSize; iD++)
+        let matrixSize = gameSize * gameSize;
+        for(let iD = 0; iD < matrixSize; iD++)
         {
-            var thisValD = lightsOutMatrix[iD][iD];
-            var compValD = lightsOutMatrix[iD][iD];
+            if(!flagSolutionMatrixComputing)
+            {
+                return {invmatrix: null, quietpats: null};
+            }
+
+            let thisValD = lightsOutMatrix[iD][iD];
+            let compValD = lightsOutMatrix[iD][iD];
             if(domainInvs[compValD] === 0 || (thisValD !== 1 && domainSize % thisValD === 0))
             {
-                for(var jSw = iD + 1; jSw < matrixSize; jSw++)
+                for(let jSw = iD + 1; jSw < matrixSize; jSw++)
                 {
+                    if(!flagSolutionMatrixComputing)
+                    {
+                        return {invmatrix: null, quietpats: null};
+                    }
+
                     compValD = lightsOutMatrix[jSw][iD];
                     if(domainInvs[compValD] !== 0)
                     {
                         thisValD = compValD;
                         
-                        var tmpMatrixRow     = lightsOutMatrix[iD];
+                        let tmpMatrixRow     = lightsOutMatrix[iD];
                         lightsOutMatrix[iD]  = lightsOutMatrix[jSw];
                         lightsOutMatrix[jSw] = tmpMatrixRow;
 
-                        var tmpInvMatrixRow = invMatrix[iD];
+                        let tmpInvMatrixRow = invMatrix[iD];
                         invMatrix[iD]       = invMatrix[jSw];
                         invMatrix[jSw]      = tmpInvMatrixRow;
 
@@ -627,9 +675,14 @@ function main()
                 }
             }
 
-            var invThisValD = domainInvs[thisValD];
-            for(var jD = iD + 1; jD < matrixSize; jD++)
+            let invThisValD = domainInvs[thisValD];
+            for(let jD = iD + 1; jD < matrixSize; jD++)
             {
+                if(!flagSolutionMatrixComputing)
+                {
+                    return {invmatrix: null, quietpats: null};
+                }
+
                 compValD = lightsOutMatrix[jD][iD];
                 if(domainInvs[compValD] !== 0)
                 {
@@ -639,15 +692,20 @@ function main()
             }
         }
 
-        var quietPatterns = 0;
-        for(var iU = matrixSize - 1; iU >= 0; iU--)
+        let quietPatterns = 0;
+        for(let iU = matrixSize - 1; iU >= 0; iU--)
         {
-            var thisValU    = lightsOutMatrix[iU][iU];
-            var invThisValU = domainInvs[thisValU];
+            let thisValU    = lightsOutMatrix[iU][iU];
+            let invThisValU = domainInvs[thisValU];
 
-            for(var jU = iU - 1; jU >= 0; jU--)
+            for(let jU = iU - 1; jU >= 0; jU--)
             {
-                var compValU = lightsOutMatrix[jU][iU];
+                if(!flagSolutionMatrixComputing)
+                {
+                    return {invmatrix: null, quietpats: null};
+                }
+
+                let compValU = lightsOutMatrix[jU][iU];
                 if(domainInvs[compValU] !== 0)
                 {
                     lightsOutMatrix[jU] = mulSubBoard(lightsOutMatrix[jU], lightsOutMatrix[iU], invThisValU * compValU, domainSize);
@@ -667,11 +725,16 @@ function main()
             }
         }
 
-        for(var i = 0; i < matrixSize; i++) //Transpose for the case of non-symmetrical click rules
+        for(let i = 0; i < matrixSize; i++) //Transpose for the case of non-symmetrical click rules
         {
-            for(var j = 0; j < i; j++)
+            for(let j = 0; j < i; j++)
             {
-                var temp        = invMatrix[i][j];
+                if(!flagSolutionMatrixComputing)
+                {
+                    return {invmatrix: null, quietpats: null};
+                }
+
+                let temp        = invMatrix[i][j];
                 invMatrix[i][j] = invMatrix[j][i];
                 invMatrix[j][i] = temp;
             }
@@ -682,14 +745,14 @@ function main()
 
     function calculateSolution()
     {
-        var solution = new Uint8Array(currentGameSize * currentGameSize);
+        let solution = new Uint8Array(currentGameSize * currentGameSize);
 
-        for(var y = 0; y < currentGameSize; y++)
+        for(let y = 0; y < currentGameSize; y++)
         {
-            for (var x = 0; x < currentGameSize; x++)
+            for (let x = 0; x < currentGameSize; x++)
             {
-                var cellIndex = cellIndexFromPoint(currentGameSize, x, y);
-                var matrixRow = currentSolutionMatrix[cellIndex];
+                let cellIndex = cellIndexFromPoint(currentGameSize, x, y);
+                let matrixRow = currentSolutionMatrix[cellIndex];
 
                 solution[cellIndex] = dotProductBoard(currentGameBoard, matrixRow, currentDomainSize);
             }
@@ -701,10 +764,10 @@ function main()
 
     function calculateInverseSolution() //Operates on currentGameBoard
     {
-        var invSolution = new Uint8Array(currentGameSize * currentGameSize);
+        let invSolution = new Uint8Array(currentGameSize * currentGameSize);
         invSolution.fill(0);
 
-        var turns = buildTurnList(currentGameBoard, currentGameSize);
+        let turns = buildTurnList(currentGameBoard, currentGameSize);
         if(flagDefaultClickRule)
         {
             invSolution = makeTurnsDefault(invSolution, currentGameSize, currentDomainSize, turns, flagToroidBoard);
@@ -717,17 +780,20 @@ function main()
         return invSolution;
     }
 
-    function updateSolutionMatrixIfNeeded()
+    async function updateSolutionMatrixIfNeeded()
     {
         if(!currentSolutionMatrixRelevant)
         {
-            solutionMatrixRes     = calculateSolutionMatrix(currentGameClickRule, currentGameSize, currentDomainSize, currentClickRuleSize, flagToroidBoard);
+            flagSolutionMatrixComputing = true;
+
+            let solutionMatrixRes = calculateSolutionMatrix(currentGameClickRule, currentGameSize, currentDomainSize, currentClickRuleSize, flagToroidBoard);
             currentSolutionMatrix = solutionMatrixRes.invmatrix;
             currentQuietPatterns  = solutionMatrixRes.quietpats;
 
             qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
 
             currentSolutionMatrixRelevant = true;
+            flagSolutionMatrixComputing   = false;
         }
     }
 
@@ -899,7 +965,7 @@ function main()
             showSolution(false);
             showInverseSolution(false);
 
-            var modeBgen = boardGenModes.BOARDGEN_ONE_ELEMENT;
+            let modeBgen = boardGenModes.BOARDGEN_ONE_ELEMENT;
             switch(resetMode)
             {
             case resetModes.RESET_ONE:
@@ -950,22 +1016,22 @@ function main()
 
     function generateNewBoard(gameSize, domainSize, bgenMode)
     {
-        var generatedBoard = new Uint8Array(gameSize * gameSize);
+        let generatedBoard = new Uint8Array(gameSize * gameSize);
 
-        var minVal = 0;
-        var maxVal = domainSize - 1;
+        let minVal = 0;
+        let maxVal = domainSize - 1;
 
-        for(var y = 0; y < gameSize; y++) 
+        for(let y = 0; y < gameSize; y++) 
         {
-            for(var x = 0; x < gameSize; x++)
+            for(let x = 0; x < gameSize; x++)
             {
-                var cellNumber = y * gameSize + x;
+                let cellNumber = y * gameSize + x;
 
                 switch (bgenMode)
                 {
                 case boardGenModes.BOARDGEN_FULL_RANDOM:
                 {
-                    var randomCellValue = minVal + Math.floor(Math.random() * (maxVal - minVal + 1));
+                    let randomCellValue = minVal + Math.floor(Math.random() * (maxVal - minVal + 1));
                     generatedBoard[cellNumber] = randomCellValue;
                     break;
                 }
@@ -1021,7 +1087,7 @@ function main()
                         generatedBoard[cellNumber] = minVal;
                     }
                     break;
-				}
+                }
                 }
             }
         }
@@ -1036,9 +1102,9 @@ function main()
             return;
         }
 
-        flagPeriodCounting     = false;
-        flagPeriodBackCounting = false;
-        flagPerio4Counting     = false;
+        //flagPeriodCounting     = false;
+        //flagPeriodBackCounting = false;
+        //flagPerio4Counting     = false;
         flagDisplayPeriodCount = false;
 
         showSolution(false);
@@ -1059,17 +1125,17 @@ function main()
         }
         case countingModes.COUNT_SOLUTION_PERIOD:
         {
-            flagPeriodCounting = true;
+            //flagPeriodCounting = true;
             break;
         }
         case countingModes.COUNT_SOLUTION_PERIOD_4X:
         {
-            flagPerio4Counting = true;
+            //flagPerio4Counting = true;
             break;
         }
         case countingModes.COUNT_INVERSE_SOLUTION_PERIOD:
         {
-            flagPeriodBackCounting = true;
+            //flagPeriodBackCounting = true;
             break;
         }
         }
@@ -1082,14 +1148,14 @@ function main()
 
     function buildTurnList(board, gameSize)
     {
-        turnList = [];
+        let turnList = [];
 
-        for(var y = 0; y < gameSize; y++)
+        for(let y = 0; y < gameSize; y++)
         {
-            for(var x = 0; x < gameSize; x++)
+            for(let x = 0; x < gameSize; x++)
             {
-                var cellIndex = cellIndexFromPoint(gameSize, x, y);
-                for(var i = 0; i < board[cellIndex]; i++)
+                let cellIndex = cellIndexFromPoint(gameSize, x, y);
+                for(let i = 0; i < board[cellIndex]; i++)
                 {
                     turnList.push({cellX: x, cellY: y});
                 }
@@ -1103,21 +1169,21 @@ function main()
     {
         if(isToroid)
         {
-            var populatedClickRuleT = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cellY);
+            let populatedClickRuleT = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cellY);
             return addBoard(board, populatedClickRuleT, domainSize);
         }
         else
         {
-            var populatedClickRuleP = populateClickRulePlane(clickRule, clickRuleSize, gameSize, cellX, cellY);
+            let populatedClickRuleP = populateClickRulePlane(clickRule, clickRuleSize, gameSize, cellX, cellY);
             return addBoard(board, populatedClickRuleP, domainSize);
         }
     }
 
     function makeConstructTurn(board, gameSize, domainSize, cellX, cellY)
     {
-        var resBoard = new Uint8Array(board);
+        let resBoard = new Uint8Array(board);
 
-        var cellIndex = cellIndexFromPoint(gameSize, cellX, cellY);
+        let cellIndex = cellIndexFromPoint(gameSize, cellX, cellY);
         resBoard[cellIndex] = (board[cellIndex] + 1) % domainSize;
 
         return resBoard;
@@ -1125,17 +1191,17 @@ function main()
 
     function makeTurns(board, clickRule, clickRuleSize, gameSize, domainSize, turns, isToroid) //Fast in-place version without populating click rules
     {
-        var newBoard = board.slice();
+        let newBoard = board.slice();
 
-        var clickSizeHalf = Math.floor(clickRuleSize / 2);
-        for(var t = 0; t < turns.length; t++)
+        let clickSizeHalf = Math.floor(clickRuleSize / 2);
+        for(let t = 0; t < turns.length; t++)
         {
-            var left = turns[t].cellX - clickSizeHalf;
-            var top  = turns[t].cellY - clickSizeHalf;
+            let left = turns[t].cellX - clickSizeHalf;
+            let top  = turns[t].cellY - clickSizeHalf;
 
-            for(var y = 0; y < clickRuleSize; y++)
+            for(let y = 0; y < clickRuleSize; y++)
             {
-                var yBig = y + top;
+                let yBig = y + top;
                 if(!isToroid)
                 {
                     if(yBig < 0 || yBig >= gameSize)
@@ -1145,12 +1211,12 @@ function main()
                 }
                 else
                 {
-                    yBig = wholeMod(yBig, gameSize)
+                    yBig = wholeMod(yBig, gameSize);
                 }
 
-                for(var x = 0; x < clickRuleSize; x++)
+                for(let x = 0; x < clickRuleSize; x++)
                 {
-                    var xBig = x + left;
+                    let xBig = x + left;
                     if(!isToroid)
                     {
                         if(xBig < 0 || xBig >= gameSize)
@@ -1163,8 +1229,8 @@ function main()
                         xBig = wholeMod(xBig, gameSize);
                     }
 
-                    var bigClickIndex = cellIndexFromPoint(gameSize, xBig, yBig);
-                    var smlClickIndex = cellIndexFromPoint(clickRuleSize, x, y);
+                    let bigClickIndex = cellIndexFromPoint(gameSize, xBig, yBig);
+                    let smlClickIndex = cellIndexFromPoint(clickRuleSize, x, y);
 
                     newBoard[bigClickIndex] = (newBoard[bigClickIndex] + clickRule[smlClickIndex]) % domainSize;
                 }
@@ -1176,24 +1242,24 @@ function main()
 
     function makeTurnsDefault(board, gameSize, domainSize, turns, isToroid) //Fast in-place version without populating click rules. Default click rule version
     {
-        var newBoard = board.slice();
+        let newBoard = board.slice();
 
         if(isToroid)
         {
-            for(var t = 0; t < turns.length; t++)
+            for(let t = 0; t < turns.length; t++)
             {
-                var turn = turns[t];
+                let turn = turns[t];
 
-                var leftX   = wholeMod(turn.cellX - 1, gameSize);
-                var rightX  = wholeMod(turn.cellX + 1, gameSize);
-                var topY    = wholeMod(turn.cellY - 1, gameSize);
-                var bottomY = wholeMod(turn.cellY + 1, gameSize);
+                let leftX   = wholeMod(turn.cellX - 1, gameSize);
+                let rightX  = wholeMod(turn.cellX + 1, gameSize);
+                let topY    = wholeMod(turn.cellY - 1, gameSize);
+                let bottomY = wholeMod(turn.cellY + 1, gameSize);
 
-                var thisCellIndex   = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY);
-                var leftCellIndex   = cellIndexFromPoint(gameSize,      leftX, turn.cellY);
-                var rightCellIndex  = cellIndexFromPoint(gameSize,     rightX, turn.cellY);
-                var topCellIndex    = cellIndexFromPoint(gameSize, turn.cellX,       topY);
-                var bottomCellIndex = cellIndexFromPoint(gameSize, turn.cellX,    bottomY);
+                let thisCellIndex   = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY);
+                let leftCellIndex   = cellIndexFromPoint(gameSize,      leftX, turn.cellY);
+                let rightCellIndex  = cellIndexFromPoint(gameSize,     rightX, turn.cellY);
+                let topCellIndex    = cellIndexFromPoint(gameSize, turn.cellX,       topY);
+                let bottomCellIndex = cellIndexFromPoint(gameSize, turn.cellX,    bottomY);
 
                 newBoard[thisCellIndex]   = (newBoard[thisCellIndex]   + 1) % domainSize;
                 newBoard[leftCellIndex]   = (newBoard[leftCellIndex]   + 1) % domainSize;
@@ -1204,34 +1270,34 @@ function main()
         }
         else
         {
-            for(var t = 0; t < turns.length; t++)
+            for(let t = 0; t < turns.length; t++)
             {
-                var turn = turns[t];
+                let turn = turns[t];
 
-                var thisCellIndex       = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY);
+                let thisCellIndex       = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY);
                 newBoard[thisCellIndex] = (newBoard[thisCellIndex] + 1) % domainSize;
 
                 if(turn.cellX > 0)
                 {
-                    var leftCellIndex       = cellIndexFromPoint(gameSize, turn.cellX - 1, turn.cellY);
+                    let leftCellIndex       = cellIndexFromPoint(gameSize, turn.cellX - 1, turn.cellY);
                     newBoard[leftCellIndex] = (newBoard[leftCellIndex] + 1) % domainSize;
                 }
 
                 if(turn.cellX < gameSize - 1)
                 {
-                    var rightCellIndex       = cellIndexFromPoint(gameSize, turn.cellX + 1, turn.cellY);
+                    let rightCellIndex       = cellIndexFromPoint(gameSize, turn.cellX + 1, turn.cellY);
                     newBoard[rightCellIndex] = (newBoard[rightCellIndex] + 1) % domainSize;
                 }
 
                 if(turn.cellY > 0)
                 {
-                    var topCellIndex       = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY - 1);
+                    let topCellIndex       = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY - 1);
                     newBoard[topCellIndex] = (newBoard[topCellIndex] + 1) % domainSize;
                 }
 
                 if(turn.cellY < gameSize - 1)
                 {
-                    var bottomCellIndex       = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY + 1);
+                    let bottomCellIndex       = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY + 1);
                     newBoard[bottomCellIndex] = (newBoard[bottomCellIndex] + 1) % domainSize;
                 }
             }
@@ -1242,32 +1308,32 @@ function main()
 
     function populateClickRulePlane(clickRule, clickRuleSize, gameSize, cellX, cellY)
     {
-        var populatedClickRule = new Uint8Array(gameSize * gameSize);
+        let populatedClickRule = new Uint8Array(gameSize * gameSize);
         populatedClickRule.fill(0);
 
-        var clickSizeHalf = Math.floor(clickRuleSize / 2);
+        let clickSizeHalf = Math.floor(clickRuleSize / 2);
 
-        var left = cellX - clickSizeHalf;
-        var top  = cellY - clickSizeHalf;
+        let left = cellX - clickSizeHalf;
+        let top  = cellY - clickSizeHalf;
         
-        for(var y = 0; y < clickRuleSize; y++)
+        for(let y = 0; y < clickRuleSize; y++)
         {
-            var yBig = y + top;
+            let yBig = y + top;
             if(yBig < 0 || yBig >= gameSize)
             {
                 continue;
             }
 
-            for(var x = 0; x < clickRuleSize; x++)
+            for(let x = 0; x < clickRuleSize; x++)
             {
-                var xBig = x + left;
+                let xBig = x + left;
                 if(xBig < 0 || xBig >= gameSize)
                 {
                     continue;
                 }
 
-                var bigClickIndex = cellIndexFromPoint(gameSize, xBig, yBig);
-                var smlClickIndex = cellIndexFromPoint(clickRuleSize, x, y);
+                let bigClickIndex = cellIndexFromPoint(gameSize, xBig, yBig);
+                let smlClickIndex = cellIndexFromPoint(clickRuleSize, x, y);
 
                 populatedClickRule[bigClickIndex] = clickRule[smlClickIndex];
             }
@@ -1278,26 +1344,26 @@ function main()
 
     function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cellY)
     {
-        var populatedClickRule = new Uint8Array(gameSize * gameSize);
+        let populatedClickRule = new Uint8Array(gameSize * gameSize);
         populatedClickRule.fill(0);
 
-        var clickSizeHalf = Math.floor(clickRuleSize / 2);
+        let clickSizeHalf = Math.floor(clickRuleSize / 2);
 
-        var left = cellX - clickSizeHalf;
-        var top  = cellY - clickSizeHalf;
+        let left = cellX - clickSizeHalf;
+        let top  = cellY - clickSizeHalf;
         
-        for(var y = 0; y < clickRuleSize; y++)
+        for(let y = 0; y < clickRuleSize; y++)
         {
-            var yBig    = y + top;
-            var yBigMod = wholeMod(yBig, gameSize);
+            let yBig    = y + top;
+            let yBigMod = wholeMod(yBig, gameSize);
 
-            for(var x = 0; x < clickRuleSize; x++)
+            for(let x = 0; x < clickRuleSize; x++)
             {
-                var xBig    = x + left;
-                var xBigMod = wholeMod(xBig, gameSize); 
+                let xBig    = x + left;
+                let xBigMod = wholeMod(xBig, gameSize); 
 
-                var bigClickIndex = cellIndexFromPoint(gameSize, xBigMod, yBigMod);
-                var smlClickIndex = cellIndexFromPoint(clickRuleSize, x, y);
+                let bigClickIndex = cellIndexFromPoint(gameSize, xBigMod, yBigMod);
+                let smlClickIndex = cellIndexFromPoint(clickRuleSize, x, y);
 
                 populatedClickRule[bigClickIndex] = clickRule[smlClickIndex];
             }
@@ -1308,15 +1374,15 @@ function main()
 
     function moveBoardLeft(board, gameSize)
     {
-        var resBoard = new Uint8Array(board.length);
-        for(var y = 0; y < gameSize; y++)
+        let resBoard = new Uint8Array(board.length);
+        for(let y = 0; y < gameSize; y++)
         {
-            for (var x = 0; x < gameSize; x++)
+            for (let x = 0; x < gameSize; x++)
             {
-                var leftX = wholeMod(x - 1, gameSize);
+                let leftX = wholeMod(x - 1, gameSize);
 
-                var cellIndex     = cellIndexFromPoint(gameSize, x,     y);
-                var cellIndexLeft = cellIndexFromPoint(gameSize, leftX, y);
+                let cellIndex     = cellIndexFromPoint(gameSize, x,     y);
+                let cellIndexLeft = cellIndexFromPoint(gameSize, leftX, y);
 
                 resBoard[cellIndexLeft] = board[cellIndex];
             }
@@ -1327,15 +1393,15 @@ function main()
 
     function moveBoardRight(board, gameSize)
     {
-        var resBoard = new Uint8Array(board.length);
-        for(var y = 0; y < gameSize; y++)
+        let resBoard = new Uint8Array(board.length);
+        for(let y = 0; y < gameSize; y++)
         {
-            for (var x = 0; x < gameSize; x++)
+            for (let x = 0; x < gameSize; x++)
             {
-                var rightX = wholeMod(x + 1, gameSize);
+                let rightX = wholeMod(x + 1, gameSize);
 
-                var cellIndex      = cellIndexFromPoint(gameSize, x,      y);
-                var cellIndexRight = cellIndexFromPoint(gameSize, rightX, y);
+                let cellIndex      = cellIndexFromPoint(gameSize, x,      y);
+                let cellIndexRight = cellIndexFromPoint(gameSize, rightX, y);
 
                 resBoard[cellIndexRight] = board[cellIndex];
             }
@@ -1346,15 +1412,15 @@ function main()
 
     function moveBoardUp(board, gameSize)
     {
-        var resBoard = new Uint8Array(board.length);
-        for(var y = 0; y < gameSize; y++)
+        let resBoard = new Uint8Array(board.length);
+        for(let y = 0; y < gameSize; y++)
         {
-            for (var x = 0; x < gameSize; x++)
+            for (let x = 0; x < gameSize; x++)
             {
-                var upY = wholeMod(y - 1, gameSize);
+                let upY = wholeMod(y - 1, gameSize);
 
-                var cellIndex   = cellIndexFromPoint(gameSize, x, y  );
-                var cellIndexUp = cellIndexFromPoint(gameSize, x, upY);
+                let cellIndex   = cellIndexFromPoint(gameSize, x, y  );
+                let cellIndexUp = cellIndexFromPoint(gameSize, x, upY);
 
                 resBoard[cellIndexUp] = board[cellIndex];
             }
@@ -1365,15 +1431,15 @@ function main()
 
     function moveBoardDown(board, gameSize)
     {
-        var resBoard = new Uint8Array(board.length);
-        for(var y = 0; y < gameSize; y++)
+        let resBoard = new Uint8Array(board.length);
+        for(let y = 0; y < gameSize; y++)
         {
-            for (var x = 0; x < gameSize; x++)
+            for (let x = 0; x < gameSize; x++)
             {
-                var downY = wholeMod(y + 1, gameSize);
+                let downY = wholeMod(y + 1, gameSize);
 
-                var cellIndex     = cellIndexFromPoint(gameSize, x, y    );
-                var cellIndexDown = cellIndexFromPoint(gameSize, x, downY);
+                let cellIndex     = cellIndexFromPoint(gameSize, x, y    );
+                let cellIndexDown = cellIndexFromPoint(gameSize, x, downY);
 
                 resBoard[cellIndexDown] = board[cellIndex];
             }
@@ -1384,8 +1450,8 @@ function main()
 
     function inverseBoard(board, domainSize)
     {
-        var resBoard = new Uint8Array(board.length);
-        for(var i = 0; i < board.length; i++)
+        let resBoard = new Uint8Array(board.length);
+        for(let i = 0; i < board.length; i++)
         {
             resBoard[i] = (board[i] + 1) % domainSize;
         }
@@ -1400,8 +1466,8 @@ function main()
             return board;
         }
 
-        var resBoard = new Uint8Array(board.length);
-        for(var i = 0; i < board.length; i++)
+        let resBoard = new Uint8Array(board.length);
+        for(let i = 0; i < board.length; i++)
         {
             resBoard[i] = (domainSize - board[i]) % domainSize;
         }
@@ -1416,10 +1482,10 @@ function main()
             return board;
         }
 
-        var resBoard = new Uint8Array(boardLeft.length);
-        for(var i = 0; i < board.length; i++)
+        let resBoard = new Uint8Array(board.length);
+        for(let i = 0; i < board.length; i++)
         {
-            var boardValue = board[i];
+            let boardValue = board[i];
             if(boardValue > 0)
             {
                 boardValue = (domainSize - boardValue) % domainSize;
@@ -1438,8 +1504,8 @@ function main()
             return boardLeft;
         }
 
-        var resBoard = new Uint8Array(boardLeft.length);
-        for(var i = 0; i < boardLeft.length; i++)
+        let resBoard = new Uint8Array(boardLeft.length);
+        for(let i = 0; i < boardLeft.length; i++)
         {
             resBoard[i] = (boardLeft[i] + boardRight[i]) % domainSize;
         }
@@ -1454,8 +1520,8 @@ function main()
             return board;
         }
 
-        var resBoard = new Uint8Array(board.length);
-        for(var i = 0; i < board.length; i++)
+        let resBoard = new Uint8Array(board.length);
+        for(let i = 0; i < board.length; i++)
         {
             resBoard[i] = (board[i] * mulValue) % domainSize;
         }
@@ -1470,8 +1536,8 @@ function main()
             return boardLeft;
         }
 
-        var resBoard = new Uint8Array(boardLeft.length);
-        for(var i = 0; i < resBoard.length; i++)
+        let resBoard = new Uint8Array(boardLeft.length);
+        for(let i = 0; i < resBoard.length; i++)
         {
             resBoard[i] = wholeMod(boardLeft[i] - mulValue * boardRight[i], domainSize);
         }
@@ -1486,8 +1552,8 @@ function main()
             return board;
         }
 
-        var resBoard = new Uint8Array(board.length);
-        for(var i = 0; i < board.length; i++)
+        let resBoard = new Uint8Array(board.length);
+        for(let i = 0; i < board.length; i++)
         {
             if(boardCompLeft[i] === boardCompRight[i])
             {
@@ -1509,8 +1575,8 @@ function main()
             return 0;
         }
 
-        var sum = 0;
-        for(var i = 0; i < boardLeft.length; i++)
+        let sum = 0;
+        for(let i = 0; i < boardLeft.length; i++)
         {
             sum += boardLeft[i] * boardRight[i];
         }
@@ -1635,15 +1701,20 @@ function main()
     {
         switch(renderMode)
         {
-            case renderModes.RENDER_SQUARES:
-            {
-                currentShaderProgram = squaresShaderProgram;
-                break;
-            }
-            default:
-            {
-                break;
-            }
+        case renderModes.RENDER_SQUARES:
+        {
+            currentShaderProgram = squaresShaderProgram;
+            break;
+        }
+        case renderModes.RENDER_CIRCLES:
+        {
+            currentShaderProgram = circlesShaderProgram;
+            break;
+        }
+        default:
+        {
+            break;
+        }
         }
 
         boardSizeUniformLocation  = gl.getUniformLocation(currentShaderProgram, "gBoardSize");
@@ -1667,12 +1738,12 @@ function main()
                
         drawVertexBufferAttribLocation = gl.getAttribLocation(currentShaderProgram, "vScreenPos");
 
-        const posArray = new Float32Array([-1.0,  1.0, 0.0, 1.0,
-                                            1.0,  1.0, 0.0, 1.0,
-                                           -1.0, -1.0, 0.0, 1.0,
+        const posArray = new Float32Array([-1.0,  1.0, 0.0, 1.0, // eslint-disable-next-line indent
+                                            1.0,  1.0, 0.0, 1.0, // eslint-disable-next-line indent
+                                           -1.0, -1.0, 0.0, 1.0, // eslint-disable-next-line indent
                                             1.0, -1.0, 0.0, 1.0]);
 
-        var posBuffer = gl.createBuffer();
+        let posBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, posArray, gl.STATIC_DRAW);
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
@@ -1685,6 +1756,8 @@ function main()
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
         gl.bindVertexArray(null);
+
+        requestRedraw();
     }
 
     function updateViewport()
@@ -1696,10 +1769,10 @@ function main()
     {
         if(currentTurnList.length !== 0)
         {
-            var turn = (-1, -1);
+            let turn = (-1, -1);
             if(flagRandomSolving)
             {
-                var randomIndex = Math.floor(Math.random() * currentTurnList.length);
+                let randomIndex = Math.floor(Math.random() * currentTurnList.length);
 
                 turn                                        = currentTurnList[randomIndex];
                 currentTurnList[randomIndex]                = currentTurnList[currentTurnList.length - 1];
@@ -1742,7 +1815,7 @@ function main()
 
     function createTextures()
     {
-        var emptyTexData = new Uint8Array(maximumBoardSize * maximumBoardSize);
+        let emptyTexData = new Uint8Array(maximumBoardSize * maximumBoardSize);
         emptyTexData.fill(0);
 
         boardTexture     = gl.createTexture();
@@ -1776,14 +1849,226 @@ function main()
 
     function createShaders()
     {
-        var vsSource = document.getElementById("vertexShader").text;
+        const vsSource = 
+        `#version 300 es
 
-        var squaresFsSource = document.getElementById("fragmentShaderSquares").text;
+        layout(location = 0) in mediump vec4 vScreenPos;
+        void main(void)
+        {
+            gl_Position = vScreenPos;
+        }
+        `;
 
-        vsSource        = trimStringLeft(vsSource,        " \n"); //CUT THIS SO THE #version WILL BE THE FIRST CHARACTERS
-        squaresFsSource = trimStringLeft(squaresFsSource, " \n"); //CUT THIS SO THE #version WILL BE THE FIRST CHARACTERS
+        const squaresFsSource = 
+        `#version 300 es
 
-        var defaultVS = gl.createShader(gl.VERTEX_SHADER);
+        #define FLAG_SHOW_SOLUTION  0x01
+        #define FLAG_SHOW_STABILITY 0x02
+        #define FLAG_TOROID_RENDER  0x04
+
+        uniform int gBoardSize;
+        uniform int gCellSize;
+        uniform int gDomainSize;
+        uniform int gFlags;
+
+        uniform int gImageWidth;
+        uniform int gImageHeight;
+        uniform int gViewportOffsetX;
+        uniform int gViewportOffsetY;
+ 
+        uniform lowp vec4 gColorNone;
+        uniform lowp vec4 gColorEnabled;
+        uniform lowp vec4 gColorSolved;
+        uniform lowp vec4 gColorBetween;
+
+        uniform highp usampler2D gBoard;
+        uniform highp usampler2D gSolution;
+        uniform highp usampler2D gStability;
+
+        layout(location = 0) out lowp vec4 outColor;
+
+        void main(void)
+        {
+            ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
+
+            if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
+            {
+                highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize, gCellSize);
+
+		        uint          cellValue = texelFetch(gBoard, cellNumber, 0).x;
+		        mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
+
+                outColor = mix(gColorNone, gColorEnabled, cellPower);
+
+                if((gFlags & FLAG_SHOW_SOLUTION) != 0)
+                {
+		            uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+		            mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
+
+                    outColor = mix(outColor, gColorSolved, solutionPower);
+                }
+                else if((gFlags & FLAG_SHOW_STABILITY) != 0)
+                {
+        			uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
+			        mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
+
+			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    colorStable.a = 1.0f;
+
+                    outColor = mix(outColor, colorStable, stablePower);
+                }
+            }
+            else
+            {
+                outColor = gColorBetween;
+            }
+        }`;
+
+        //https://lightstrout.com/blog/2019/05/21/circles-render-mode/
+        const circlesFsSource = 
+        `#version 300 es
+
+        #define FLAG_SHOW_SOLUTION  0x01
+        #define FLAG_SHOW_STABILITY 0x02
+        #define FLAG_TOROID_RENDER  0x04
+
+        uniform int gBoardSize;
+        uniform int gCellSize;
+        uniform int gDomainSize;
+        uniform int gFlags;
+
+        uniform int gImageWidth;
+        uniform int gImageHeight;
+        uniform int gViewportOffsetX;
+        uniform int gViewportOffsetY;
+ 
+        uniform lowp vec4 gColorNone;
+        uniform lowp vec4 gColorEnabled;
+        uniform lowp vec4 gColorSolved;
+        uniform lowp vec4 gColorBetween;
+
+        uniform highp usampler2D gBoard;
+        uniform highp usampler2D gSolution;
+        uniform highp usampler2D gStability;
+
+        layout(location = 0) out lowp vec4 outColor;
+
+        ivec2 toXX(int x) //Simulating HLSL's .xx
+        {
+            return ivec2(x, x);
+        }
+
+        uvec2 toXX(uint x) //Simulating HLSL's .xx
+        {
+            return uvec2(x, x);
+        }
+
+        void main(void)
+        {
+            ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
+
+            if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
+            {
+                highp ivec2 cellNumber = screenPos.xy / toXX(gCellSize);
+
+                uint          cellValue = texelFetch(gBoard, cellNumber, 0).x;
+                mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
+
+                mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellNumber * toXX(gCellSize)) - vec2(toXX(gCellSize)) / 2.0f);
+                mediump float circleRadius = float(gCellSize - 1) / 2.0f;
+                
+                ivec2 leftCell   = cellNumber + ivec2(-1,  0);
+                ivec2 rightCell  = cellNumber + ivec2( 1,  0);
+                ivec2 topCell    = cellNumber + ivec2( 0, -1);
+                ivec2 bottomCell = cellNumber + ivec2( 0,  1);
+        
+                bool insideCircle = (dot(cellCoord, cellCoord) < circleRadius * circleRadius);
+        
+                bool nonLeftEdge   = cellNumber.x > 0;
+                bool nonRightEdge  = cellNumber.x < (gBoardSize - 1);
+                bool nonTopEdge    = cellNumber.y > 0;
+                bool nonBottomEdge = cellNumber.y < (gBoardSize - 1);
+
+                if((gFlags & FLAG_TOROID_RENDER) != 0)
+                {
+                    nonLeftEdge   = true;
+                    nonRightEdge  = true;
+                    nonTopEdge    = true;
+                    nonBottomEdge = true;
+        
+                    const uint maxCheckDistance = 1u; //Different for different render modes
+        
+                    uvec2 leftCellU   = uvec2(leftCell)   + uvec2(toXX(gBoardSize)) * maxCheckDistance;
+                    uvec2 rightCellU  = uvec2(rightCell)  + uvec2(toXX(gBoardSize)) * maxCheckDistance;
+                    uvec2 topCellU    = uvec2(topCell)    + uvec2(toXX(gBoardSize)) * maxCheckDistance;
+                    uvec2 bottomCellU = uvec2(bottomCell) + uvec2(toXX(gBoardSize)) * maxCheckDistance;
+        
+                    leftCell   = ivec2(leftCellU   % uvec2(toXX(gBoardSize)));
+                    rightCell  = ivec2(rightCellU  % uvec2(toXX(gBoardSize)));
+                    topCell    = ivec2(topCellU    % uvec2(toXX(gBoardSize)));
+                    bottomCell = ivec2(bottomCellU % uvec2(toXX(gBoardSize)));
+                }
+
+                uint leftPartValue   = uint(nonLeftEdge)   * texelFetch(gBoard, leftCell,   0).x;
+                uint rightPartValue  = uint(nonRightEdge)  * texelFetch(gBoard, rightCell,  0).x;
+                uint topPartValue    = uint(nonTopEdge)    * texelFetch(gBoard, topCell,    0).x;
+                uint bottomPartValue = uint(nonBottomEdge) * texelFetch(gBoard, bottomCell, 0).x;
+
+                bool circleRuleColored = insideCircle || ((leftPartValue   == cellValue && cellCoord.x <= 0.0f) 
+                                                      ||  (topPartValue    == cellValue && cellCoord.y <= 0.0f) 
+                                                      ||  (rightPartValue  == cellValue && cellCoord.x >= 0.0f) 
+                                                      ||  (bottomPartValue == cellValue && cellCoord.y >= 0.0f));
+
+                cellPower = cellPower * float(circleRuleColored);
+                outColor  = mix(gColorNone, gColorEnabled, cellPower);
+
+                if((gFlags & FLAG_SHOW_SOLUTION) != 0)
+                {
+		            uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+		            mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
+
+                    uint leftPartSolvedValue   = uint(nonLeftEdge)   * texelFetch(gSolution, leftCell,   0).x;
+                    uint rightPartSolvedValue  = uint(nonRightEdge)  * texelFetch(gSolution, rightCell,  0).x;
+                    uint topPartSolvedValue    = uint(nonTopEdge)    * texelFetch(gSolution, topCell,    0).x;
+                    uint bottomPartSolvedValue = uint(nonBottomEdge) * texelFetch(gSolution, bottomCell, 0).x;
+        
+                    bool circleRuleSolved = insideCircle || ((leftPartSolvedValue   == solutionValue && cellCoord.x <= 0.0f) 
+                                                         ||  (topPartSolvedValue    == solutionValue && cellCoord.y <= 0.0f) 
+                                                         ||  (rightPartSolvedValue  == solutionValue && cellCoord.x >= 0.0f) 
+                                                         ||  (bottomPartSolvedValue == solutionValue && cellCoord.y >= 0.0f));
+        
+                    solutionPower = solutionPower * float(circleRuleSolved);
+                    outColor      = mix(outColor, gColorSolved, solutionPower);
+                }
+                else if((gFlags & FLAG_SHOW_STABILITY) != 0)
+                {
+        			uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
+			        mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
+
+			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    colorStable.a = 1.0f;
+
+                    uint leftPartStableValue   = uint(nonLeftEdge)   * texelFetch(gStability, leftCell,   0).x;
+                    uint rightPartStableValue  = uint(nonRightEdge)  * texelFetch(gStability, rightCell,  0).x;
+                    uint topPartStableValue    = uint(nonTopEdge)    * texelFetch(gStability, topCell,    0).x;
+                    uint bottomPartStableValue = uint(nonBottomEdge) * texelFetch(gStability, bottomCell, 0).x;
+        
+                    bool circleRuleStable = insideCircle || ((leftPartStableValue  == stableValue && cellCoord.x <= 0.0f) 
+                                                         || (topPartStableValue    == stableValue && cellCoord.y <= 0.0f) 
+                                                         || (rightPartStableValue  == stableValue && cellCoord.x >= 0.0f) 
+                                                         || (bottomPartStableValue == stableValue && cellCoord.y >= 0.0f));
+        
+                    stablePower = stablePower * float(circleRuleStable);
+                    outColor    = mix(outColor, colorStable, stablePower);
+                }
+            }
+            else
+            {
+                outColor = gColorBetween;
+            }
+        }`;
+
+        let defaultVS = gl.createShader(gl.VERTEX_SHADER);
         gl.shaderSource(defaultVS, vsSource);
         gl.compileShader(defaultVS);
 
@@ -1792,13 +2077,22 @@ function main()
             alert(gl.getShaderInfoLog(defaultVS));
         }
 
-        var squaresFS = gl.createShader(gl.FRAGMENT_SHADER);
+        let squaresFS = gl.createShader(gl.FRAGMENT_SHADER);
         gl.shaderSource(squaresFS, squaresFsSource);
         gl.compileShader(squaresFS);
 
         if(!gl.getShaderParameter(squaresFS, gl.COMPILE_STATUS))
         {
             alert(gl.getShaderInfoLog(squaresFS));
+        }
+
+        let circlesFS = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(circlesFS, circlesFsSource);
+        gl.compileShader(circlesFS);
+
+        if(!gl.getShaderParameter(circlesFS, gl.COMPILE_STATUS))
+        {
+            alert(gl.getShaderInfoLog(circlesFS));
         }
 
         squaresShaderProgram = gl.createProgram();
@@ -1809,6 +2103,16 @@ function main()
         if(!gl.getProgramParameter(squaresShaderProgram, gl.LINK_STATUS))
         {
             alert(gl.getProgramInfoLog(squaresShaderProgram));
+        }
+
+        circlesShaderProgram = gl.createProgram();
+        gl.attachShader(circlesShaderProgram, defaultVS);
+        gl.attachShader(circlesShaderProgram, circlesFS);
+        gl.linkProgram(circlesShaderProgram);
+
+        if(!gl.getProgramParameter(circlesShaderProgram, gl.LINK_STATUS))
+        {
+            alert(gl.getProgramInfoLog(circlesShaderProgram));
         }
     }
 
@@ -1863,7 +2167,7 @@ function main()
         gl.clearColor(1.0, 1.0, 1.0, 0.0);
         gl.clear(gl.COLOR_BUFFER_BIT);
 
-        var drawFlags = 0;
+        let drawFlags = 0;
         if(flagShowSolution || flagShowInverseSolution)
         {
             drawFlags = drawFlags | 1;
@@ -1945,26 +2249,10 @@ function main()
 
         if(num > max)
         {
-           return max;
+            return max;
         }
 
         return num;
-    }
-
-    function trimStringLeft(string, chars)
-    {
-        if(string.length === 0)
-        {
-            return string;
-        }
-
-        var start = 0;
-        while(start < string.length && chars.includes(string[start]))
-        {
-            start++;
-        }
-
-        return string.substring(start);
     }
 
     function cellIndexFromPoint(gameSize, x, y)
@@ -1986,16 +2274,16 @@ function main()
             }
             else
             {
-                var tCurr = 0;
-                var rCurr = domainSize;
-                var tNext = 1;
-                var rNext = num;
+                let tCurr = 0;
+                let rCurr = domainSize;
+                let tNext = 1;
+                let rNext = num;
 
                 while(rNext !== 0)
                 {
-                    var quotR = Math.floor(rCurr / rNext);
-                    var tPrev = tCurr;
-                    var rPrev = rCurr;
+                    let quotR = Math.floor(rCurr / rNext);
+                    let tPrev = tCurr;
+                    let rPrev = rCurr;
 
                     tCurr = tNext;
                     rCurr = rNext;
