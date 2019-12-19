@@ -1,0 +1,97 @@
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Lights Out</title>
+    <script src="js/LightsOut.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/LightsOut.css"> 
+
+    <script id="vertexShader" type="x-shader/x-vertex">
+        #version 300 es
+
+        layout(location = 0) in mediump vec4 vScreenPos;
+        void main(void)
+        {
+            gl_Position = vScreenPos;
+        }
+    </script>
+
+    <script id="fragmentShaderSquares" type="x-shader/x-fragment">
+        #version 300 es
+
+        #define FLAG_SHOW_SOLUTION  0x01
+        #define FLAG_SHOW_STABILITY 0x02
+
+        uniform int gBoardSize;
+        uniform int gCellSize;
+        uniform int gDomainSize;
+        uniform int gFlags;
+
+        uniform int gImageWidth;
+        uniform int gImageHeight;
+        uniform int gViewportOffsetX;
+        uniform int gViewportOffsetY;
+ 
+        uniform lowp vec4 gColorNone;
+        uniform lowp vec4 gColorEnabled;
+        uniform lowp vec4 gColorSolved;
+        uniform lowp vec4 gColorBetween;
+
+        uniform highp usampler2D gBoard;
+        uniform highp usampler2D gSolution;
+        uniform highp usampler2D gStability;
+
+        layout(location = 0) out lowp vec4 outColor;
+
+        void main(void)
+        {
+            ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
+
+            if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
+            {
+                highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize, gCellSize);
+
+		        uint          cellValue = texelFetch(gBoard, cellNumber, 0).x;
+		        mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
+
+                outColor = mix(gColorNone, gColorEnabled, cellPower);
+
+                if((gFlags & FLAG_SHOW_SOLUTION) != 0)
+                {
+		            uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+		            mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
+
+                    outColor = mix(outColor, gColorSolved, solutionPower);
+                }
+                else if((gFlags & FLAG_SHOW_STABILITY) != 0)
+                {
+        			uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
+			        mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
+
+			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    colorStable.a = 1.0f;
+
+                    outColor = mix(outColor, colorStable, stablePower);
+                }
+            }
+            else
+            {
+                outColor = gColorBetween;
+            }
+        }
+    </script>
+</head>
+
+<body onload="main();">
+    <div class="container">
+        <div class="leftside">
+            <canvas id="LightsOutCanvas" width="900" height="900"></canvas>
+        </div>
+
+        <div class="rightside">
+            <p id="LightsOutPuzzleInfo">Lights Out</p><br>
+            <p id="QuietPatternsInfo">QuietPatterns: </p>
+        </div>
+    </div>
+</body>
+
+</html>

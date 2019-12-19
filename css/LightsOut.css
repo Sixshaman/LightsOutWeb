@@ -1,0 +1,17 @@
+div.container
+{
+    display: flex;
+}
+
+div.leftside
+{
+    width: fit-content;
+    float: left;
+}
+
+div.rightside
+{
+    float: right;
+    margin-left: 20px;
+    width: 100%;
+}
