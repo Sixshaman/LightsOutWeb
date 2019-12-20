@@ -535,6 +535,8 @@ function main()
         flagDefaultClickRule          = true;
         currentSolutionMatrixRelevant = false;
         flagSolutionMatrixComputing   = false;
+
+        requestRedraw();
     }
 
     function enableDefaultToroidClickRule()
@@ -550,6 +552,8 @@ function main()
         flagDefaultClickRule          = true;
         currentSolutionMatrixRelevant = false;
         flagSolutionMatrixComputing   = false;
+
+        requestRedraw();
     }
 
     function resetCountedBoard()
@@ -3154,6 +3158,10 @@ function main()
         if(flagShowStability || flagShowLitStability)
         {
             drawFlags = drawFlags | 2;
+        }
+        if(flagToroidBoard)
+        {
+            drawFlags = drawFlags | 4;
         }
 
         gl.bindVertexArray(drawVertexBuffer);
