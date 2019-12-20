@@ -322,6 +322,7 @@ function main()
 
     let squaresShaderProgram   = null;
     let circlesShaderProgram   = null;
+    let diamondsShaderProgram  = null;
     let raindropsShaderProgram = null;
     let chainsShaderProgram    = null;
 
@@ -1691,6 +1692,11 @@ function main()
             currentShaderProgram = circlesShaderProgram;
             break;
         }
+        case "Diamonds":
+        {
+            currentShaderProgram = diamondsShaderProgram;
+            break;
+        }
         case "Raindrops":
         {
             currentShaderProgram = raindropsShaderProgram;
@@ -2046,6 +2052,229 @@ function main()
         
                     stablePower = stablePower * float(circleRuleStable);
                     outColor    = mix(outColor, colorStable, stablePower);
+                }
+            }
+            else
+            {
+                outColor = gColorBetween;
+            }
+        }`;
+
+        //http://lightstrout.com/blog/2019/12/09/diamonds-render-mode/
+        const diamondsFsSource = 
+        `#version 300 es
+
+        #define FLAG_SHOW_SOLUTION  0x01
+        #define FLAG_SHOW_STABILITY 0x02
+        #define FLAG_TOROID_RENDER  0x04
+
+        uniform int gBoardSize;
+        uniform int gCellSize;
+        uniform int gDomainSize;
+        uniform int gFlags;
+
+        uniform int gImageWidth;
+        uniform int gImageHeight;
+        uniform int gViewportOffsetX;
+        uniform int gViewportOffsetY;
+ 
+        uniform lowp vec4 gColorNone;
+        uniform lowp vec4 gColorEnabled;
+        uniform lowp vec4 gColorSolved;
+        uniform lowp vec4 gColorBetween;
+
+        uniform highp usampler2D gBoard;
+        uniform highp usampler2D gSolution;
+        uniform highp usampler2D gStability;
+
+        layout(location = 0) out lowp vec4 outColor;
+
+        ivec2 XX(int x) //Simulating HLSL's .xx
+        {
+            return ivec2(x, x);
+        }
+
+        uvec4 XXXX(uint x) //Simulating HLSL's .xxxx
+        {
+            return uvec4(x, x, x, x);
+        }
+    
+        uvec4 XYZW(uvec4 v) //For uniformity
+        {
+            return v.xyzw;
+        }
+
+        uvec4 YZWX(uvec4 v) //For uniformity
+        {
+            return v.yzwx;
+        }
+
+        bvec4 b4eq(uvec4 a, uvec4 b) //Another thing that doesn't require writing functions in hlsl
+        {
+            return bvec4(a.x == b.x, a.y == b.y, a.z == b.z, a.w == b.w);
+        }
+
+        bvec4 emptyCornerRule(uvec4 edgeValue)
+        {
+            return b4eq(XYZW(edgeValue), YZWX(edgeValue));
+        }
+
+        bvec4 cornerRule(uint cellValue, uvec4 cornerValue)
+        {
+            return b4eq(XXXX(cellValue), XYZW(cornerValue));
+        }
+
+        void main(void)
+        {
+            ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
+
+            if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
+            {
+                highp ivec2 cellNumber = screenPos.xy / XX(gCellSize);
+                uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
+
+                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * XX(gCellSize)) - vec2(XX(gCellSize)) / 2.0f);
+                mediump float diamondRadius = float(gCellSize - 1) / 2.0f;
+                
+                mediump float domainFactor = 1.0f / float(gDomainSize - 1);
+
+                bool insideDiamond     = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
+                bool insideTopLeft     = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
+                bool insideTopRight    = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
+                bool insideBottomRight = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
+                bool insideBottomLeft  = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
+
+                bvec4 insideCorner = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
+
+                ivec2 leftCell        = cellNumber + ivec2(-1,  0);
+                ivec2 rightCell       = cellNumber + ivec2( 1,  0);
+                ivec2 topCell         = cellNumber + ivec2( 0, -1);
+                ivec2 bottomCell      = cellNumber + ivec2( 0,  1);
+                ivec2 leftTopCell     = cellNumber + ivec2(-1, -1);
+                ivec2 rightTopCell    = cellNumber + ivec2( 1, -1);
+                ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
+                ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
+        
+                bool nonLeftEdge        = cellNumber.x > 0;
+                bool nonRightEdge       = cellNumber.x < gBoardSize - 1;
+                bool nonTopEdge         =                                  cellNumber.y > 0;
+                bool nonBottomEdge      =                                  cellNumber.y < gBoardSize - 1;
+                bool nonLeftTopEdge     = cellNumber.x > 0              && cellNumber.y > 0;
+                bool nonRightTopEdge    = cellNumber.x < gBoardSize - 1 && cellNumber.y > 0;
+                bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
+                bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
+
+                if((gFlags & FLAG_TOROID_RENDER) != 0)
+                {
+                    nonLeftEdge        = true;
+                    nonRightEdge       = true;
+                    nonTopEdge         = true;
+                    nonBottomEdge      = true;
+                    nonLeftTopEdge     = true;
+                    nonRightTopEdge    = true;
+                    nonLeftBottomEdge  = true;
+                    nonRightBottomEdge = true;
+        
+                    const uint maxCheckDistance = 1u; //Different for different render modes
+
+                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 topCellU         = uvec2(topCell)         + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(XX(gBoardSize)) * maxCheckDistance;
+
+                    leftCell        = ivec2(leftCellU        % uvec2(XX(gBoardSize)));
+                    rightCell       = ivec2(rightCellU       % uvec2(XX(gBoardSize)));
+                    topCell         = ivec2(topCellU         % uvec2(XX(gBoardSize)));
+                    bottomCell      = ivec2(bottomCellU      % uvec2(XX(gBoardSize)));
+                    leftTopCell     = ivec2(leftTopCellU     % uvec2(XX(gBoardSize)));
+                    rightTopCell    = ivec2(rightTopCellU    % uvec2(XX(gBoardSize)));
+                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(XX(gBoardSize)));
+                    rightBottomCell = ivec2(rightBottomCellU % uvec2(XX(gBoardSize)));
+                }
+
+                uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
+                uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCell,       0).x;
+                uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCell,         0).x;
+                uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCell,      0).x;
+                uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCell,     0).x;
+                uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCell,    0).x;
+                uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCell,  0).x;
+                uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCell, 0).x;
+
+                uvec4 edgeValue   = uvec4(leftPartValue,    topPartValue,      rightPartValue,       bottomPartValue);
+                uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
+
+                uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)        ) * edgeValue;
+                uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, cornerValue)) * cellValue;
+
+                uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
+
+                mediump float  cellPower = float(cellValue) * domainFactor;		
+                mediump vec4 cornerPower =  vec4(resCorner) * domainFactor;
+
+                mediump float enablePower = cellPower * float(insideDiamond) + dot(cornerPower, vec4(insideCorner));
+                outColor                  = mix(gColorNone, gColorEnabled, enablePower);
+
+                if((gFlags & FLAG_SHOW_SOLUTION) != 0)
+                {
+		            uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+        
+                    uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
+                    uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
+                    uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCell,         0).x;
+                    uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCell,      0).x;
+                    uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCell,     0).x;
+                    uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCell,    0).x;
+                    uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCell,  0).x;
+                    uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCell, 0).x;
+
+                    uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
+                    uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
+
+                    uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(edgeSolved)            ) * edgeSolved;
+                    uvec4 cornerSolutionCandidate      = uvec4(cornerRule(solutionValue, cornerSolved)) * solutionValue;
+
+                    uvec4 resCornerSolved = max(emptyCornerSolutionCandidate, cornerSolutionCandidate);
+        
+                    mediump float      solutionPower =  float(solutionValue) * domainFactor;		
+                    mediump vec4 cornerSolutionPower = vec4(resCornerSolved) * domainFactor;
+
+                    mediump float solvedPower = solutionPower * float(insideDiamond) + dot(cornerSolutionPower, vec4(insideCorner));
+                    outColor                  = mix(outColor, gColorSolved, solvedPower);
+                }
+                else if((gFlags & FLAG_SHOW_STABILITY) != 0)
+                {
+        			uint stableValue = texelFetch(gStability, cellNumber, 0).x;
+
+			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    colorStable.a = 1.0f;
+
+                    uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
+                    uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCell,       0).x;
+                    uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCell,         0).x;
+                    uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCell,      0).x;
+                    uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCell,     0).x;
+                    uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCell,    0).x;
+                    uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCell,  0).x;
+                    uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCell, 0).x;
+
+                    uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
+                    uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
+        
+                    uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(edgeStable)          ) * edgeStable;
+                    uvec4 cornerStabilityCandidate      = uvec4(cornerRule(stableValue, cornerStable)) * stableValue;
+        
+                    uvec4 resCornerStable = max(emptyCornerStabilityCandidate, cornerStabilityCandidate);
+        
+                    mediump float      stabilityPower =    float(stableValue) * domainFactor;		
+                    mediump vec4 cornerStabilityPower = vec4(resCornerStable) * domainFactor;
+        
+                    mediump float stablePower = stabilityPower * float(insideDiamond) + dot(cornerStabilityPower, vec4(insideCorner));
+                    outColor                  = mix(outColor, colorStable, stablePower);
                 }
             }
             else
@@ -2788,6 +3017,15 @@ function main()
             alert(gl.getShaderInfoLog(circlesFS));
         }
 
+        let diamondsFS = gl.createShader(gl.FRAGMENT_SHADER);
+        gl.shaderSource(diamondsFS, diamondsFsSource);
+        gl.compileShader(diamondsFS);
+
+        if(!gl.getShaderParameter(diamondsFS, gl.COMPILE_STATUS))
+        {
+            alert(gl.getShaderInfoLog(diamondsFS));
+        }
+
         let raindropsFS = gl.createShader(gl.FRAGMENT_SHADER);
         gl.shaderSource(raindropsFS, raindropsFsSource);
         gl.compileShader(raindropsFS);
@@ -2824,6 +3062,16 @@ function main()
         if(!gl.getProgramParameter(circlesShaderProgram, gl.LINK_STATUS))
         {
             alert(gl.getProgramInfoLog(circlesShaderProgram));
+        }
+
+        diamondsShaderProgram = gl.createProgram();
+        gl.attachShader(diamondsShaderProgram, defaultVS);
+        gl.attachShader(diamondsShaderProgram, diamondsFS);
+        gl.linkProgram(diamondsShaderProgram);
+
+        if(!gl.getProgramParameter(diamondsShaderProgram, gl.LINK_STATUS))
+        {
+            alert(gl.getProgramInfoLog(diamondsShaderProgram));
         }
 
         raindropsShaderProgram = gl.createProgram();
