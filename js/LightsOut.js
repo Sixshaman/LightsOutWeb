@@ -5,6 +5,7 @@ function main()
     
     const infoText = document.getElementById("LightsOutPuzzleInfo");
     const qpText   = document.getElementById("QuietPatternsInfo");
+    const spText   = document.getElementById("SolutionPeriodInfo");
 
     const renderModeSelect = document.getElementById("rendermodesel");
 
@@ -23,8 +24,26 @@ function main()
         clickAtPoint(x, y, e.ctrlKey);
     };
 
+    document.onkeydown = function(e)
+    {
+        if(e.code == "ArrowLeft" || e.code == "ArrowRight" || e.code == "ArrowUp" || e.code == "ArrowDown")
+        {
+            e.preventDefault();
+        }
+    }
+
+    document.onkeypress = function(e)
+    {
+        if(e.code == "ArrowLeft" || e.code == "ArrowRight" || e.code == "ArrowUp" || e.code == "ArrowDown")
+        {
+            e.preventDefault();
+        }
+    }
+
     document.onkeyup = function (e)
     {
+        e.preventDefault();
+
         switch (e.code)
         {
         case "Equal": //Actually +
@@ -95,7 +114,14 @@ function main()
         }
         case "KeyI":
         {
-            resetGameBoard(resetModes.RESET_INVERTO, currentGameSize, currentDomainSize);
+            if(e.shiftKey)
+            {
+                resetGameBoard(resetModes.RESET_DOMAIN_ROTATE_NONZERO, currentGameSize, currentDomainSize);
+            }
+            else
+            {
+                resetGameBoard(resetModes.RESET_INVERTO, currentGameSize, currentDomainSize);
+            }
             break;
         }
         case "KeyE":
@@ -204,6 +230,18 @@ function main()
 
             break;
         }
+        case "KeyZ":
+        {
+            if(flagPeriodBackCounting /*|| flagPeriodCounting || flagPerio4Counting*/)
+            {
+                changeCountingMode(countingModes.COUNT_NONE, false);
+            }
+            else
+            {
+                changeCountingMode(countingModes.COUNT_INVERSE_SOLUTION_PERIOD, true);
+            }
+            break;
+        } 
         default:
         {
             break;
@@ -279,8 +317,8 @@ function main()
     //let flagPeriodCounting          = false; //TODO check
     //let flagEigvecCounting          = false; //TODO check
     //let flagPerio4Counting          = false; //TODO check
-    //let flagPeriodBackCounting      = false; //TODO check
-    let flagDisplayPeriodCount      = false;
+    let flagPeriodBackCounting      = false;
+    let flagStopCountingWhenFound   = false;
     let flagToroidBoard             = false;
     let flagTickLoop                = false;
     let flagDefaultClickRule        = false;
@@ -290,6 +328,7 @@ function main()
     let currentGameSolution     = null;
     let currentGameStability    = null;
     let currentGameLitStability = null;
+    let currentCountedBoard     = null;
 
     let currentCellSize = 20;
 
@@ -557,11 +596,6 @@ function main()
         requestRedraw();
     }
 
-    function resetCountedBoard()
-    {
-        //TODO
-    }
-
     function resetStability()
     {
         currentGameStability = new Uint8Array(currentGameSize * currentGameSize);
@@ -790,7 +824,7 @@ function main()
 
     function calculateLitStability()
     {
-        return addBoard(currentGameStability, currentGameBoard, currentDomainSize);
+        return mulComponentWiseBoard(currentGameStability, currentGameBoard, currentDomainSize);
     }
 
     function resetGameBoard(resetMode)
@@ -1089,9 +1123,8 @@ function main()
         }
 
         //flagPeriodCounting     = false;
-        //flagPeriodBackCounting = false;
+        flagPeriodBackCounting = false;
         //flagPerio4Counting     = false;
-        flagDisplayPeriodCount = false;
 
         showSolution(false);
         showInverseSolution(false);
@@ -1103,9 +1136,9 @@ function main()
         {
         case countingModes.COUNT_NONE:
         {
-            if(flagDisplayPeriodCount && currentPeriodCount !== 0)
+            if(currentPeriodCount !== 0 && flagStopCountingWhenFound)
             {
-                alert("Solution period so far is " + currentPeriodCount);
+                spText.textContent = "Solution period so far is " + currentPeriodCount;
             }
             break;
         }
@@ -1121,15 +1154,21 @@ function main()
         }
         case countingModes.COUNT_INVERSE_SOLUTION_PERIOD:
         {
-            //flagPeriodBackCounting = true;
+            flagPeriodBackCounting = true;
             break;
         }
         }
 
-        currentPeriodCount     = 0;
-        flagDisplayPeriodCount = stopWhenReturned;
+        flagStopCountingWhenFound = stopWhenReturned;
 
-        resetCountedBoard();
+        if(flagPeriodBackCounting /*|| flagPeriodCounting || flagPerio4Counting*/)
+        {
+            currentPeriodCount = 0;
+            currentCountedBoard = currentGameBoard.slice();
+
+            flagTickLoop = true;
+            window.requestAnimationFrame(nextTick);
+        }
     }
 
     function buildTurnList(board, gameSize)
@@ -1471,13 +1510,10 @@ function main()
         let resBoard = new Uint8Array(board.length);
         for(let i = 0; i < board.length; i++)
         {
-            let boardValue = board[i];
-            if(boardValue > 0)
+            if(board[i] != 0)
             {
-                boardValue = (domainSize - boardValue) % domainSize;
+                resBoard[i] = board[i] % (domainSize - 1) + 1;
             }
-
-            resBoard[i] = boardValue;
         }
 
         return resBoard;
@@ -1510,6 +1546,22 @@ function main()
         for(let i = 0; i < board.length; i++)
         {
             resBoard[i] = (board[i] * mulValue) % domainSize;
+        }
+
+        return resBoard;
+    }
+
+    function mulComponentWiseBoard(boardLeft, boardRight, domainSize)
+    {
+        if(boardLeft.length !== boardRight.length)
+        {
+            return boardLeft;
+        }
+
+        let resBoard = new Uint8Array(boardLeft.length);
+        for(let i = 0; i < boardLeft.length; i++)
+        {
+            resBoard[i] = (boardLeft[i] * boardRight[i]) % domainSize;
         }
 
         return resBoard;
@@ -1568,6 +1620,24 @@ function main()
         }
 
         return sum % domainSize;
+    }
+
+    function equalsBoard(boardLeft, boardRight)
+    {
+        if(boardLeft.length !== boardRight.length)
+        {
+            return false;
+        }
+
+        for(let i = 0; i < boardLeft.length; i++)
+        {
+            if(boardLeft[i] !== boardRight[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     function showSolution(showFlag)
@@ -1805,6 +1875,37 @@ function main()
             {
                 flagTickLoop = false; //No need for the next tick
             }
+        }
+
+        if(flagPeriodBackCounting)
+        {
+            currentPeriodCount++;
+
+            currentGameSolution = calculateInverseSolution();
+            
+            currentGameStability = calculateNewStabilityValue(currentGameSolution);
+            currentGameBoard     = currentGameSolution;
+
+            updateBoardTexture();
+
+            if(flagShowLitStability)
+            {
+                currentGameLitStability = calculateLitStability();
+                updateStabilityTexture();
+            }
+            else if(flagShowStability)
+            {
+                updateStabilityTexture();
+            }
+
+            if(flagStopCountingWhenFound && equalsBoard(currentGameBoard, currentCountedBoard))
+            {
+                flagStopCountingWhenFound = false;
+                changeCountingMode(countingModes.COUNT_NONE, false);
+                flagTickLoop = false;
+            }
+
+            spText.textContent = "Solution period: " + currentPeriodCount;
         }
 
         requestRedraw();

@@ -1,6 +1,12 @@
 div.container
 {
     display: flex;
+    justify-content: space-between;
+}
+
+div.puzzle
+{
+    display: flex;
 }
 
 div.leftside
@@ -12,6 +18,10 @@ div.leftside
 div.rightside
 {
     float: right;
-    margin-left: 20px;
-    width: 100%;
+    margin-left: 30px;
+}
+
+div.rightrightside
+{
+    float: right;
 }
