@@ -30,7 +30,7 @@ function main()
         {
             e.preventDefault();
         }
-    }
+    };
 
     document.onkeypress = function(e)
     {
@@ -38,7 +38,7 @@ function main()
         {
             e.preventDefault();
         }
-    }
+    };
 
     document.onkeyup = function (e)
     {
@@ -2061,7 +2061,7 @@ function main()
 
         layout(location = 0) out lowp vec4 outColor;
 
-        ivec2 XX(int x) //Simulating HLSL's .xx
+        ivec2 xx(int x) //Simulating HLSL's .xx
         {
             return ivec2(x, x);
         }
@@ -2072,12 +2072,12 @@ function main()
 
             if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
             {
-                highp ivec2 cellNumber = screenPos / XX(gCellSize);
+                highp ivec2 cellNumber = screenPos / xx(gCellSize);
 
                 uint          cellValue = texelFetch(gBoard, cellNumber, 0).x;
                 mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
 
-                mediump vec2  cellCoord    = (vec2(screenPos) - vec2(cellNumber * gCellSize) - vec2(XX(gCellSize)) / 2.0f);
+                mediump vec2  cellCoord    = (vec2(screenPos) - vec2(cellNumber * gCellSize) - vec2(xx(gCellSize)) / 2.0f);
                 mediump float circleRadius = float(gCellSize - 1) / 2.0f;
                 
                 ivec2 leftCell   = cellNumber + ivec2(-1,  0);
@@ -2101,15 +2101,15 @@ function main()
         
                     const uint maxCheckDistance = 1u; //Different for different render modes
         
-                    uvec2 leftCellU   = uvec2(leftCell)   + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightCellU  = uvec2(rightCell)  + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 topCellU    = uvec2(topCell)    + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 bottomCellU = uvec2(bottomCell) + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 leftCellU   = uvec2(leftCell)   + uvec2(xx(gBoardSize)) * maxCheckDistance;
+                    uvec2 rightCellU  = uvec2(rightCell)  + uvec2(xx(gBoardSize)) * maxCheckDistance;
+                    uvec2 topCellU    = uvec2(topCell)    + uvec2(xx(gBoardSize)) * maxCheckDistance;
+                    uvec2 bottomCellU = uvec2(bottomCell) + uvec2(xx(gBoardSize)) * maxCheckDistance;
         
-                    leftCell   = ivec2(leftCellU   % uvec2(XX(gBoardSize)));
-                    rightCell  = ivec2(rightCellU  % uvec2(XX(gBoardSize)));
-                    topCell    = ivec2(topCellU    % uvec2(XX(gBoardSize)));
-                    bottomCell = ivec2(bottomCellU % uvec2(XX(gBoardSize)));
+                    leftCell   = ivec2(leftCellU   % uvec2(xx(gBoardSize)));
+                    rightCell  = ivec2(rightCellU  % uvec2(xx(gBoardSize)));
+                    topCell    = ivec2(topCellU    % uvec2(xx(gBoardSize)));
+                    bottomCell = ivec2(bottomCellU % uvec2(xx(gBoardSize)));
                 }
 
                 uint leftPartValue   = uint(nonLeftEdge)   * texelFetch(gBoard, leftCell,   0).x;
@@ -2200,39 +2200,29 @@ function main()
 
         layout(location = 0) out lowp vec4 outColor;
 
-        ivec2 XX(int x) //Simulating HLSL's .xx
+        ivec2 xx(int x) //Simulating HLSL's .xx
         {
             return ivec2(x, x);
         }
 
-        uvec4 XXXX(uint x) //Simulating HLSL's .xxxx
+        uvec4 xxxx(uint x) //Simulating HLSL's .xxxx
         {
             return uvec4(x, x, x, x);
         }
-    
-        uvec4 XYZW(uvec4 v) //For uniformity
-        {
-            return v.xyzw;
-        }
 
-        uvec4 YZWX(uvec4 v) //For uniformity
-        {
-            return v.yzwx;
-        }
-
-        bvec4 b4eq(uvec4 a, uvec4 b) //Another thing that doesn't require writing functions in hlsl
+        bvec4 u4eq(uvec4 a, uvec4 b) //Another thing that doesn't require writing functions in hlsl
         {
             return bvec4(a.x == b.x, a.y == b.y, a.z == b.z, a.w == b.w);
         }
 
         bvec4 emptyCornerRule(uvec4 edgeValue)
         {
-            return b4eq(XYZW(edgeValue), YZWX(edgeValue));
+            return u4eq(edgeValue.xyzw, edgeValue.yzwx);
         }
 
         bvec4 cornerRule(uint cellValue, uvec4 cornerValue)
         {
-            return b4eq(XXXX(cellValue), XYZW(cornerValue));
+            return u4eq(xxxx(cellValue), cornerValue.xyzw);
         }
 
         void main(void)
@@ -2241,10 +2231,10 @@ function main()
 
             if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
             {
-                highp ivec2 cellNumber = screenPos.xy / XX(gCellSize);
+                highp ivec2 cellNumber = screenPos.xy / xx(gCellSize);
                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
 
-                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * XX(gCellSize)) - vec2(XX(gCellSize)) / 2.0f);
+                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * xx(gCellSize)) - vec2(xx(gCellSize)) / 2.0f);
                 mediump float diamondRadius = float(gCellSize - 1) / 2.0f;
                 
                 mediump float domainFactor = 1.0f / float(gDomainSize - 1);
@@ -2277,6 +2267,8 @@ function main()
 
                 if((gFlags & FLAG_TOROID_RENDER) != 0)
                 {
+                    ivec2 boardSizexx = xx(gBoardSize);
+
                     nonLeftEdge        = true;
                     nonRightEdge       = true;
                     nonTopEdge         = true;
@@ -2288,23 +2280,23 @@ function main()
         
                     const uint maxCheckDistance = 1u; //Different for different render modes
 
-                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 topCellU         = uvec2(topCell)         + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 topCellU         = uvec2(topCell)         + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(boardSizexx) * maxCheckDistance;
 
-                    leftCell        = ivec2(leftCellU        % uvec2(XX(gBoardSize)));
-                    rightCell       = ivec2(rightCellU       % uvec2(XX(gBoardSize)));
-                    topCell         = ivec2(topCellU         % uvec2(XX(gBoardSize)));
-                    bottomCell      = ivec2(bottomCellU      % uvec2(XX(gBoardSize)));
-                    leftTopCell     = ivec2(leftTopCellU     % uvec2(XX(gBoardSize)));
-                    rightTopCell    = ivec2(rightTopCellU    % uvec2(XX(gBoardSize)));
-                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(XX(gBoardSize)));
-                    rightBottomCell = ivec2(rightBottomCellU % uvec2(XX(gBoardSize)));
+                    leftCell        = ivec2(leftCellU        % uvec2(boardSizexx));
+                    rightCell       = ivec2(rightCellU       % uvec2(boardSizexx));
+                    topCell         = ivec2(topCellU         % uvec2(boardSizexx));
+                    bottomCell      = ivec2(bottomCellU      % uvec2(boardSizexx));
+                    leftTopCell     = ivec2(leftTopCellU     % uvec2(boardSizexx));
+                    rightTopCell    = ivec2(rightTopCellU    % uvec2(boardSizexx));
+                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(boardSizexx));
+                    rightBottomCell = ivec2(rightBottomCellU % uvec2(boardSizexx));
                 }
 
                 uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
@@ -2423,152 +2415,32 @@ function main()
 
         layout(location = 0) out lowp vec4 outColor;
 
-        ivec2 XX(int x) //Simulating HLSL's .xx
+        ivec2 xx(int x) //Simulating HLSL's .xx
         {
             return ivec2(x, x);
         }
 
-        uvec4 XXXX(uint x) //Simulating HLSL's .xxxx
+        uvec4 xxxx(uint x) //Simulating HLSL's .xxxx
         {
             return uvec4(x, x, x, x);
         }
 
-        bvec4 XXXX(bool b) //No, seriously
+        bvec4 xxxx(bool b) //No, seriously
         {
             return bvec4(b, b, b, b);
         }
 
-        mediump vec4 XXXX(mediump float f) //I don't care anymore
+        mediump vec4 xxxx(mediump float f) //I don't care anymore
         {
             return vec4(f, f, f, f);
         }
 
-        uvec4 XYYZ(uvec4 b) //For consistency
-        {
-            return b.xyyz;
-        }
-
-        uvec4 XYZW(uvec4 v) //For consistency
-        {
-            return v.xyzw;
-        }
-
-        uvec4 XZYW(uvec4 v) //For consistency
-        {
-            return v.xzyw;
-        }
-
-        uvec4 XZZX(uvec4 v) //For consistency, I guess
-        {
-            return v.xzzx;
-        }
-
-        uvec4 YXWZ(uvec4 v) //For consistency
-        {
-            return v.yxwz;
-        }
-
-        uvec4 YYZZ(uvec4 v) //For consistency
-        {
-            return v.yyzz;
-        }
-
-        uvec4 YYWW(uvec4 v) //For consistency
-        {
-            return v.yyww;
-        }
-
-        uvec4 YZWX(uvec4 v) //For consistency
-        {
-            return v.yzwx;
-        }
-
-        uvec4 ZXWY(uvec4 v) //For consistency
-        {
-            return v.zxwy;
-        }
-
-        uvec4 ZWXY(uvec4 v) //For consistency
-        {
-            return v.zwxy;
-        }
-
-        uvec4 ZWWX(uvec4 v) //For consistency
-        {
-            return v.zwwx;
-        }
-
-        uvec4 WXYZ(uvec4 v) //For consistency
-        {
-            return v.wxyz;
-        }
-
-        uvec4 WZYX(uvec4 v) //For consistency
-        {
-            return v.wzyx;
-        }
-
-        uvec4 WWXX(uvec4 v) //For consistency
-        {
-            return v.wwxx;
-        }
-
-        bvec4 XYZW(bvec4 v) //For consistency
-        {
-            return v.xyzw;
-        }
-
-        bvec4 XZYW(bvec4 v) //For consistency
-        {
-            return v.xzyw;
-        }
-
-        bvec4 XZZX(bvec4 v) //For consistency, I guess
-        {
-            return v.xzzx;
-        }
-
-        bvec4 YXWZ(bvec4 v) //For consistency
-        {
-            return v.yxwz;
-        }
-
-        bvec4 YYZZ(bvec4 v) //For consistency
-        {
-            return v.yyzz;
-        }
-
-        bvec4 YYWW(bvec4 v) //For consistency
-        {
-            return v.yyww;
-        }
-
-        bvec4 YZWX(bvec4 v) //For consistency
-        {
-            return v.yzwx;
-        }
-
-        bvec4 ZXWY(bvec4 v) //For consistency
-        {
-            return v.zxwy;
-        }
-
-        bvec4 WZYX(bvec4 v) //For consistency
-        {
-            return v.wzyx;
-        }
-
-        bvec4 WWXX(bvec4 v) //For consistency
-        {
-            return v.wwxx;
-        }
-
-        bvec4 b4eq(uvec4 a, uvec4 b) //Another thing that doesn't require writing functions in hlsl
+        bvec4 u4eq(uvec4 a, uvec4 b) //Another thing that doesn't require writing functions in hlsl
         {
             return bvec4(a.x == b.x, a.y == b.y, a.z == b.z, a.w == b.w);
         }
 
-        bvec4 b4nq(uvec4 a, uvec4 b) //Another thing that doesn't require writing functions in hlsl
+        bvec4 u4nq(uvec4 a, uvec4 b) //Another thing that doesn't require writing functions in hlsl
         {
             return bvec4(a.x != b.x, a.y != b.y, a.z != b.z, a.w != b.w);
         }
@@ -2607,9 +2479,11 @@ function main()
         {
             bvec4 res = bvec4(true, true, true, true);
 
-            res = b4nd(res, b4eq(XYZW(edgeValue), YZWX(edgeValue)));
-            res = b4nd(res, b4nq(XYZW(edgeValue), XYZW(cornerValue)));
-            res = b4nd(res, b4nq(XYZW(edgeValue), XXXX(cellValue)));
+            uvec4 cellValuexxxx = xxxx(cellValue);
+
+            res = b4nd(res, u4eq(edgeValue.xyzw, edgeValue.yzwx));
+            res = b4nd(res, u4nq(edgeValue.xyzw, cornerValue.xyzw));
+            res = b4nd(res, u4nq(edgeValue.xyzw, cellValuexxxx));
 
             return res;
         }
@@ -2618,11 +2492,13 @@ function main()
         {
             bvec4 res = bvec4(false, false, false, false);
             
-            res = b4or(res,      b4eq(XXXX(cellValue), XYZW(edgeValue  ))                                                                                                                                                                     ); //B#1
-            res = b4or(res,      b4eq(XXXX(cellValue), YZWX(edgeValue  ))                                                                                                                                                                     ); //B#2
-            res = b4or(res,      b4eq(XXXX(cellValue), XYZW(cornerValue))                                                                                                                                                                     ); //B#3
-            res = b4or(res, b4nd(b4eq(XXXX(cellValue), ZWXY(edgeValue  )), b4eq(XXXX(cellValue), WXYZ(edgeValue  ))                                                                                                                          )); //B#4
-            res = b4or(res, b4nd(b4eq(XXXX(cellValue), ZWXY(cornerValue)), b4nq(XXXX(cellValue), WXYZ(cornerValue)), b4nq(XXXX(cellValue), WXYZ(edgeValue)), b4nq(XXXX(cellValue), ZWXY(edgeValue)), b4nq(XXXX(cellValue), YZWX(cornerValue)))); //B#5
+            uvec4 cellValuexxxx = xxxx(cellValue);
+
+            res = b4or(res,      u4eq(cellValuexxxx, edgeValue.xyzw  )                                                                                                                                                         ); //B#1
+            res = b4or(res,      u4eq(cellValuexxxx, edgeValue.yzwx  )                                                                                                                                                         ); //B#2
+            res = b4or(res,      u4eq(cellValuexxxx, cornerValue.xyzw)                                                                                                                                                         ); //B#3
+            res = b4or(res, b4nd(u4eq(cellValuexxxx, edgeValue.zwxy  ), u4eq(cellValuexxxx, edgeValue.wxyz  )                                                                                                                 )); //B#4
+            res = b4or(res, b4nd(u4eq(cellValuexxxx, cornerValue.zwxy), u4nq(cellValuexxxx, cornerValue.wxyz), u4nq(cellValuexxxx, edgeValue.wxyz), u4nq(cellValuexxxx, edgeValue.zwxy), u4nq(cellValuexxxx, cornerValue.yzwx))); //B#5
 
             return res;
         }
@@ -2634,12 +2510,15 @@ function main()
             bool loneDiamond = cellValue != edgeValue.x   && cellValue != edgeValue.y   && cellValue != edgeValue.z   && cellValue != edgeValue.w 
                             && cellValue != cornerValue.x && cellValue != cornerValue.y && cellValue != cornerValue.z && cellValue != cornerValue.w;
 
-            res = b4or(res,      b4eq(XXXX(cellValue  ), XYZW(edgeValue  ))                                                                                                                           ); //I#1
-            res = b4or(res, b4nd(b4eq(XXXX(cellValue  ), XYZW(cornerValue)), b4nq(XXXX(cellValue), YZWX(edgeValue  ))                                                                                )); //I#2
-            res = b4or(res, b4nd(b4eq(XXXX(cellValue  ), WXYZ(cornerValue)), b4nq(XXXX(cellValue), WXYZ(edgeValue  ))                                                                                )); //I#3
-            res = b4or(res, b4nd(b4eq(XXXX(cellValue  ), ZWXY(cornerValue)), b4eq(XXXX(cellValue), YZWX(cornerValue)), b4nq(XXXX(cellValue), WXYZ(edgeValue)), b4nq(XXXX(cellValue), YZWX(edgeValue)))); //I#4
-            res = b4or(res, b4nd(b4eq(XXXX(cellValue  ), ZWXY(edgeValue  )), b4nq(XXXX(cellValue), WXYZ(edgeValue  )), b4nq(XXXX(cellValue), YZWX(edgeValue))                                        )); //I#5
-            res = b4or(res,           XXXX(loneDiamond)                                                                                                                                               ); //I#6
+            uvec4 cellValuexxxx   = xxxx(cellValue);
+            bvec4 loneDiamondxxxx = xxxx(loneDiamond);
+
+            res = b4or(res,      u4eq(cellValuexxxx,   edgeValue.xyzw  )                                                                                                                  ); //I#1
+            res = b4or(res, b4nd(u4eq(cellValuexxxx,   cornerValue.xyzw), u4nq(cellValuexxxx, edgeValue.yzwx  )                                                                          )); //I#2
+            res = b4or(res, b4nd(u4eq(cellValuexxxx,   cornerValue.wxyz), u4nq(cellValuexxxx, edgeValue.wxyz  )                                                                          )); //I#3
+            res = b4or(res, b4nd(u4eq(cellValuexxxx,   cornerValue.zwxy), u4eq(cellValuexxxx, cornerValue.yzwx), u4nq(cellValuexxxx, edgeValue.wxyz), u4nq(cellValuexxxx, edgeValue.yzwx))); //I#4
+            res = b4or(res, b4nd(u4eq(cellValuexxxx,   edgeValue.zwxy  ), u4nq(cellValuexxxx, edgeValue.wxyz  ), u4nq(cellValuexxxx, edgeValue.yzwx)                                     )); //I#5
+            res = b4or(res,           loneDiamondxxxx                                                                                                                                     ); //I#6
 
             return res;
         }
@@ -2647,9 +2526,11 @@ function main()
         bvec4 regYTopRightRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
         {
             bvec4 res = bvec4(false, false, false, false);
+
+            uvec4 cellValuexxxx = xxxx(cellValue);
             
-            res = b4or(res,      b4eq(XXXX(cellValue), YYZZ(edgeValue  ))                                         ); //Y#1
-            res = b4or(res, b4nd(b4eq(XXXX(cellValue), XYYZ(cornerValue)), b4nq(XXXX(cellValue), XZYW(edgeValue)))); //Y#2
+            res = b4or(res,      u4eq(cellValuexxxx, edgeValue.yyzz  )                                      ); //Y#1
+            res = b4or(res, b4nd(u4eq(cellValuexxxx, cornerValue.xyyz), u4nq(cellValuexxxx, edgeValue.xzyw))); //Y#2
 
             return res;
         }
@@ -2657,16 +2538,19 @@ function main()
         bvec4 regYBottomLeftRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
         {
             bvec4 res = bvec4(false, false, false, false);
+
+            uvec4 cellValuexxxx = xxxx(cellValue);
             
-            res = b4or(res,      b4eq(XXXX(cellValue), WWXX(edgeValue  ))                                         ); //Y#1
-            res = b4or(res, b4nd(b4eq(XXXX(cellValue), ZWWX(cornerValue)), b4nq(XXXX(cellValue), ZXWY(edgeValue)))); //Y#2
+            res = b4or(res,      u4eq(cellValuexxxx, edgeValue.wwxx  )                                      ); //Y#1
+            res = b4or(res, b4nd(u4eq(cellValuexxxx, cornerValue.zwwx), u4nq(cellValuexxxx, edgeValue.zxwy))); //Y#2
 
             return res;
         }
 
         bvec4 regVRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
         {
-            return b4nd(b4eq(XXXX(cellValue), XYZW(cornerValue)), b4nq(XXXX(cellValue), XYZW(edgeValue)), b4nq(XXXX(cellValue), YZWX(edgeValue))); //V#1;
+            uvec4 cellValuexxxx = xxxx(cellValue);
+            return b4nd(u4eq(cellValuexxxx, cornerValue.xyzw), u4nq(cellValuexxxx, edgeValue.xyzw), u4nq(cellValuexxxx, edgeValue.yzwx)); //V#1
         }
 
         void main(void)
@@ -2675,10 +2559,12 @@ function main()
 
             if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
             {
-                highp ivec2 cellNumber = screenPos.xy / XX(gCellSize);
+                ivec2 cellSizexx = xx(gCellSize);
+
+                highp ivec2 cellNumber = screenPos.xy / cellSizexx;
                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
 
-                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * XX(gCellSize)) - vec2(XX(gCellSize)) / 2.0f);
+                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * cellSizexx) - vec2(cellSizexx) / 2.0f);
                 mediump float diamondRadius = float(gCellSize - 1) / 2.0f;
                 
                 mediump float domainFactor = 1.0f / float(gDomainSize - 1);
@@ -2695,13 +2581,13 @@ function main()
 
                 bool insideG = insideCentralDiamond && (insideHorizontalBeamLeft || insideHorizontalBeamRight) && (insideVerticalBeamTop || insideVerticalBeamBottom); //G
 
-                bvec4 insideB = b4nd(XZZX(insideBeam),      YYWW(insideBeam) ,                         XXXX(!insideCentralDiamond)); //B-A, B-B, B-C, B-D
-                bvec4 insideI = b4nd(XYZW(insideBeam), b4ne(YXWZ(insideBeam)), b4ne(WZYX(insideBeam)), XXXX( insideCentralDiamond)); //I-A, I-B, I-C, I-D
+                bvec4 insideB = b4nd(insideBeam.xzzx,      insideBeam.yyww ,                        xxxx(!insideCentralDiamond)); //B-A, B-B, B-C, B-D
+                bvec4 insideI = b4nd(insideBeam.xyzw, b4ne(insideBeam.yxwz), b4ne(insideBeam.wzyx), xxxx( insideCentralDiamond)); //I-A, I-B, I-C, I-D
 
-                bvec4 insideYTopRight   = b4nd(YYZZ(insideBeam), b4ne(XZYW(insideBeam)), XXXX(!insideCentralDiamond), XZYW(insideSide)); //Y-A, Y-B, Y-C, Y-D
-                bvec4 insideYBottomLeft = b4nd(WWXX(insideBeam), b4ne(ZXWY(insideBeam)), XXXX(!insideCentralDiamond), ZXWY(insideSide)); //Y-E, Y-F, Y-G, Y-H
+                bvec4 insideYTopRight   = b4nd(insideBeam.yyzz, b4ne(insideBeam.xzyw), xxxx(!insideCentralDiamond), insideSide.xzyw); //Y-A, Y-B, Y-C, Y-D
+                bvec4 insideYBottomLeft = b4nd(insideBeam.wwxx, b4ne(insideBeam.zxwy), xxxx(!insideCentralDiamond), insideSide.zxwy); //Y-E, Y-F, Y-G, Y-H
 
-                bvec4 insideV = b4nd(b4ne(XYZW(insideBeam)), b4ne(YZWX(insideBeam)), XYZW(insideSide), YZWX(insideSide)); //V-A, V-B, V-C, V-D
+                bvec4 insideV = b4nd(b4ne(insideBeam.xyzw), b4ne(insideBeam.yzwx), insideSide.xyzw, insideSide.yzwx); //V-A, V-B, V-C, V-D
 
                 ivec2 leftCell        = cellNumber + ivec2(-1,  0);
                 ivec2 rightCell       = cellNumber + ivec2( 1,  0);
@@ -2723,6 +2609,8 @@ function main()
 
                 if((gFlags & FLAG_TOROID_RENDER) != 0)
                 {
+                    ivec2 boardSizexx = xx(gBoardSize);
+
                     nonLeftEdge        = true;
                     nonRightEdge       = true;
                     nonTopEdge         = true;
@@ -2734,23 +2622,23 @@ function main()
         
                     const uint maxCheckDistance = 1u; //Different for different render modes
 
-                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 topCellU         = uvec2(topCell)         + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 topCellU         = uvec2(topCell)         + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(boardSizexx) * maxCheckDistance;
 
-                    leftCell        = ivec2(leftCellU        % uvec2(XX(gBoardSize)));
-                    rightCell       = ivec2(rightCellU       % uvec2(XX(gBoardSize)));
-                    topCell         = ivec2(topCellU         % uvec2(XX(gBoardSize)));
-                    bottomCell      = ivec2(bottomCellU      % uvec2(XX(gBoardSize)));
-                    leftTopCell     = ivec2(leftTopCellU     % uvec2(XX(gBoardSize)));
-                    rightTopCell    = ivec2(rightTopCellU    % uvec2(XX(gBoardSize)));
-                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(XX(gBoardSize)));
-                    rightBottomCell = ivec2(rightBottomCellU % uvec2(XX(gBoardSize)));
+                    leftCell        = ivec2(leftCellU        % uvec2(boardSizexx));
+                    rightCell       = ivec2(rightCellU       % uvec2(boardSizexx));
+                    topCell         = ivec2(topCellU         % uvec2(boardSizexx));
+                    bottomCell      = ivec2(bottomCellU      % uvec2(boardSizexx));
+                    leftTopCell     = ivec2(leftTopCellU     % uvec2(boardSizexx));
+                    rightTopCell    = ivec2(rightTopCellU    % uvec2(boardSizexx));
+                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(boardSizexx));
+                    rightBottomCell = ivec2(rightBottomCellU % uvec2(boardSizexx));
                 }
 
                 uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
@@ -2775,17 +2663,17 @@ function main()
 
                 uvec4 regionVCandidate = uvec4(regVRule(cellValue, edgeValue, cornerValue)) * cellValue;
 
-                uvec4 resB           = max(regionBCandidate,           XYZW(emptyCornerCandidate));
-                uvec4 resYTopRight   = max(regionYTopRightCandidate,   XYYZ(emptyCornerCandidate));
-                uvec4 resYBottomLeft = max(regionYBottomLeftCandidate, ZWWX(emptyCornerCandidate));
-                uvec4 resV           = max(regionVCandidate,           XYZW(emptyCornerCandidate));
+                uvec4 resB           = max(regionBCandidate,           emptyCornerCandidate.xyzw);
+                uvec4 resYTopRight   = max(regionYTopRightCandidate,   emptyCornerCandidate.xyyz);
+                uvec4 resYBottomLeft = max(regionYBottomLeftCandidate, emptyCornerCandidate.zwwx);
+                uvec4 resV           = max(regionVCandidate,           emptyCornerCandidate.xyzw);
 
                 mediump float regGPower           = float(cellValue       ) *      domainFactor;
-                mediump vec4  regIPower           = vec4( regionICandidate) * XXXX(domainFactor);
-                mediump vec4  regBPower           = vec4( resB            ) * XXXX(domainFactor);
-                mediump vec4  regYTopRightPower   = vec4( resYTopRight    ) * XXXX(domainFactor);
-                mediump vec4  regYBottomLeftPower = vec4( resYBottomLeft  ) * XXXX(domainFactor);
-                mediump vec4  regVPower           = vec4( resV            ) * XXXX(domainFactor);
+                mediump vec4  regIPower           = vec4( regionICandidate) * xxxx(domainFactor);
+                mediump vec4  regBPower           = vec4( resB            ) * xxxx(domainFactor);
+                mediump vec4  regYTopRightPower   = vec4( resYTopRight    ) * xxxx(domainFactor);
+                mediump vec4  regYBottomLeftPower = vec4( resYBottomLeft  ) * xxxx(domainFactor);
+                mediump vec4  regVPower           = vec4( resV            ) * xxxx(domainFactor);
 
                 mediump float enablePower =    float(insideG)      *     regGPower;
                 enablePower              += dot(vec4(insideB),           regBPower);
@@ -2822,17 +2710,17 @@ function main()
     
                     uvec4 regionVSolutionCandidate = uvec4(regVRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
     
-                    uvec4 resBSolution           = max(regionBSolutionCandidate,           XYZW(emptyCornerSolutionCandidate));
-                    uvec4 resYTopRightSolution   = max(regionYTopRightSolutionCandidate,   XYYZ(emptyCornerSolutionCandidate));
-                    uvec4 resYBottomLeftSolution = max(regionYBottomLeftSolutionCandidate, ZWWX(emptyCornerSolutionCandidate));
-                    uvec4 resVSolution           = max(regionVSolutionCandidate,           XYZW(emptyCornerSolutionCandidate));
+                    uvec4 resBSolution           = max(regionBSolutionCandidate,           emptyCornerSolutionCandidate.xyzw);
+                    uvec4 resYTopRightSolution   = max(regionYTopRightSolutionCandidate,   emptyCornerSolutionCandidate.xyyz);
+                    uvec4 resYBottomLeftSolution = max(regionYBottomLeftSolutionCandidate, emptyCornerSolutionCandidate.zwwx);
+                    uvec4 resVSolution           = max(regionVSolutionCandidate,           emptyCornerSolutionCandidate.xyzw);
     
                     mediump float regGSolutionPower           = float(solutionValue           ) *      domainFactor;
-                    mediump vec4  regISolutionPower           = vec4( regionISolutionCandidate) * XXXX(domainFactor);
-                    mediump vec4  regBSolutionPower           = vec4( resBSolution            ) * XXXX(domainFactor);
-                    mediump vec4  regYTopRightSolutionPower   = vec4( resYTopRightSolution    ) * XXXX(domainFactor);
-                    mediump vec4  regYBottomLeftSolutionPower = vec4( resYBottomLeftSolution  ) * XXXX(domainFactor);
-                    mediump vec4  regVSolutionPower           = vec4( resVSolution            ) * XXXX(domainFactor);
+                    mediump vec4  regISolutionPower           = vec4( regionISolutionCandidate) * xxxx(domainFactor);
+                    mediump vec4  regBSolutionPower           = vec4( resBSolution            ) * xxxx(domainFactor);
+                    mediump vec4  regYTopRightSolutionPower   = vec4( resYTopRightSolution    ) * xxxx(domainFactor);
+                    mediump vec4  regYBottomLeftSolutionPower = vec4( resYBottomLeftSolution  ) * xxxx(domainFactor);
+                    mediump vec4  regVSolutionPower           = vec4( resVSolution            ) * xxxx(domainFactor);
     
                     mediump float solvedPower =    float(insideG)      *     regGSolutionPower;
                     solvedPower              += dot(vec4(insideB),           regBSolutionPower);
@@ -2872,17 +2760,17 @@ function main()
     
                     uvec4 regionVStabilityCandidate = uvec4(regVRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
     
-                    uvec4 resBStability           = max(regionBStabilityCandidate,           XYZW(emptyCornerStabilityCandidate));
-                    uvec4 resYTopRightStability   = max(regionYTopRightStabilityCandidate,   XYYZ(emptyCornerStabilityCandidate));
-                    uvec4 resYBottomLeftStability = max(regionYBottomLeftStabilityCandidate, ZWWX(emptyCornerStabilityCandidate));
-                    uvec4 resVStability           = max(regionVStabilityCandidate,           XYZW(emptyCornerStabilityCandidate));
+                    uvec4 resBStability           = max(regionBStabilityCandidate,           emptyCornerStabilityCandidate.xyzw);
+                    uvec4 resYTopRightStability   = max(regionYTopRightStabilityCandidate,   emptyCornerStabilityCandidate.xyyz);
+                    uvec4 resYBottomLeftStability = max(regionYBottomLeftStabilityCandidate, emptyCornerStabilityCandidate.zwwx);
+                    uvec4 resVStability           = max(regionVStabilityCandidate,           emptyCornerStabilityCandidate.xyzw);
     
                     mediump float regGStabilityPower           = float(stabilityValue           ) *      domainFactor;
-                    mediump vec4  regIStabilityPower           = vec4( regionIStabilityCandidate) * XXXX(domainFactor);
-                    mediump vec4  regBStabilityPower           = vec4( resBStability            ) * XXXX(domainFactor);
-                    mediump vec4  regYTopRightStabilityPower   = vec4( resYTopRightStability    ) * XXXX(domainFactor);
-                    mediump vec4  regYBottomLeftStabilityPower = vec4( resYBottomLeftStability  ) * XXXX(domainFactor);
-                    mediump vec4  regVStabilityPower           = vec4( resVStability            ) * XXXX(domainFactor);
+                    mediump vec4  regIStabilityPower           = vec4( regionIStabilityCandidate) * xxxx(domainFactor);
+                    mediump vec4  regBStabilityPower           = vec4( resBStability            ) * xxxx(domainFactor);
+                    mediump vec4  regYTopRightStabilityPower   = vec4( resYTopRightStability    ) * xxxx(domainFactor);
+                    mediump vec4  regYBottomLeftStabilityPower = vec4( resYBottomLeftStability  ) * xxxx(domainFactor);
+                    mediump vec4  regVStabilityPower           = vec4( resVStability            ) * xxxx(domainFactor);
     
                     mediump float stablePower =    float(insideG)      *     regGStabilityPower;
                     stablePower              += dot(vec4(insideB),           regBStabilityPower);
@@ -2929,27 +2817,17 @@ function main()
 
         layout(location = 0) out lowp vec4 outColor;
 
-        ivec2 XX(int x) //Simulating HLSL's .xx
+        ivec2 xx(int x) //Simulating HLSL's .xx
         {
             return ivec2(x, x);
         }
 
-        uvec4 XXXX(uint x) //Simulating HLSL's .xxxx
+        uvec4 xxxx(uint x) //Simulating HLSL's .xxxx
         {
             return uvec4(x, x, x, x);
         }
     
-        uvec4 XYZW(uvec4 v) //For uniformity
-        {
-            return v.xyzw;
-        }
-
-        uvec4 YZWX(uvec4 v) //For uniformity
-        {
-            return v.yzwx;
-        }
-
-        bvec4 b4eq(uvec4 a, uvec4 b) //Another thing that doesn't require writing functions in hlsl
+        bvec4 u4eq(uvec4 a, uvec4 b) //Another thing that doesn't require writing functions in hlsl
         {
             return bvec4(a.x == b.x, a.y == b.y, a.z == b.z, a.w == b.w);
         }
@@ -2961,16 +2839,18 @@ function main()
 
         bvec4 emptyCornerRule(uvec4 edgeValue)
         {
-            return b4eq(XYZW(edgeValue), YZWX(edgeValue));
+            return u4eq(edgeValue.xyzw, edgeValue.yzwx);
         }
 
         bvec4 cornerRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
         {
             bvec4 res = bvec4(false, false, false, false);
+
+            uvec4 cellValuexxxx = xxxx(cellValue);
             
-            res = b4or(res, b4eq(XXXX(cellValue), XYZW(cornerValue)));
-            res = b4or(res, b4eq(XXXX(cellValue), XYZW(edgeValue)));
-            res = b4or(res, b4eq(XXXX(cellValue), YZWX(edgeValue)));
+            res = b4or(res, u4eq(cellValuexxxx, cornerValue.xyzw));
+            res = b4or(res, u4eq(cellValuexxxx, edgeValue.xyzw));
+            res = b4or(res, u4eq(cellValuexxxx, edgeValue.yzwx));
 
             return res;
         }
@@ -2981,10 +2861,12 @@ function main()
 
             if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
             {
-                highp ivec2 cellNumber = screenPos.xy / XX(gCellSize);
+                ivec2 cellSizexx = xx(gCellSize);
+
+                highp ivec2 cellNumber = screenPos.xy / cellSizexx;
                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
 
-                mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellNumber * XX(gCellSize)) - vec2(XX(gCellSize)) / 2.0f);
+                mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellNumber * cellSizexx) - vec2(cellSizexx) / 2.0f);
                 mediump float circleRadius = float(gCellSize - 1) / 2.0f;
                 
                 mediump float domainFactor = 1.0f / float(gDomainSize - 1);
@@ -3017,6 +2899,8 @@ function main()
 
                 if((gFlags & FLAG_TOROID_RENDER) != 0)
                 {
+                    ivec2 boardSizexx = xx(gBoardSize);
+
                     nonLeftEdge        = true;
                     nonRightEdge       = true;
                     nonTopEdge         = true;
@@ -3028,23 +2912,23 @@ function main()
         
                     const uint maxCheckDistance = 1u; //Different for different render modes
 
-                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 topCellU         = uvec2(topCell)         + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 topCellU         = uvec2(topCell)         + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(boardSizexx) * maxCheckDistance;
 
-                    leftCell        = ivec2(leftCellU        % uvec2(XX(gBoardSize)));
-                    rightCell       = ivec2(rightCellU       % uvec2(XX(gBoardSize)));
-                    topCell         = ivec2(topCellU         % uvec2(XX(gBoardSize)));
-                    bottomCell      = ivec2(bottomCellU      % uvec2(XX(gBoardSize)));
-                    leftTopCell     = ivec2(leftTopCellU     % uvec2(XX(gBoardSize)));
-                    rightTopCell    = ivec2(rightTopCellU    % uvec2(XX(gBoardSize)));
-                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(XX(gBoardSize)));
-                    rightBottomCell = ivec2(rightBottomCellU % uvec2(XX(gBoardSize)));
+                    leftCell        = ivec2(leftCellU        % uvec2(boardSizexx));
+                    rightCell       = ivec2(rightCellU       % uvec2(boardSizexx));
+                    topCell         = ivec2(topCellU         % uvec2(boardSizexx));
+                    bottomCell      = ivec2(bottomCellU      % uvec2(boardSizexx));
+                    leftTopCell     = ivec2(leftTopCellU     % uvec2(boardSizexx));
+                    rightTopCell    = ivec2(rightTopCellU    % uvec2(boardSizexx));
+                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(boardSizexx));
+                    rightBottomCell = ivec2(rightBottomCellU % uvec2(boardSizexx));
                 }
 
                 uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
@@ -3163,112 +3047,47 @@ function main()
 
         layout(location = 0) out lowp vec4 outColor;
 
-        bvec2 XX(bool b) //Simulating HLSL
+        bvec2 xx(bool b) //Simulating HLSL
         {
             return bvec2(b, b);
         }
 
-        ivec2 XX(int i) //Simulating HLSL
+        ivec2 xx(int i) //Simulating HLSL
         {
             return ivec2(i, i);
         }
 
-        uvec2 XX(uint u) //Simulating HLSL
+        uvec2 xx(uint u) //Simulating HLSL
         {
             return uvec2(u, u);
         }
 
-        uvec2 XY(uvec4 v) //For uniformity
-        {
-            return v.xy;
-        }
-
-        uvec2 ZW(uvec4 v) //For uniformity
-        {
-            return v.zw;
-        }
-
-        mediump vec2 XX(mediump float f) //Simulating HLSL
+        mediump vec2 xx(mediump float f) //Simulating HLSL
         {
             return vec2(f, f);
         }
 
-        bvec4 XXXX(bool b) //Simulating HLSL again
+        bvec4 xxxx(bool b) //Simulating HLSL again
         {
             return bvec4(b, b, b, b);
         }
 
-        bvec4 XXXX(bvec2 v) //For uniformity
-        {
-            return v.xxxx;
-        }
-
-        bvec4 YYYY(bvec2 v) //For uniformity
-        {
-            return v.yyyy;
-        }
-
-        bvec4 XYYX(bvec2 v) //For uniformity
-        {
-            return v.xyyx;
-        }
-
-        bvec4 XXYY(bvec4 v) //For uniformity
-        {
-            return v.xxyy;
-        }
-
-        bvec4 ZZWW(bvec4 v) //For uniformity
-        {
-            return v.zzww;
-        }
-
-        uvec4 XXXX(uint x) //Simulating HLSL's .xxxx yet again
+        uvec4 xxxx(uint x) //Simulating HLSL's .xxxx yet again
         {
             return uvec4(x, x, x, x);
         }
 
-        uvec4 XXYY(uvec4 v) //For uniformity again
-        {
-            return v.xxyy;
-        }
-
-        uvec4 XYYZ(uvec4 v) //For uniformity 
-        {
-            return v.xyyz;
-        }
-
-        uvec4 ZZWW(uvec4 v) //For uniformity
-        {
-            return v.zzww;
-        }
-
-        uvec4 ZWWX(uvec4 v) //For uniformity
-        {
-            return v.zwwx;
-        }
-
-        uvec4 XYZW(uvec4 v) //For uniformity
-        {
-            return v.xyzw;
-        }
-
-        uvec4 YZWX(uvec4 v) //For uniformity
-        {
-            return v.yzwx;
-        }
-
-        mediump vec4 XXXX(mediump float f)
+        mediump vec4 xxxx(mediump float f)
         {
             return vec4(f, f, f, f);
         }
 
-        bvec4 b4eq(uvec4 a, uvec4 b) //Another thing that doesn't require writing functions in hlsl
+        bvec4 u4eq(uvec4 a, uvec4 b) //Another thing that doesn't require writing functions in hlsl
         {
             return bvec4(a.x == b.x, a.y == b.y, a.z == b.z, a.w == b.w);
         }
 
-        bvec2 b2eq(uvec2 a, uvec2 b) //Another thing that doesn't require writing functions in hlsl
+        bvec2 u2eq(uvec2 a, uvec2 b) //Another thing that doesn't require writing functions in hlsl
         {
             return bvec2(a.x == b.x, a.y == b.y);
         }
@@ -3305,28 +3124,31 @@ function main()
 
         bvec4 emptyCornerRule(uvec4 edgeValue)
         {
-            return b4eq(XYZW(edgeValue), YZWX(edgeValue));
+            return u4eq(edgeValue.xyzw, edgeValue.yzwx);
         }
 
         bvec4 cornerRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
         {
             bvec4 res = bvec4(false, false, false, false);
             
-            res = b4or(res, b4eq(XXXX(cellValue), XYZW(cornerValue)));
-            res = b4or(res, b4eq(XXXX(cellValue), XYZW(edgeValue)));
-            res = b4or(res, b4eq(XXXX(cellValue), YZWX(edgeValue)));
+            uvec4 cellValuexxxx = xxxx(cellValue);
+
+            res = b4or(res, u4eq(cellValuexxxx, cornerValue.xyzw));
+            res = b4or(res, u4eq(cellValuexxxx, edgeValue.xyzw));
+            res = b4or(res, u4eq(cellValuexxxx, edgeValue.yzwx));
 
             return res;
         }
 
         bvec2 linkRule(uvec4 edgeValue)
         {
-            return b2eq(XY(edgeValue), ZW(edgeValue));
+            return u2eq(edgeValue.xy, edgeValue.zw);
         }
 
         bvec4 slimEdgeRule(uint cellValue, uvec4 edge2Value)
         {
-            return b4eq(XXXX(cellValue), XYZW(edge2Value));
+            uvec4 cellValuexxxx = xxxx(cellValue);
+            return u4eq(cellValuexxxx, edge2Value.xyzw);
         }
 
         void main(void)
@@ -3335,10 +3157,12 @@ function main()
 
             if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
             {
-                highp ivec2 cellNumber = screenPos.xy / XX(gCellSize);
+                ivec2 cellSizexx = xx(gCellSize);
+
+                highp ivec2 cellNumber = screenPos.xy / cellSizexx;
                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
 
-                mediump vec2  cellCoord       = (vec2(screenPos.xy) - vec2(cellNumber * XX(gCellSize)) - vec2(XX(gCellSize)) / 2.0f);
+                mediump vec2  cellCoord       = (vec2(screenPos.xy) - vec2(cellNumber * cellSizexx) - vec2(cellSizexx) / 2.0f);
                 mediump float circleRadius    = float(gCellSize - 1) / 2.0f;
                 mediump float circleRadiusBig = float(gCellSize - 1);
                 mediump float domainFactor    = 1.0f / float(gDomainSize - 1);
@@ -3368,12 +3192,12 @@ function main()
                 bvec2 insideLink      = bvec2(insideLinkH, insideLinkV);
                 bool  insideBothLinks = insideLinkV && insideLinkH;
 
-                bvec4 insideSlimEdgeTopRightPart   = b4nd(XYYX(insideLink), XXYY(insideCorner));
-                bvec4 insideSlimEdgeBottomLeftPart = b4nd(XYYX(insideLink), ZZWW(insideCorner));
+                bvec4 insideSlimEdgeTopRightPart   = b4nd(insideLink.xyyx, insideCorner.xxyy);
+                bvec4 insideSlimEdgeBottomLeftPart = b4nd(insideLink.xyyx, insideCorner.zzww);
 
-                bvec2 insideCenterLink = b2nd(insideLink,   XX(   insideCircle), XX(  !insideBothLinks));
+                bvec2 insideCenterLink = b2nd(insideLink,   xx(   insideCircle), xx(  !insideBothLinks));
                 bool  insideFreeCircle = b1nd(insideCircle,      !insideLinkV  ,      !insideLinkH);
-                bvec4 insideFreeCorner = b4nd(insideCorner, XXXX(!insideLinkH ), XXXX(!insideLinkV));
+                bvec4 insideFreeCorner = b4nd(insideCorner, xxxx(!insideLinkH ), xxxx(!insideLinkV));
 
                 ivec2 leftCell        = cellNumber + ivec2(-1,  0);
                 ivec2 rightCell       = cellNumber + ivec2( 1,  0);
@@ -3403,6 +3227,8 @@ function main()
 
                 if((gFlags & FLAG_TOROID_RENDER) != 0)
                 {
+                    ivec2 boardSizexx = xx(gBoardSize);
+
                     nonLeftEdge        = true;
                     nonRightEdge       = true;
                     nonTopEdge         = true;
@@ -3418,31 +3244,31 @@ function main()
         
                     const uint maxCheckDistance = 2u; //Different for different render modes
 
-                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 topCellU         = uvec2(topCell)         + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 left2CellU       = uvec2(left2Cell)       + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 right2CellU      = uvec2(right2Cell)      + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 top2CellU        = uvec2(top2Cell)        + uvec2(XX(gBoardSize)) * maxCheckDistance;
-                    uvec2 bottom2CellU     = uvec2(bottom2Cell)     + uvec2(XX(gBoardSize)) * maxCheckDistance;
+                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 topCellU         = uvec2(topCell)         + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 left2CellU       = uvec2(left2Cell)       + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 right2CellU      = uvec2(right2Cell)      + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 top2CellU        = uvec2(top2Cell)        + uvec2(boardSizexx) * maxCheckDistance;
+                    uvec2 bottom2CellU     = uvec2(bottom2Cell)     + uvec2(boardSizexx) * maxCheckDistance;
 
-                    leftCell        = ivec2(leftCellU        % uvec2(XX(gBoardSize)));
-                    rightCell       = ivec2(rightCellU       % uvec2(XX(gBoardSize)));
-                    topCell         = ivec2(topCellU         % uvec2(XX(gBoardSize)));
-                    bottomCell      = ivec2(bottomCellU      % uvec2(XX(gBoardSize)));
-                    leftTopCell     = ivec2(leftTopCellU     % uvec2(XX(gBoardSize)));
-                    rightTopCell    = ivec2(rightTopCellU    % uvec2(XX(gBoardSize)));
-                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(XX(gBoardSize)));
-                    rightBottomCell = ivec2(rightBottomCellU % uvec2(XX(gBoardSize)));
-                    left2Cell       = ivec2(left2CellU       % uvec2(XX(gBoardSize)));
-                    right2Cell      = ivec2(right2CellU      % uvec2(XX(gBoardSize)));
-                    top2Cell        = ivec2(top2CellU        % uvec2(XX(gBoardSize)));
-                    bottom2Cell     = ivec2(bottom2CellU     % uvec2(XX(gBoardSize)));
+                    leftCell        = ivec2(leftCellU        % uvec2(boardSizexx));
+                    rightCell       = ivec2(rightCellU       % uvec2(boardSizexx));
+                    topCell         = ivec2(topCellU         % uvec2(boardSizexx));
+                    bottomCell      = ivec2(bottomCellU      % uvec2(boardSizexx));
+                    leftTopCell     = ivec2(leftTopCellU     % uvec2(boardSizexx));
+                    rightTopCell    = ivec2(rightTopCellU    % uvec2(boardSizexx));
+                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(boardSizexx));
+                    rightBottomCell = ivec2(rightBottomCellU % uvec2(boardSizexx));
+                    left2Cell       = ivec2(left2CellU       % uvec2(boardSizexx));
+                    right2Cell      = ivec2(right2CellU      % uvec2(boardSizexx));
+                    top2Cell        = ivec2(top2CellU        % uvec2(boardSizexx));
+                    bottom2Cell     = ivec2(bottom2CellU     % uvec2(boardSizexx));
                 }
 
                 uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
@@ -3467,21 +3293,21 @@ function main()
                 uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)                   ) * edgeValue;
                 uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, edgeValue, cornerValue)) * cellValue;
 
-                uvec2 linkCandidate     = uvec2(linkRule(edgeValue)                ) *   XY(edgeValue);
-                uvec4 slimEdgeCandidate = uvec4(slimEdgeRule(cellValue, edge2Value)) * XXXX(cellValue);
+                uvec2 linkCandidate     = uvec2(linkRule(edgeValue)                ) *      edgeValue.xy;
+                uvec4 slimEdgeCandidate = uvec4(slimEdgeRule(cellValue, edge2Value)) * xxxx(cellValue);
 
                 uvec4 resCorner                  = max(cornerCandidate, emptyCornerCandidate);
-                uvec4 resSlimCornerTopRightPart  = max(XXYY(resCorner), XYYZ(slimEdgeCandidate));
-                uvec4 resSlimCornerBotomLeftPart = max(ZZWW(resCorner), ZWWX(slimEdgeCandidate));
+                uvec4 resSlimCornerTopRightPart  = max(resCorner.xxyy, slimEdgeCandidate.xyyz);
+                uvec4 resSlimCornerBotomLeftPart = max(resCorner.zzww, slimEdgeCandidate.zwwx);
 
-                uvec2 resLink     = max(linkCandidate, XX(centerCandidate));
+                uvec2 resLink     = max(linkCandidate, xx(centerCandidate));
                 uint  resMidLinks = max(resLink.x,     resLink.y);
 
                 mediump float cellPower           = float(cellValue                 ) *      domainFactor;
-                mediump vec4  cornerPower         = vec4( resCorner                 ) * XXXX(domainFactor);
-                mediump vec4  slimTopRightPower   = vec4( resSlimCornerTopRightPart ) * XXXX(domainFactor);
-                mediump vec4  slimBottomLeftPower = vec4( resSlimCornerBotomLeftPart) * XXXX(domainFactor);
-                mediump vec2  linkPower           = vec2( resLink                   ) *   XX(domainFactor);
+                mediump vec4  cornerPower         = vec4( resCorner                 ) * xxxx(domainFactor);
+                mediump vec4  slimTopRightPower   = vec4( resSlimCornerTopRightPart ) * xxxx(domainFactor);
+                mediump vec4  slimBottomLeftPower = vec4( resSlimCornerBotomLeftPart) * xxxx(domainFactor);
+                mediump vec2  linkPower           = vec2( resLink                   ) *   xx(domainFactor);
                 mediump float midPower            = float(resMidLinks               ) *      domainFactor;
 
                 mediump float enablePower =    float(insideFreeCircle)      *       cellPower;
@@ -3519,21 +3345,21 @@ function main()
                     uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(edgeSolved)                        ) * edgeSolved;
                     uvec4 cornerSolutionCandidate      = uvec4(cornerRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
         
-                    uvec2 linkSolutionCandidate     = uvec2(linkRule(edgeSolved)                    ) * XY(edgeSolved);
-                    uvec4 slimEdgeSolutionCandidate = uvec4(slimEdgeRule(solutionValue, edge2Solved)) * XXXX(solutionValue);
+                    uvec2 linkSolutionCandidate     = uvec2(linkRule(edgeSolved)                    ) *      edgeSolved.xy;
+                    uvec4 slimEdgeSolutionCandidate = uvec4(slimEdgeRule(solutionValue, edge2Solved)) * xxxx(solutionValue);
         
                     uvec4 resCornerSolution                  = max(cornerSolutionCandidate, emptyCornerSolutionCandidate);
-                    uvec4 resSlimCornerTopRightPartSolution  = max(XXYY(resCornerSolution), XYYZ(slimEdgeSolutionCandidate));
-                    uvec4 resSlimCornerBotomLeftPartSolution = max(ZZWW(resCornerSolution), ZWWX(slimEdgeSolutionCandidate));
+                    uvec4 resSlimCornerTopRightPartSolution  = max(resCornerSolution.xxyy,  slimEdgeSolutionCandidate.xyyz);
+                    uvec4 resSlimCornerBotomLeftPartSolution = max(resCornerSolution.zzww,  slimEdgeSolutionCandidate.zwwx);
         
-                    uvec2 resLinkSolution     = max(linkSolutionCandidate, XX(centerSolutionCandidate));
+                    uvec2 resLinkSolution     = max(linkSolutionCandidate, xx(centerSolutionCandidate));
                     uint  resMidLinksSolution = max(resLinkSolution.x,     resLinkSolution.y);
         
                     mediump float cellSolutionPower           = float(solutionValue                     ) *      domainFactor;
-                    mediump vec4  cornerSolutionPower         = vec4( resCornerSolution                 ) * XXXX(domainFactor);
-                    mediump vec4  slimTopRightSolutionPower   = vec4( resSlimCornerTopRightPartSolution ) * XXXX(domainFactor);
-                    mediump vec4  slimBottomLeftSolutionPower = vec4( resSlimCornerBotomLeftPartSolution) * XXXX(domainFactor);
-                    mediump vec2  linkSolutionPower           = vec2( resLinkSolution                   ) *   XX(domainFactor);
+                    mediump vec4  cornerSolutionPower         = vec4( resCornerSolution                 ) * xxxx(domainFactor);
+                    mediump vec4  slimTopRightSolutionPower   = vec4( resSlimCornerTopRightPartSolution ) * xxxx(domainFactor);
+                    mediump vec4  slimBottomLeftSolutionPower = vec4( resSlimCornerBotomLeftPartSolution) * xxxx(domainFactor);
+                    mediump vec2  linkSolutionPower           = vec2( resLinkSolution                   ) *   xx(domainFactor);
                     mediump float midSolutionPower            = float(resMidLinksSolution               ) *      domainFactor;
 
                     mediump float solvedPower =    float(insideFreeCircle)      *       cellSolutionPower;
@@ -3574,21 +3400,21 @@ function main()
                     uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(edgeStable)                         ) * edgeStable;
                     uvec4 cornerStabilityCandidate      = uvec4(cornerRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
         
-                    uvec2 linkStabilityCandidate     = uvec2(linkRule(edgeStable)                     ) * XY(edgeStable);
-                    uvec4 slimEdgeStabilityCandidate = uvec4(slimEdgeRule(stabilityValue, edge2Stable)) * XXXX(stabilityValue);
+                    uvec2 linkStabilityCandidate     = uvec2(linkRule(edgeStable)                     ) *      edgeStable.xy;
+                    uvec4 slimEdgeStabilityCandidate = uvec4(slimEdgeRule(stabilityValue, edge2Stable)) * xxxx(stabilityValue);
         
                     uvec4 resCornerStability                  = max(cornerStabilityCandidate, emptyCornerStabilityCandidate);
-                    uvec4 resSlimCornerTopRightPartStability  = max(XXYY(resCornerStability), XYYZ(slimEdgeStabilityCandidate));
-                    uvec4 resSlimCornerBotomLeftPartStability = max(ZZWW(resCornerStability), ZWWX(slimEdgeStabilityCandidate));
+                    uvec4 resSlimCornerTopRightPartStability  = max(resCornerStability.xxyy,  slimEdgeStabilityCandidate.xyyz);
+                    uvec4 resSlimCornerBotomLeftPartStability = max(resCornerStability.zzww,  slimEdgeStabilityCandidate.zwwx);
         
-                    uvec2 resLinkStability     = max(linkStabilityCandidate, XX(centerStabilityCandidate));
+                    uvec2 resLinkStability     = max(linkStabilityCandidate, xx(centerStabilityCandidate));
                     uint  resMidLinksStability = max(resLinkStability.x,     resLinkStability.y);
         
                     mediump float cellStabilityPower           = float(stabilityValue                     ) *      domainFactor;
-                    mediump vec4  cornerStabilityPower         = vec4( resCornerStability                 ) * XXXX(domainFactor);
-                    mediump vec4  slimTopRightStabilityPower   = vec4( resSlimCornerTopRightPartStability ) * XXXX(domainFactor);
-                    mediump vec4  slimBottomLeftStabilityPower = vec4( resSlimCornerBotomLeftPartStability) * XXXX(domainFactor);
-                    mediump vec2  linkStabilityPower           = vec2( resLinkStability                   ) *   XX(domainFactor);
+                    mediump vec4  cornerStabilityPower         = vec4( resCornerStability                 ) * xxxx(domainFactor);
+                    mediump vec4  slimTopRightStabilityPower   = vec4( resSlimCornerTopRightPartStability ) * xxxx(domainFactor);
+                    mediump vec4  slimBottomLeftStabilityPower = vec4( resSlimCornerBotomLeftPartStability) * xxxx(domainFactor);
+                    mediump vec2  linkStabilityPower           = vec2( resLinkStability                   ) *   xx(domainFactor);
                     mediump float midStabilityPower            = float(resMidLinksStability               ) *      domainFactor;
 
                     mediump float stablePower =    float(insideFreeCircle)      *       cellStabilityPower;
