@@ -219,9 +219,21 @@ function main()
 
             break;
         }
+        case "KeyG":
+        {
+            if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
+            {
+                changeCountingMode(countingModes.COUNT_NONE, false);
+            }
+            else
+            {
+                changeCountingMode(countingModes.COUNT_EIGENVECTOR, e.shiftKey);
+            }
+            break;
+        }    
         case "KeyV":
         {
-            if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting)
+            if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
             {
                 changeCountingMode(countingModes.COUNT_NONE, false);
             }
@@ -233,7 +245,7 @@ function main()
         }
         case "KeyX":
         {
-            if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting)
+            if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
             {
                 changeCountingMode(countingModes.COUNT_NONE, false);
             }
@@ -245,7 +257,7 @@ function main()
         } 
         case "KeyZ":
         {
-            if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting)
+            if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
             {
                 changeCountingMode(countingModes.COUNT_NONE, false);
             }
@@ -308,7 +320,8 @@ function main()
         COUNT_NONE:                    1,
         COUNT_SOLUTION_PERIOD:         2,
         COUNT_INVERSE_SOLUTION_PERIOD: 3,
-        COUNT_SOLUTION_PERIOD_4X:      4
+        COUNT_SOLUTION_PERIOD_4X:      4,
+        COUNT_EIGENVECTOR:             5
     };
 
     const minimumBoardSize = 1;
@@ -331,7 +344,7 @@ function main()
     let flagShowStability           = false;
     let flagShowLitStability        = false;
     let flagPeriodCounting          = false;
-    //let flagEigvecCounting          = false; //TODO check
+    let flagEigvecCounting          = false;
     let flagPerio4Counting          = false;
     let flagPeriodBackCounting      = false;
     let flagStopCountingWhenFound   = false;
@@ -366,10 +379,6 @@ function main()
     let currentQuietPatterns = 0;
 
     let currentTurnList = [];
-
-    //TODO check
-    //let eigvecTurnX = -1;
-    //let eigvecTurnY = -1;
 
     let currentPeriodCount = 0;
 
@@ -455,10 +464,7 @@ function main()
         changeCountingMode(countingModes.COUNT_NONE, false);
         currentTurnList.length = 0;
         flagRandomSolving = false;
-
-        //eigvecTurnX = -1;
-        //eigvecTurnY = -1;
-
+        
         currentGameSize = clamp(newSize, minimumBoardSize, maximumBoardSize);
         currentSolutionMatrixRelevant = false;
         flagSolutionMatrixComputing   = false;
@@ -506,10 +512,6 @@ function main()
         changeCountingMode(countingModes.COUNT_NONE, false);
         currentTurnList.length = 0;
         flagRandomSolving = false;
-
-        //TODO
-        //eigvecTurnX = -1;
-        //eigvecTurnY = -1;
 
         currentDomainSize = clamp(newSize, minimumDomainSize, maximumDomainSize);
         currentSolutionMatrixRelevant = false;
@@ -1141,6 +1143,7 @@ function main()
         flagPeriodCounting     = false;
         flagPeriodBackCounting = false;
         flagPerio4Counting     = false;
+        flagEigvecCounting     = false;
 
         showSolution(false);
         showInverseSolution(false);
@@ -1175,6 +1178,11 @@ function main()
             flagPeriodBackCounting = true;
             break;
         }
+        case countingModes.COUNT_EIGENVECTOR:
+        {
+            flagEigvecCounting = true;
+            break;
+        }
         }
 
         flagStopCountingWhenFound = stopWhenReturned;
@@ -1183,6 +1191,15 @@ function main()
         {
             currentPeriodCount = 0;
             currentCountedBoard = currentGameBoard.slice();
+
+            flagTickLoop = true;
+            currentAnimationFrame = window.requestAnimationFrame(nextTick);
+        }
+        else if(flagEigvecCounting)
+        {
+            currentPeriodCount = 0;
+            currentCountedBoard = currentGameBoard.slice();
+            currentGameBoard    = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize);
 
             flagTickLoop = true;
             currentAnimationFrame = window.requestAnimationFrame(nextTick);
@@ -1993,6 +2010,45 @@ function main()
                 } 
             }
             
+            currentGameStability = calculateNewStabilityValue(currentGameSolution);
+            currentGameBoard     = currentGameSolution;
+
+            updateBoardTexture();
+
+            if(flagShowLitStability)
+            {
+                currentGameLitStability = calculateLitStability();
+                updateStabilityTexture();
+            }
+            else if(flagShowStability)
+            {
+                updateStabilityTexture();
+            }
+
+            if(!flagTickLoop) //Just stopped, period is found
+            {
+                spText.textContent = "Solution period: " + currentPeriodCount;
+            }
+            else
+            {
+                spText.textContent = "Interchanges: " + currentPeriodCount;
+            }
+        }
+
+        if(flagEigvecCounting)
+        {
+            currentPeriodCount++;
+
+            let citybuilderBoard = addBoard(currentGameBoard, currentCountedBoard, currentDomainSize);
+
+            currentGameSolution = calculateInverseSolution(citybuilderBoard, currentGameSize, currentDomainSize);
+            if(flagStopCountingWhenFound && equalsBoard(currentGameSolution, citybuilderBoard)) //Solution is the current board => we found an eigenvector
+            {
+                flagStopCountingWhenFound = false;
+                changeCountingMode(countingModes.COUNT_NONE, false);
+                flagTickLoop = false;
+            }
+
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
 
