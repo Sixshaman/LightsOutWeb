@@ -24,20 +24,14 @@ function main()
         clickAtPoint(x, y, e.ctrlKey);
     };
 
-    document.onkeydown = function(e)
+    renderModeSelect.onkeydown = function(e)
     {
-        if(e.code == "ArrowLeft" || e.code == "ArrowRight" || e.code == "ArrowUp" || e.code == "ArrowDown")
-        {
-            e.preventDefault();
-        }
+        e.preventDefault();
     };
 
-    document.onkeypress = function(e)
+    renderModeSelect.onkeypress = function(e)
     {
-        if(e.code == "ArrowLeft" || e.code == "ArrowRight" || e.code == "ArrowUp" || e.code == "ArrowDown")
-        {
-            e.preventDefault();
-        }
+        e.preventDefault();
     };
 
     document.onkeyup = function (e)
