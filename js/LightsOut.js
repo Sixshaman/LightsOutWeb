@@ -24,19 +24,12 @@ function main()
         clickAtPoint(x, y, e.ctrlKey);
     };
 
-    renderModeSelect.onkeydown = function(e)
-    {
-        e.preventDefault();
-    };
-
-    renderModeSelect.onkeypress = function(e)
-    {
-        e.preventDefault();
-    };
-
     document.onkeyup = function (e)
     {
-        e.preventDefault();
+        if(document.activeElement === renderModeSelect)
+        {
+            return;
+        }
 
         switch (e.code)
         {
@@ -183,7 +176,7 @@ function main()
             if(currentTurnList.length == 0)
             {
                 updateSolutionMatrixIfNeeded();
-                currentGameSolution = calculateSolution();
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize);
                 updateSolutionTexture();
 
                 currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
@@ -191,11 +184,12 @@ function main()
                 flagRandomSolving = true;
 
                 flagTickLoop = true;
-                window.requestAnimationFrame(nextTick);
+                currentAnimationFrame = window.requestAnimationFrame(nextTick);
             }
             else
             {
                 currentTurnList.length = 0;
+                window.cancelAnimationFrame(currentAnimationFrame);
                 flagTickLoop = false;
             }
 
@@ -206,7 +200,7 @@ function main()
             if(currentTurnList.length == 0)
             {
                 updateSolutionMatrixIfNeeded();
-                currentGameSolution = calculateSolution();
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize);
                 updateSolutionTexture();
 
                 currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
@@ -214,25 +208,50 @@ function main()
                 flagRandomSolving = false;
 
                 flagTickLoop = true;
-                window.requestAnimationFrame(nextTick);
+                currentAnimationFrame = window.requestAnimationFrame(nextTick);
             }
             else
             {
                 currentTurnList.length = 0;
+                window.cancelAnimationFrame(currentAnimationFrame);
                 flagTickLoop = false;
             }
 
             break;
         }
-        case "KeyZ":
+        case "KeyV":
         {
-            if(flagPeriodBackCounting /*|| flagPeriodCounting || flagPerio4Counting*/)
+            if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting)
             {
                 changeCountingMode(countingModes.COUNT_NONE, false);
             }
             else
             {
-                changeCountingMode(countingModes.COUNT_INVERSE_SOLUTION_PERIOD, true);
+                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD, e.shiftKey);
+            }
+            break;
+        }
+        case "KeyX":
+        {
+            if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting)
+            {
+                changeCountingMode(countingModes.COUNT_NONE, false);
+            }
+            else
+            {
+                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD_4X, e.shiftKey);
+            }
+            break;
+        } 
+        case "KeyZ":
+        {
+            if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting)
+            {
+                changeCountingMode(countingModes.COUNT_NONE, false);
+            }
+            else
+            {
+                changeCountingMode(countingModes.COUNT_INVERSE_SOLUTION_PERIOD, e.shiftKey);
             }
             break;
         } 
@@ -246,6 +265,7 @@ function main()
     renderModeSelect.onchange = function()
     {
         setRenderMode(renderModeSelect.value);
+        canvas.focus();
     };
 
     let boardGenModes =
@@ -302,15 +322,17 @@ function main()
     let standardWidth  = canvas.clientWidth;
     let standardHeight = canvas.clientHeight;
 
+    let currentAnimationFrame = 0;
+
     let flagSolutionMatrixComputing = false;
     let flagRandomSolving           = false;
     let flagShowSolution            = false;
     let flagShowInverseSolution     = false;
     let flagShowStability           = false;
     let flagShowLitStability        = false;
-    //let flagPeriodCounting          = false; //TODO check
+    let flagPeriodCounting          = false;
     //let flagEigvecCounting          = false; //TODO check
-    //let flagPerio4Counting          = false; //TODO check
+    let flagPerio4Counting          = false;
     let flagPeriodBackCounting      = false;
     let flagStopCountingWhenFound   = false;
     let flagToroidBoard             = false;
@@ -533,12 +555,12 @@ function main()
 
         if(flagShowSolution)
         {
-            currentGameSolution = calculateSolution();
+            currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize);
             updateSolutionTexture();
         }
         else if(flagShowInverseSolution)
         {
-            currentGameSolution = calculateInverseSolution();
+            currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize);
             updateSolutionTexture();
         }
 
@@ -757,18 +779,18 @@ function main()
         return {invmatrix: invMatrix, quietpats: quietPatterns};
     }
 
-    function calculateSolution()
+    function calculateSolution(board, gameSize, domainSize)
     {
-        let solution = new Uint8Array(currentGameSize * currentGameSize);
+        let solution = new Uint8Array(gameSize * gameSize);
 
-        for(let y = 0; y < currentGameSize; y++)
+        for(let y = 0; y < gameSize; y++)
         {
-            for (let x = 0; x < currentGameSize; x++)
+            for (let x = 0; x < gameSize; x++)
             {
-                let cellIndex = cellIndexFromPoint(currentGameSize, x, y);
+                let cellIndex = cellIndexFromPoint(gameSize, x, y);
                 let matrixRow = currentSolutionMatrix[cellIndex];
 
-                solution[cellIndex] = dotProductBoard(currentGameBoard, matrixRow, currentDomainSize);
+                solution[cellIndex] = dotProductBoard(board, matrixRow, domainSize);
             }
         }
 
@@ -776,19 +798,19 @@ function main()
         return solution;
     }
 
-    function calculateInverseSolution() //Operates on currentGameBoard
+    function calculateInverseSolution(board, gameSize, domainSize)
     {
-        let invSolution = new Uint8Array(currentGameSize * currentGameSize);
+        let invSolution = new Uint8Array(gameSize * gameSize);
         invSolution.fill(0);
 
-        let turns = buildTurnList(currentGameBoard, currentGameSize);
+        let turns = buildTurnList(board, gameSize);
         if(flagDefaultClickRule)
         {
-            invSolution = makeTurnsDefault(invSolution, currentGameSize, currentDomainSize, turns, flagToroidBoard);
+            invSolution = makeTurnsDefault(invSolution, gameSize, domainSize, turns, flagToroidBoard);
         }
         else
         {
-            invSolution = makeTurns(invSolution, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, turns, flagToroidBoard);
+            invSolution = makeTurns(invSolution, currentGameClickRule, currentClickRuleSize, gameSize, domainSize, turns, flagToroidBoard);
         }
 
         return invSolution;
@@ -864,12 +886,12 @@ function main()
 
             if(flagShowSolution)
             {
-                currentGameSolution = calculateSolution();
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize);
                 updateSolutionTexture();
             }
             else if(flagShowInverseSolution)
             {
-                currentGameSolution = calculateInverseSolution();
+                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize);
                 updateSolutionTexture();
             }
         }
@@ -945,12 +967,12 @@ function main()
 
             if(flagShowSolution)
             {
-                currentGameSolution = calculateSolution();
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize);
                 updateSolutionTexture();
             }
             else if(flagShowInverseSolution)
             {
-                currentGameSolution = calculateInverseSolution();
+                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize);
                 updateSolutionTexture();
             }
         }
@@ -967,7 +989,7 @@ function main()
             showInverseSolution(false);
 
             currentGameBoard = generateNewBoard(currentGameSize, currentDomainSize, boardGenModes.BOARDGEN_FULL_RANDOM);
-            currentGameBoard = calculateInverseSolution();
+            currentGameBoard = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize);
 
             resetStability();
             updateStabilityTexture();
@@ -1116,9 +1138,9 @@ function main()
             return;
         }
 
-        //flagPeriodCounting     = false;
+        flagPeriodCounting     = false;
         flagPeriodBackCounting = false;
-        //flagPerio4Counting     = false;
+        flagPerio4Counting     = false;
 
         showSolution(false);
         showInverseSolution(false);
@@ -1138,12 +1160,14 @@ function main()
         }
         case countingModes.COUNT_SOLUTION_PERIOD:
         {
-            //flagPeriodCounting = true;
+            updateSolutionMatrixIfNeeded();
+            flagPeriodCounting = true;
             break;
         }
         case countingModes.COUNT_SOLUTION_PERIOD_4X:
         {
-            //flagPerio4Counting = true;
+            updateSolutionMatrixIfNeeded();
+            flagPerio4Counting = true;
             break;
         }
         case countingModes.COUNT_INVERSE_SOLUTION_PERIOD:
@@ -1155,13 +1179,18 @@ function main()
 
         flagStopCountingWhenFound = stopWhenReturned;
 
-        if(flagPeriodBackCounting /*|| flagPeriodCounting || flagPerio4Counting*/)
+        if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting)
         {
             currentPeriodCount = 0;
             currentCountedBoard = currentGameBoard.slice();
 
             flagTickLoop = true;
-            window.requestAnimationFrame(nextTick);
+            currentAnimationFrame = window.requestAnimationFrame(nextTick);
+        }
+        else
+        {
+            cancelAnimationFrame(currentAnimationFrame);
+            flagTickLoop = false;
         }
     }
 
@@ -1651,7 +1680,7 @@ function main()
         {
             flagShowSolution = true;
 
-            currentGameSolution = calculateSolution();
+            currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize);
             updateSolutionTexture();
         }
         else
@@ -1679,7 +1708,7 @@ function main()
         {
             flagShowInverseSolution = true;
 
-            currentGameSolution = calculateInverseSolution();
+            currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize);
             updateSolutionTexture();
         }
         else
@@ -1875,7 +1904,7 @@ function main()
         {
             currentPeriodCount++;
 
-            currentGameSolution = calculateInverseSolution();
+            currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize);
             
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
@@ -1899,14 +1928,101 @@ function main()
                 flagTickLoop = false;
             }
 
-            spText.textContent = "Solution period: " + currentPeriodCount;
+            if(!flagTickLoop) //Just stopped, period is found
+            {
+                spText.textContent = "Solution period: " + currentPeriodCount;
+            }
+            else
+            {
+                spText.textContent = "Interchanges: " + currentPeriodCount;
+            }
+        }
+
+        if(flagPeriodCounting)
+        {
+            currentPeriodCount++;
+
+            currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize);
+            
+            currentGameStability = calculateNewStabilityValue(currentGameSolution);
+            currentGameBoard     = currentGameSolution;
+
+            updateBoardTexture();
+
+            if(flagShowLitStability)
+            {
+                currentGameLitStability = calculateLitStability();
+                updateStabilityTexture();
+            }
+            else if(flagShowStability)
+            {
+                updateStabilityTexture();
+            }
+
+            if(flagStopCountingWhenFound && equalsBoard(currentGameBoard, currentCountedBoard))
+            {
+                flagStopCountingWhenFound = false;
+                changeCountingMode(countingModes.COUNT_NONE, false);
+                flagTickLoop = false;
+            }
+
+            if(!flagTickLoop) //Just stopped, period is found
+            {
+                spText.textContent = "Solution period: " + currentPeriodCount;
+            }
+            else
+            {
+                spText.textContent = "Interchanges: " + currentPeriodCount;
+            }
+        }
+
+        if(flagPerio4Counting)
+        {
+            currentGameSolution = currentGameBoard.slice();
+            for(let i = 0; i < 4; i++)
+            {
+                currentPeriodCount++;
+                currentGameSolution = calculateSolution(currentGameSolution, currentGameSize, currentDomainSize);
+                if(flagStopCountingWhenFound && equalsBoard(currentGameSolution, currentCountedBoard))
+                {
+                    flagStopCountingWhenFound = false;
+                    changeCountingMode(countingModes.COUNT_NONE, false);
+                    flagTickLoop = false;
+                    
+                    break;
+                } 
+            }
+            
+            currentGameStability = calculateNewStabilityValue(currentGameSolution);
+            currentGameBoard     = currentGameSolution;
+
+            updateBoardTexture();
+
+            if(flagShowLitStability)
+            {
+                currentGameLitStability = calculateLitStability();
+                updateStabilityTexture();
+            }
+            else if(flagShowStability)
+            {
+                updateStabilityTexture();
+            }
+
+            if(!flagTickLoop) //Just stopped, period is found
+            {
+                spText.textContent = "Solution period: " + currentPeriodCount;
+            }
+            else
+            {
+                spText.textContent = "Interchanges: " + currentPeriodCount;
+            }
         }
 
         requestRedraw();
         
         if(flagTickLoop)
         {
-            window.requestAnimationFrame(nextTick);
+            currentAnimationFrame = window.requestAnimationFrame(nextTick);
         }
     }
 
