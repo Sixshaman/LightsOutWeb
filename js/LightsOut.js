@@ -9,6 +9,8 @@ function main()
 
     const renderModeSelect = document.getElementById("rendermodesel");
 
+    const gridCheckBox = document.getElementById("gridcheckbox");
+
     const gl = canvas.getContext("webgl2");
     if (!gl)
     {
@@ -285,6 +287,11 @@ function main()
         canvas.focus();
     };
 
+    gridCheckBox.onclick = function()
+    {
+        setGridVisible(gridCheckBox.checked);
+    };
+
     let boardGenModes =
     {
         BOARDGEN_FULL_RANDOM:  1, //Generate a random board
@@ -350,6 +357,7 @@ function main()
     let flagShowInverseSolution     = false;
     let flagShowStability           = false;
     let flagShowLitStability        = false;
+    let flagNoGrid                  = false;
     let flagPeriodCounting          = false;
     let flagEigvecCounting          = false;
     let flagPerio4Counting          = false;
@@ -495,8 +503,10 @@ function main()
         }
 
         currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
-        standardWidth  = currentGameSize * currentCellSize + 1;
-        standardHeight = currentGameSize * currentCellSize + 1;
+
+        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, !flagNoGrid);
+        standardWidth     = newCanvasSize.width;
+        standardHeight    = newCanvasSize.height;
 
         updateBoardTexture();
 
@@ -533,16 +543,10 @@ function main()
 
     function clickAtPoint(x, y, isConstruct)
     {
-        if(x > standardWidth || y > standardHeight)
-        {
-            return;
-        }
+        let boardPoint = boardPointFromCanvasPoint(x, y, currentGameSize, standardWidth, standardHeight, !flagNoGrid);
 
-        let stepX = Math.floor((standardWidth  + 1) / currentGameSize);
-        let stepY = Math.floor((standardHeight + 1) / currentGameSize);
-
-        let modX = Math.floor(x / stepX);
-        let modY = Math.floor(y / stepY);
+        let modX = boardPoint.xBoard;
+        let modY = boardPoint.yBoard;
 
         if(currentWorkingMode === workingModes.LIT_BOARD)
         {
@@ -670,7 +674,7 @@ function main()
                 let invMatrixRow = new Uint8Array(gameSize * gameSize);
                 invMatrixRow.fill(0);
 
-                let cellIndex = cellIndexFromPoint(gameSize, xI, yI);
+                let cellIndex = cellIndexFromBoardPoint(gameSize, xI, yI);
                 invMatrixRow[cellIndex] = 1;
 
                 invMatrix.push(invMatrixRow);
@@ -796,7 +800,7 @@ function main()
         {
             for (let x = 0; x < gameSize; x++)
             {
-                let cellIndex = cellIndexFromPoint(gameSize, x, y);
+                let cellIndex = cellIndexFromBoardPoint(gameSize, x, y);
                 let matrixRow = currentSolutionMatrix[cellIndex];
 
                 solution[cellIndex] = dotProductBoard(board, matrixRow, domainSize);
@@ -1242,7 +1246,7 @@ function main()
         {
             for(let x = 0; x < gameSize; x++)
             {
-                let cellIndex = cellIndexFromPoint(gameSize, x, y);
+                let cellIndex = cellIndexFromBoardPoint(gameSize, x, y);
                 for(let i = 0; i < board[cellIndex]; i++)
                 {
                     turnList.push({cellX: x, cellY: y});
@@ -1271,7 +1275,7 @@ function main()
     {
         let resBoard = new Uint8Array(board);
 
-        let cellIndex = cellIndexFromPoint(gameSize, cellX, cellY);
+        let cellIndex = cellIndexFromBoardPoint(gameSize, cellX, cellY);
         resBoard[cellIndex] = (board[cellIndex] + 1) % domainSize;
 
         return resBoard;
@@ -1289,7 +1293,7 @@ function main()
                 let left = xBoard - clickSizeHalf;
                 let top  = yBoard - clickSizeHalf;
 
-                let clickPoint = cellIndexFromPoint(gameSize, xBoard, yBoard);
+                let clickPoint = cellIndexFromBoardPoint(gameSize, xBoard, yBoard);
                 let turnValue  = turnListBoard[clickPoint];
 
                 for(let yClick = 0; yClick < clickRuleSize; yClick++)
@@ -1322,8 +1326,8 @@ function main()
                             xBig = wholeMod(xBig, gameSize);
                         }
 
-                        let bigClickIndex = cellIndexFromPoint(gameSize, xBig, yBig);
-                        let smlClickIndex = cellIndexFromPoint(clickRuleSize, xClick, yClick);
+                        let bigClickIndex = cellIndexFromBoardPoint(gameSize, xBig, yBig);
+                        let smlClickIndex = cellIndexFromBoardPoint(clickRuleSize, xClick, yClick);
 
                         newBoard[bigClickIndex] = (newBoard[bigClickIndex] + turnValue * clickRule[smlClickIndex]) % domainSize;
                     }
@@ -1350,11 +1354,11 @@ function main()
                     let leftX   = wholeMod(x - 1, gameSize);
                     let rightX  = wholeMod(x + 1, gameSize);
 
-                    let thisCellIndex   = cellIndexFromPoint(gameSize,      x,       y);
-                    let leftCellIndex   = cellIndexFromPoint(gameSize,  leftX,       y);
-                    let rightCellIndex  = cellIndexFromPoint(gameSize, rightX,       y);
-                    let topCellIndex    = cellIndexFromPoint(gameSize,      x,    topY);
-                    let bottomCellIndex = cellIndexFromPoint(gameSize,      x, bottomY);
+                    let thisCellIndex   = cellIndexFromBoardPoint(gameSize,      x,       y);
+                    let leftCellIndex   = cellIndexFromBoardPoint(gameSize,  leftX,       y);
+                    let rightCellIndex  = cellIndexFromBoardPoint(gameSize, rightX,       y);
+                    let topCellIndex    = cellIndexFromBoardPoint(gameSize,      x,    topY);
+                    let bottomCellIndex = cellIndexFromBoardPoint(gameSize,      x, bottomY);
 
                     let turnValue = turnListBoard[thisCellIndex];
 
@@ -1372,32 +1376,32 @@ function main()
             {
                 for(let x = 0; x < gameSize; x++)
                 {
-                    let thisCellIndex = cellIndexFromPoint(gameSize, x, y);
+                    let thisCellIndex = cellIndexFromBoardPoint(gameSize, x, y);
                     let turnValue     = turnListBoard[thisCellIndex];
 
                     newBoard[thisCellIndex] = (newBoard[thisCellIndex] + turnValue) % domainSize;
 
                     if(x > 0)
                     {
-                        let leftCellIndex       = cellIndexFromPoint(gameSize, x - 1, y);
+                        let leftCellIndex       = cellIndexFromBoardPoint(gameSize, x - 1, y);
                         newBoard[leftCellIndex] = (newBoard[leftCellIndex] + turnValue) % domainSize;
                     }
 
                     if(x < gameSize - 1)
                     {
-                        let rightCellIndex       = cellIndexFromPoint(gameSize, x + 1, y);
+                        let rightCellIndex       = cellIndexFromBoardPoint(gameSize, x + 1, y);
                         newBoard[rightCellIndex] = (newBoard[rightCellIndex] + turnValue) % domainSize;
                     }
 
                     if(y > 0)
                     {
-                        let topCellIndex       = cellIndexFromPoint(gameSize, x, y - 1);
+                        let topCellIndex       = cellIndexFromBoardPoint(gameSize, x, y - 1);
                         newBoard[topCellIndex] = (newBoard[topCellIndex] + turnValue) % domainSize;
                     }
 
                     if(y < gameSize - 1)
                     {
-                        let bottomCellIndex       = cellIndexFromPoint(gameSize, x, y + 1);
+                        let bottomCellIndex       = cellIndexFromBoardPoint(gameSize, x, y + 1);
                         newBoard[bottomCellIndex] = (newBoard[bottomCellIndex] + turnValue) % domainSize;
                     }
                 }
@@ -1433,8 +1437,8 @@ function main()
                     continue;
                 }
 
-                let bigClickIndex = cellIndexFromPoint(gameSize, xBig, yBig);
-                let smlClickIndex = cellIndexFromPoint(clickRuleSize, x, y);
+                let bigClickIndex = cellIndexFromBoardPoint(gameSize, xBig, yBig);
+                let smlClickIndex = cellIndexFromBoardPoint(clickRuleSize, x, y);
 
                 populatedClickRule[bigClickIndex] = clickRule[smlClickIndex];
             }
@@ -1463,8 +1467,8 @@ function main()
                 let xBig    = x + left;
                 let xBigMod = wholeMod(xBig, gameSize); 
 
-                let bigClickIndex = cellIndexFromPoint(gameSize, xBigMod, yBigMod);
-                let smlClickIndex = cellIndexFromPoint(clickRuleSize, x, y);
+                let bigClickIndex = cellIndexFromBoardPoint(gameSize, xBigMod, yBigMod);
+                let smlClickIndex = cellIndexFromBoardPoint(clickRuleSize, x, y);
 
                 populatedClickRule[bigClickIndex] = clickRule[smlClickIndex];
             }
@@ -1482,8 +1486,8 @@ function main()
             {
                 let leftX = wholeMod(x - 1, gameSize);
 
-                let cellIndex     = cellIndexFromPoint(gameSize, x,     y);
-                let cellIndexLeft = cellIndexFromPoint(gameSize, leftX, y);
+                let cellIndex     = cellIndexFromBoardPoint(gameSize, x,     y);
+                let cellIndexLeft = cellIndexFromBoardPoint(gameSize, leftX, y);
 
                 resBoard[cellIndexLeft] = board[cellIndex];
             }
@@ -1501,8 +1505,8 @@ function main()
             {
                 let rightX = wholeMod(x + 1, gameSize);
 
-                let cellIndex      = cellIndexFromPoint(gameSize, x,      y);
-                let cellIndexRight = cellIndexFromPoint(gameSize, rightX, y);
+                let cellIndex      = cellIndexFromBoardPoint(gameSize, x,      y);
+                let cellIndexRight = cellIndexFromBoardPoint(gameSize, rightX, y);
 
                 resBoard[cellIndexRight] = board[cellIndex];
             }
@@ -1520,8 +1524,8 @@ function main()
             {
                 let upY = wholeMod(y - 1, gameSize);
 
-                let cellIndex   = cellIndexFromPoint(gameSize, x, y  );
-                let cellIndexUp = cellIndexFromPoint(gameSize, x, upY);
+                let cellIndex   = cellIndexFromBoardPoint(gameSize, x, y  );
+                let cellIndexUp = cellIndexFromBoardPoint(gameSize, x, upY);
 
                 resBoard[cellIndexUp] = board[cellIndex];
             }
@@ -1539,8 +1543,8 @@ function main()
             {
                 let downY = wholeMod(y + 1, gameSize);
 
-                let cellIndex     = cellIndexFromPoint(gameSize, x, y    );
-                let cellIndexDown = cellIndexFromPoint(gameSize, x, downY);
+                let cellIndex     = cellIndexFromBoardPoint(gameSize, x, y    );
+                let cellIndexDown = cellIndexFromBoardPoint(gameSize, x, downY);
 
                 resBoard[cellIndexDown] = board[cellIndex];
             }
@@ -1913,6 +1917,18 @@ function main()
         requestRedraw();
     }
 
+    function setGridVisible(visible)
+    {
+        flagNoGrid = !visible;
+        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, visible);
+
+        standardWidth  = newCanvasSize.width;
+        standardHeight = newCanvasSize.height;
+
+        updateViewport();
+        requestRedraw();
+    }
+
     function updateViewport()
     {
         gl.viewport(0, canvas.clientHeight - standardHeight, standardWidth, standardHeight); //Very careful here. 
@@ -2175,6 +2191,7 @@ function main()
         #define FLAG_SHOW_SOLUTION  0x01
         #define FLAG_SHOW_STABILITY 0x02
         #define FLAG_TOROID_RENDER  0x04
+        #define FLAG_NO_GRID        0x08
 
         uniform int gBoardSize;
         uniform int gCellSize;
@@ -2201,7 +2218,7 @@ function main()
         {
             ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
 
-            if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
+            if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
             {
                 highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize, gCellSize);
 
@@ -2241,6 +2258,7 @@ function main()
         #define FLAG_SHOW_SOLUTION  0x01
         #define FLAG_SHOW_STABILITY 0x02
         #define FLAG_TOROID_RENDER  0x04
+        #define FLAG_NO_GRID        0x08
 
         uniform int gBoardSize;
         uniform int gCellSize;
@@ -2272,7 +2290,7 @@ function main()
         {
             ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
 
-            if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
+            if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
             {
                 highp ivec2 cellNumber = screenPos / xx(gCellSize);
 
@@ -2380,6 +2398,7 @@ function main()
         #define FLAG_SHOW_SOLUTION  0x01
         #define FLAG_SHOW_STABILITY 0x02
         #define FLAG_TOROID_RENDER  0x04
+        #define FLAG_NO_GRID        0x08
 
         uniform int gBoardSize;
         uniform int gCellSize;
@@ -2431,7 +2450,7 @@ function main()
         {
             ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
 
-            if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
+            if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
             {
                 highp ivec2 cellNumber = screenPos.xy / xx(gCellSize);
                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
@@ -2595,6 +2614,7 @@ function main()
         #define FLAG_SHOW_SOLUTION  0x01
         #define FLAG_SHOW_STABILITY 0x02
         #define FLAG_TOROID_RENDER  0x04
+        #define FLAG_NO_GRID        0x08
 
         uniform int gBoardSize;
         uniform int gCellSize;
@@ -2759,7 +2779,7 @@ function main()
         {
             ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
 
-            if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
+            if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
             {
                 ivec2 cellSizexx = xx(gCellSize);
 
@@ -2997,6 +3017,7 @@ function main()
         #define FLAG_SHOW_SOLUTION  0x01
         #define FLAG_SHOW_STABILITY 0x02
         #define FLAG_TOROID_RENDER  0x04
+        #define FLAG_NO_GRID        0x08
 
         uniform int gBoardSize;
         uniform int gCellSize;
@@ -3061,7 +3082,7 @@ function main()
         {
             ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
 
-            if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
+            if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
             {
                 ivec2 cellSizexx = xx(gCellSize);
 
@@ -3227,6 +3248,7 @@ function main()
         #define FLAG_SHOW_SOLUTION  0x01
         #define FLAG_SHOW_STABILITY 0x02
         #define FLAG_TOROID_RENDER  0x04
+        #define FLAG_NO_GRID        0x08
 
         uniform int gBoardSize;
         uniform int gCellSize;
@@ -3357,7 +3379,7 @@ function main()
         {
             ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
 
-            if((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0)) //Inside the cell
+            if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
             {
                 ivec2 cellSizexx = xx(gCellSize);
 
@@ -3823,6 +3845,10 @@ function main()
         {
             drawFlags = drawFlags | 4;
         }
+        if(flagNoGrid)
+        {
+            drawFlags = drawFlags | 8;
+        }
 
         gl.bindVertexArray(drawVertexBuffer);
 
@@ -3902,9 +3928,55 @@ function main()
         return num;
     }
 
-    function cellIndexFromPoint(gameSize, x, y)
+    function cellIndexFromBoardPoint(gameSize, x, y)
     {
         return y * gameSize + x;
+    }
+
+    function canvasSizeFromGameSize(gameSize, cellSize, useGrid)
+    {
+        let res = {width: 0, height: 0};
+
+        if(useGrid)
+        {
+            res.width  = gameSize * cellSize + 1;
+            res.height = gameSize * cellSize + 1;       
+        }
+        else
+        {
+            res.width  = gameSize * cellSize;
+            res.height = gameSize * cellSize ; 
+        }
+
+        return res;
+    }
+
+    function boardPointFromCanvasPoint(x, y, gameSize, canvasWidth, canvasHeight, useGrid)
+    {
+        let res = {xBoard: -1, yBoard: -1};
+        if(x > canvasWidth || y > canvasHeight)
+        {
+            return res;
+        }
+
+        let stepX = 1;
+        let stepY = 1;
+
+        if(useGrid)
+        {
+            stepX = Math.floor((canvasWidth  + 1) / gameSize);
+            stepY = Math.floor((canvasHeight + 1) / gameSize);
+        }
+        else
+        {
+            stepX = Math.floor(canvasWidth  / gameSize);
+            stepY = Math.floor(canvasHeight / gameSize);
+        }
+
+        res.xBoard = Math.floor(x / stepX);
+        res.yBoard = Math.floor(y / stepY);
+
+        return res;
     }
 
     function invModGcdEx(num, domainSize) //Extended Euclid algorithm for inverting (num) modulo (domainSize)
