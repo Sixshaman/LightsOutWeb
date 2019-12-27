@@ -67,6 +67,11 @@ function main()
             resetGameBoard(resetModes.RESET_ONE, currentGameSize, currentDomainSize);
             break;
         }
+        case "Digit4":
+        {
+            resetGameBoard(resetModes.RESET_FOUR_CORNERS, currentGameSize, currentDomainSize);
+            break;
+        }
         case "KeyO":
         {
             resetGameBoard(resetModes.RESET_BORDER, currentGameSize, currentDomainSize);
@@ -287,7 +292,8 @@ function main()
         BOARDGEN_ONE_ELEMENT:  3, //Generate a fully lit board
         BOARDGEN_BLATNOY:      4, //Generate a chessboard pattern board
         BOARDGEN_PIETIA_STYLE: 5, //Generate a checkers pattern board
-        BOARDGEN_BORDER:       6  //Generate a border board
+        BOARDGEN_BORDER:       6, //Generate a border board
+        BOARDGEN_4_CORNERS:    7  //Generate a four corners board
     };
 
     let resetModes =
@@ -297,15 +303,16 @@ function main()
         RESET_BORDER:                 3, //Border board
         RESET_PIETIA:                 4, //Checkers board
         RESET_BLATNOY:                5, //Chessboard board
-        RESET_SOLVABLE_RANDOM:        6, //Random board, always solvable
-        RESET_FULL_RANDOM:            7, //Random board
-        RESET_SOLUTION:               8, //Current board -> Current solution/Current stability
-        RESET_INVERTO:                9, //Current board -> Inverted current board
-        RESET_DOMAIN_ROTATE_NONZERO: 10, //Current board -> Nonzero domain rotated current board
-        RESET_LEFT:                  11, //Current board -> Current board moved left
-        RESET_RIGHT:                 12, //Current board -> Current board moved right
-        RESET_UP:                    13, //Current board -> Current board moved up
-        RESET_DOWN:                  14  //Current board -> Current board moved down
+        RESET_FOUR_CORNERS:           6, //4 lit corners
+        RESET_SOLVABLE_RANDOM:        7, //Random board, always solvable
+        RESET_FULL_RANDOM:            8, //Random board
+        RESET_SOLUTION:               9, //Current board -> Current solution/Current stability
+        RESET_INVERTO:               10, //Current board -> Inverted current board
+        RESET_DOMAIN_ROTATE_NONZERO: 11, //Current board -> Nonzero domain rotated current board
+        RESET_LEFT:                  12, //Current board -> Current board moved left
+        RESET_RIGHT:                 13, //Current board -> Current board moved right
+        RESET_UP:                    14, //Current board -> Current board moved up
+        RESET_DOWN:                  15  //Current board -> Current board moved down
     };
 
     let workingModes =
@@ -805,14 +812,13 @@ function main()
         let invSolution = new Uint8Array(gameSize * gameSize);
         invSolution.fill(0);
 
-        let turns = buildTurnList(board, gameSize);
         if(flagDefaultClickRule)
         {
-            invSolution = makeTurnsDefault(invSolution, gameSize, domainSize, turns, flagToroidBoard);
+            invSolution = makeTurnsDefault(invSolution, gameSize, domainSize, board, flagToroidBoard);
         }
         else
         {
-            invSolution = makeTurns(invSolution, currentGameClickRule, currentClickRuleSize, gameSize, domainSize, turns, flagToroidBoard);
+            invSolution = makeTurns(invSolution, currentGameClickRule, currentClickRuleSize, gameSize, domainSize, board, flagToroidBoard);
         }
 
         return invSolution;
@@ -1016,6 +1022,11 @@ function main()
                 modeBgen = boardGenModes.BOARDGEN_ZERO_ELEMENT; 
                 break;
             }
+            case resetModes.RESET_FOUR_CORNERS:
+            {
+                modeBgen = boardGenModes.BOARDGEN_4_CORNERS;
+                break;
+            }
             case resetModes.RESET_BORDER:
             {
                 modeBgen = boardGenModes.BOARDGEN_BORDER;
@@ -1117,6 +1128,18 @@ function main()
                 case boardGenModes.BOARDGEN_BORDER:
                 {
                     if(y === 0 || y === (gameSize - 1) || x === 0 || x === (gameSize - 1))
+                    {
+                        generatedBoard[cellNumber] = maxVal;
+                    }
+                    else
+                    {
+                        generatedBoard[cellNumber] = minVal;
+                    }
+                    break;
+                }
+                case boardGenModes.BOARDGEN_4_CORNERS:
+                {
+                    if((y === 0 && x === 0) || (y === (gameSize - 1) && x === 0) || (y === 0 && x === (gameSize - 1)) || (y === (gameSize - 1) && x === (gameSize - 1)))
                     {
                         generatedBoard[cellNumber] = maxVal;
                     }
@@ -1254,50 +1277,56 @@ function main()
         return resBoard;
     }
 
-    function makeTurns(board, clickRule, clickRuleSize, gameSize, domainSize, turns, isToroid) //Fast in-place version without populating click rules
+    function makeTurns(board, clickRule, clickRuleSize, gameSize, domainSize, turnListBoard, isToroid) //Fast in-place version without populating click rules
     {
         let newBoard = board.slice();
 
         let clickSizeHalf = Math.floor(clickRuleSize / 2);
-        for(let t = 0; t < turns.length; t++)
+        for(let yBoard = 0; yBoard < gameSize; yBoard++)
         {
-            let left = turns[t].cellX - clickSizeHalf;
-            let top  = turns[t].cellY - clickSizeHalf;
-
-            for(let y = 0; y < clickRuleSize; y++)
+            for(let xBoard = 0; xBoard < gameSize; xBoard++)
             {
-                let yBig = y + top;
-                if(!isToroid)
-                {
-                    if(yBig < 0 || yBig >= gameSize)
-                    {
-                        continue;
-                    }
-                }
-                else
-                {
-                    yBig = wholeMod(yBig, gameSize);
-                }
+                let left = xBoard - clickSizeHalf;
+                let top  = yBoard - clickSizeHalf;
 
-                for(let x = 0; x < clickRuleSize; x++)
+                let clickPoint = cellIndexFromPoint(gameSize, xBoard, yBoard);
+                let turnValue  = turnListBoard[clickPoint];
+
+                for(let yClick = 0; yClick < clickRuleSize; yClick++)
                 {
-                    let xBig = x + left;
+                    let yBig = yClick + top;
                     if(!isToroid)
                     {
-                        if(xBig < 0 || xBig >= gameSize)
+                        if(yBig < 0 || yBig >= gameSize)
                         {
                             continue;
                         }
                     }
                     else
                     {
-                        xBig = wholeMod(xBig, gameSize);
+                        yBig = wholeMod(yBig, gameSize);
                     }
 
-                    let bigClickIndex = cellIndexFromPoint(gameSize, xBig, yBig);
-                    let smlClickIndex = cellIndexFromPoint(clickRuleSize, x, y);
+                    for(let xClick = 0; xClick < clickRuleSize; xClick++)
+                    {
+                        let xBig = xClick + left;
+                        if(!isToroid)
+                        {
+                            if(xBig < 0 || xBig >= gameSize)
+                            {
+                                continue;
+                            }
+                        }
+                        else
+                        {
+                            xBig = wholeMod(xBig, gameSize);
+                        }
 
-                    newBoard[bigClickIndex] = (newBoard[bigClickIndex] + clickRule[smlClickIndex]) % domainSize;
+                        let bigClickIndex = cellIndexFromPoint(gameSize, xBig, yBig);
+                        let smlClickIndex = cellIndexFromPoint(clickRuleSize, xClick, yClick);
+
+                        newBoard[bigClickIndex] = (newBoard[bigClickIndex] + turnValue * clickRule[smlClickIndex]) % domainSize;
+                    }
                 }
             }
         }
@@ -1305,65 +1334,72 @@ function main()
         return newBoard;
     }
 
-    function makeTurnsDefault(board, gameSize, domainSize, turns, isToroid) //Fast in-place version without populating click rules. Default click rule version
+    function makeTurnsDefault(board, gameSize, domainSize, turnListBoard, isToroid) //Fast in-place version without populating click rules. Default click rule version
     {
         let newBoard = board.slice();
 
         if(isToroid)
         {
-            for(let t = 0; t < turns.length; t++)
+            for(let y = 0; y < gameSize; y++)
             {
-                let turn = turns[t];
+                let topY    = wholeMod(y - 1, gameSize);
+                let bottomY = wholeMod(y + 1, gameSize);
 
-                let leftX   = wholeMod(turn.cellX - 1, gameSize);
-                let rightX  = wholeMod(turn.cellX + 1, gameSize);
-                let topY    = wholeMod(turn.cellY - 1, gameSize);
-                let bottomY = wholeMod(turn.cellY + 1, gameSize);
+                for(let x = 0; x < gameSize; x++)
+                {
+                    let leftX   = wholeMod(x - 1, gameSize);
+                    let rightX  = wholeMod(x + 1, gameSize);
 
-                let thisCellIndex   = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY);
-                let leftCellIndex   = cellIndexFromPoint(gameSize,      leftX, turn.cellY);
-                let rightCellIndex  = cellIndexFromPoint(gameSize,     rightX, turn.cellY);
-                let topCellIndex    = cellIndexFromPoint(gameSize, turn.cellX,       topY);
-                let bottomCellIndex = cellIndexFromPoint(gameSize, turn.cellX,    bottomY);
+                    let thisCellIndex   = cellIndexFromPoint(gameSize,      x,       y);
+                    let leftCellIndex   = cellIndexFromPoint(gameSize,  leftX,       y);
+                    let rightCellIndex  = cellIndexFromPoint(gameSize, rightX,       y);
+                    let topCellIndex    = cellIndexFromPoint(gameSize,      x,    topY);
+                    let bottomCellIndex = cellIndexFromPoint(gameSize,      x, bottomY);
 
-                newBoard[thisCellIndex]   = (newBoard[thisCellIndex]   + 1) % domainSize;
-                newBoard[leftCellIndex]   = (newBoard[leftCellIndex]   + 1) % domainSize;
-                newBoard[rightCellIndex]  = (newBoard[rightCellIndex]  + 1) % domainSize;
-                newBoard[topCellIndex]    = (newBoard[topCellIndex]    + 1) % domainSize;
-                newBoard[bottomCellIndex] = (newBoard[bottomCellIndex] + 1) % domainSize;
+                    let turnValue = turnListBoard[thisCellIndex];
+
+                    newBoard[thisCellIndex]   = (newBoard[thisCellIndex]   + turnValue) % domainSize;
+                    newBoard[leftCellIndex]   = (newBoard[leftCellIndex]   + turnValue) % domainSize;
+                    newBoard[rightCellIndex]  = (newBoard[rightCellIndex]  + turnValue) % domainSize;
+                    newBoard[topCellIndex]    = (newBoard[topCellIndex]    + turnValue) % domainSize;
+                    newBoard[bottomCellIndex] = (newBoard[bottomCellIndex] + turnValue) % domainSize;
+                }
             }
         }
         else
         {
-            for(let t = 0; t < turns.length; t++)
+            for(let y = 0; y < gameSize; y++)
             {
-                let turn = turns[t];
-
-                let thisCellIndex       = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY);
-                newBoard[thisCellIndex] = (newBoard[thisCellIndex] + 1) % domainSize;
-
-                if(turn.cellX > 0)
+                for(let x = 0; x < gameSize; x++)
                 {
-                    let leftCellIndex       = cellIndexFromPoint(gameSize, turn.cellX - 1, turn.cellY);
-                    newBoard[leftCellIndex] = (newBoard[leftCellIndex] + 1) % domainSize;
-                }
+                    let thisCellIndex = cellIndexFromPoint(gameSize, x, y);
+                    let turnValue     = turnListBoard[thisCellIndex];
 
-                if(turn.cellX < gameSize - 1)
-                {
-                    let rightCellIndex       = cellIndexFromPoint(gameSize, turn.cellX + 1, turn.cellY);
-                    newBoard[rightCellIndex] = (newBoard[rightCellIndex] + 1) % domainSize;
-                }
+                    newBoard[thisCellIndex] = (newBoard[thisCellIndex] + turnValue) % domainSize;
 
-                if(turn.cellY > 0)
-                {
-                    let topCellIndex       = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY - 1);
-                    newBoard[topCellIndex] = (newBoard[topCellIndex] + 1) % domainSize;
-                }
+                    if(x > 0)
+                    {
+                        let leftCellIndex       = cellIndexFromPoint(gameSize, x - 1, y);
+                        newBoard[leftCellIndex] = (newBoard[leftCellIndex] + turnValue) % domainSize;
+                    }
 
-                if(turn.cellY < gameSize - 1)
-                {
-                    let bottomCellIndex       = cellIndexFromPoint(gameSize, turn.cellX, turn.cellY + 1);
-                    newBoard[bottomCellIndex] = (newBoard[bottomCellIndex] + 1) % domainSize;
+                    if(x < gameSize - 1)
+                    {
+                        let rightCellIndex       = cellIndexFromPoint(gameSize, x + 1, y);
+                        newBoard[rightCellIndex] = (newBoard[rightCellIndex] + turnValue) % domainSize;
+                    }
+
+                    if(y > 0)
+                    {
+                        let topCellIndex       = cellIndexFromPoint(gameSize, x, y - 1);
+                        newBoard[topCellIndex] = (newBoard[topCellIndex] + turnValue) % domainSize;
+                    }
+
+                    if(y < gameSize - 1)
+                    {
+                        let bottomCellIndex       = cellIndexFromPoint(gameSize, x, y + 1);
+                        newBoard[bottomCellIndex] = (newBoard[bottomCellIndex] + turnValue) % domainSize;
+                    }
                 }
             }
         }
