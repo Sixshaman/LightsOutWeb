@@ -1,3 +1,8 @@
+body
+{
+    background-color: black;
+}
+
 div.container
 {
     display: flex;
@@ -24,4 +29,20 @@ div.rightside
 div.rightrightside
 {
     float: right;
+}
+
+p
+{
+    color: lavender;
+}
+
+input[type=checkbox] + label
+{
+    color: lavender;
+}
+
+select
+{
+    background-color: black;
+    color: lavender;
 }
