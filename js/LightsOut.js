@@ -26,7 +26,7 @@ function main()
         clickAtPoint(x, y, e.ctrlKey);
     };
 
-    document.onkeyup = function (e)
+    document.onkeydown = function (e)
     {
         if(document.activeElement === renderModeSelect)
         {
@@ -309,6 +309,7 @@ function main()
     renderModeSelect.onchange = function()
     {
         setRenderMode(renderModeSelect.value);
+        renderModeSelect.blur(); //Blur - Beetlebum
         canvas.focus();
     };
 
@@ -371,8 +372,11 @@ function main()
 
     const canvasSize = 900;
 
-    let standardWidth  = canvas.clientWidth;
-    let standardHeight = canvas.clientHeight;
+    let currentViewportWidth  = canvas.clientWidth;
+    let currentViewportHeight = canvas.clientHeight;
+
+    let currentViewportOffsetX = 0;
+    let currentViewportOffsetY = 0;
 
     let currentAnimationFrame = 0;
 
@@ -525,15 +529,15 @@ function main()
             resetStability();
             updateStabilityTexture();
 
-            makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, Math.floor(currentGameSize / 2), Math.floor(currentGameSize / 2), false);
+            currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, Math.floor(currentGameSize / 2), Math.floor(currentGameSize / 2), false);
             infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         }
 
         currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
 
-        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, !flagNoGrid);
-        standardWidth     = newCanvasSize.width;
-        standardHeight    = newCanvasSize.height;
+        let newCanvasSize     = canvasSizeFromGameSize(currentGameSize, currentCellSize, !flagNoGrid);
+        currentViewportWidth  = newCanvasSize.width;
+        currentViewportHeight = newCanvasSize.height;
 
         updateBoardTexture();
 
@@ -570,7 +574,7 @@ function main()
 
     function clickAtPoint(x, y, isConstruct)
     {
-        let boardPoint = boardPointFromCanvasPoint(x, y, currentGameSize, standardWidth, standardHeight, !flagNoGrid);
+        let boardPoint = boardPointFromCanvasPoint(x, y, currentGameSize, currentViewportOffsetX, currentViewportOffsetY, currentViewportWidth, currentViewportHeight, !flagNoGrid);
 
         let modX = boardPoint.xBoard;
         let modY = boardPoint.yBoard;
@@ -2026,8 +2030,8 @@ function main()
         flagNoGrid = !visible;
         let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, visible);
 
-        standardWidth  = newCanvasSize.width;
-        standardHeight = newCanvasSize.height;
+        currentViewportWidth  = newCanvasSize.width;
+        currentViewportHeight = newCanvasSize.height;
 
         updateViewport();
         requestRedraw();
@@ -2035,7 +2039,10 @@ function main()
 
     function updateViewport()
     {
-        gl.viewport(0, canvas.clientHeight - standardHeight, standardWidth, standardHeight); //Very careful here. 
+        currentViewportOffsetX = (canvas.width  - currentViewportWidth)  / 2;
+        currentViewportOffsetY = (canvas.height - currentViewportHeight) / 2;
+
+        gl.viewport(currentViewportOffsetX, currentViewportOffsetY, currentViewportWidth, currentViewportHeight); //Very careful here. 
     }
 
     function nextTick()
@@ -3964,10 +3971,10 @@ function main()
         gl.uniform1i(domainSizeUniformLocation, currentDomainSize);
         gl.uniform1i(flagsUniformLocation,      drawFlags);
 
-        gl.uniform1i(canvasWidthUniformLocation,     standardWidth);
-        gl.uniform1i(canvasHeightUniformLocation,    standardHeight);
-        gl.uniform1i(viewportXOffsetUniformLocation, 0);
-        gl.uniform1i(viewportYOffsetUniformLocation, canvas.clientHeight - standardHeight);
+        gl.uniform1i(canvasWidthUniformLocation,     currentViewportWidth);
+        gl.uniform1i(canvasHeightUniformLocation,    currentViewportHeight);
+        gl.uniform1i(viewportXOffsetUniformLocation, currentViewportOffsetX);
+        gl.uniform1i(viewportYOffsetUniformLocation, currentViewportOffsetY);
 
         gl.uniform4f(colorNoneUniformLocation,    currentColorUnlit[0],   currentColorUnlit[1],   currentColorUnlit[2],   currentColorUnlit[3]);
         gl.uniform4f(colorEnabledUniformLocation, currentColorLit[0],     currentColorLit[1],     currentColorLit[2],     currentColorLit[3]);
@@ -4055,10 +4062,10 @@ function main()
         return res;
     }
 
-    function boardPointFromCanvasPoint(x, y, gameSize, canvasWidth, canvasHeight, useGrid)
+    function boardPointFromCanvasPoint(x, y, gameSize, canvasOffsetX, canvasOffsetY, canvasWidth, canvasHeight, useGrid)
     {
         let res = {xBoard: -1, yBoard: -1};
-        if(x > canvasWidth || y > canvasHeight)
+        if((x - canvasOffsetX) > canvasWidth || (y - canvasOffsetY) > canvasHeight)
         {
             return res;
         }
@@ -4077,8 +4084,8 @@ function main()
             stepY = Math.floor(canvasHeight / gameSize);
         }
 
-        res.xBoard = Math.floor(x / stepX);
-        res.yBoard = Math.floor(y / stepY);
+        res.xBoard = Math.floor((x - canvasOffsetX) / stepX);
+        res.yBoard = Math.floor((y - canvasOffsetY) / stepY);
 
         return res;
     }
