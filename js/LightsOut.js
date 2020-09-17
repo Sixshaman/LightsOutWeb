@@ -76,7 +76,14 @@ function main()
         }
         case "KeyO":
         {
-            resetGameBoard(resetModes.RESET_BORDER, currentGameSize, currentDomainSize);
+            if(e.shiftKey)
+            {
+                changeWorkingMode(workingModes.CONSTRUCT_CLICKRULE_TOROID);
+            }  
+            else
+            {
+                resetGameBoard(resetModes.RESET_BORDER, currentGameSize, currentDomainSize);
+            }
             break;
         }
         case "KeyB":
@@ -148,6 +155,16 @@ function main()
             resetGameBoard(resetModes.RESET_DOWN, currentGameSize, currentDomainSize);
             break;
         }
+        case "Enter":
+        {
+            acceptClickRule();
+            break;
+        }
+        case "Escape":
+        {
+            rejectClickRule();
+            break;
+        }
         case "KeyW":
         {
             showInverseSolution(!flagShowInverseSolution);
@@ -163,6 +180,14 @@ function main()
             {
                 updateSolutionMatrixIfNeeded();
                 showSolution(!flagShowSolution);
+            }
+            break;
+        }
+        case "KeyM":
+        {
+            if(e.shiftKey)
+            {
+                changeWorkingMode(workingModes.CONSTRUCT_CLICKRULE);
             }
             break;
         }
@@ -373,11 +398,13 @@ function main()
     let currentGameStability    = null;
     let currentGameLitStability = null;
     let currentCountedBoard     = null;
+    let currentSavedBoard       = null;
 
     let currentCellSize = 20;
 
     let currentClickRuleSize = 3;
     let currentGameSize      = 15;
+    let currentSavedGameSize = 15;
     let currentDomainSize    = 2;
 
     let currentColorLit     = [0.0, 1.0, 0.0, 1.0];
@@ -499,7 +526,7 @@ function main()
             updateStabilityTexture();
 
             makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, Math.floor(currentGameSize / 2), Math.floor(currentGameSize / 2), false);
-            infoText.textContent = "Lights Out constructing " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
+            infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         }
 
         currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
@@ -639,7 +666,7 @@ function main()
         {
             for(let xL = 0; xL < gameSize; xL++)
             {
-                let matrixRow;
+                let matrixRow = {};
                 if(isToroid)
                 {
                     matrixRow = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, xL, yL);
@@ -1237,6 +1264,83 @@ function main()
             flagTickLoop = false;
         }
     }
+
+    function changeWorkingMode(workingMode)
+    {
+        //First problem: flags. There are A LOL of them
+        showSolution(false);
+        showInverseSolution(false);
+        showStability(false);
+        showLitStability(false);
+
+        //We can change for normal mode here too!
+        flagSolutionMatrixComputing = false;
+        flagRandomSolving           = false;
+        flagPeriodCounting          = false;
+        flagEigvecCounting          = false;
+        flagPerio4Counting          = false;
+        flagPeriodBackCounting      = false;
+        flagStopCountingWhenFound   = false;
+        flagTickLoop                = false;
+
+        currentWorkingMode = workingMode;
+        
+        if(workingMode == workingModes.CONSTRUCT_CLICKRULE || workingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
+        {
+            currentSavedBoard    = currentGameBoard.slice();
+            currentSavedGameSize = currentGameSize; 
+
+            changeGameSize(currentClickRuleSize);
+            currentGameBoard = currentGameClickRule;
+            updateBoardTexture();
+
+            infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
+        }
+
+        requestRedraw();
+    }
+
+    function acceptClickRule()
+    {
+        if(currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE_TOROID)
+        {
+            if(currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
+            {
+                flagToroidBoard = true;
+            }
+
+            currentGameClickRule = currentGameBoard.slice();
+            currentClickRuleSize = currentGameSize;
+
+            changeGameSize(currentSavedGameSize);
+            currentGameBoard = currentSavedBoard.slice();
+
+            updateBoardTexture();
+            flagDefaultClickRule = false;
+
+            requestRedraw();
+            changeWorkingMode(workingModes.LIT_BOARD);
+
+            infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
+        }
+    }
+
+    function rejectClickRule()
+    {
+        if(currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE_TOROID)
+        {
+            changeGameSize(currentSavedGameSize);
+            currentGameBoard = currentSavedBoard.slice();
+
+            updateBoardTexture();
+
+            requestRedraw();
+            changeWorkingMode(workingModes.LIT_BOARD);
+
+            infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
+        }
+    }
+
 
     function buildTurnList(board, gameSize)
     {
