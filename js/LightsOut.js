@@ -680,39 +680,28 @@ function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cell
 //=================================================== Matrix functions ===================================================
 //========================================================================================================================
 
-//Calculates the Lights Out matrix for the given click rule and game size. Lights Out matrix helps to calculate inverse solutions
-function calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid)
+//Lights out inverse matrix calculation step 1: calculate lights out matrix
+function calculateSolutionMatrixStep1Bit(lightsOutMatrix, clickRule, clickRuleSize, gameSize, gridRowNumber, isToroid)
 {
-    //Generate a normal Lights Out matrix for the click rule
-    let lightsOutMatrix = [];
-    for(let yL = 0; yL < gameSize; yL++)
+    for(let xL = 0; xL < gameSize; xL++)
     {
-        for(let xL = 0; xL < gameSize; xL++)
+        let matrixRow = {};
+        if(isToroid)
         {
-            let matrixRow = {};
-            if(isToroid)
-            {
-                matrixRow = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, xL, yL);
-            }
-            else
-            {
-                matrixRow = populateClickRulePlane(clickRule, clickRuleSize, gameSize, xL, yL);
-            }
-
-            lightsOutMatrix.push(matrixRow);
+            matrixRow = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, xL, gridRowNumber);
         }
-    }
+        else
+        {
+            matrixRow = populateClickRulePlane(clickRule, clickRuleSize, gameSize, xL, gridRowNumber);
+        }
 
-    return lightsOutMatrix;
+        lightsOutMatrix.push(matrixRow);
+    }
 }
 
-//Calculates the inverse Lights Out matrix for the given click rule and game size. Lights Out matrix helps to calculate solutions
-function calculateSolutionMatrix(clickRule, gameSize, domainSize, clickRuleSize, isToroid)
+//Lights out inverse matrix calculation step 2: allocate inverse matrix
+function calculateSolutionMatrixStep2Bit(invMatrix, gameSize)
 {
-    let lightsOutMatrix = calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid);
-
-    //Generate a unit matrix. This will eventually become an inverse matrix
-    let invMatrix = [];
     for(let yI = 0; yI < gameSize; yI++)
     {
         for(let xI = 0; xI < gameSize; xI++)
@@ -726,6 +715,108 @@ function calculateSolutionMatrix(clickRule, gameSize, domainSize, clickRuleSize,
             invMatrix.push(invMatrixRow);
         }
     }
+}
+
+//Lights out inverse matrix calculation step 3: top to bottom, eliminating numbers from below the diagonal
+function calculateSolutionMatrixStep3Bit(lightsOutMatrix, invMatrix, matrixSize, domainInvs, domainSize, matrixRow)
+{
+    let thisValD = lightsOutMatrix[matrixRow][matrixRow];
+    let compValD = lightsOutMatrix[matrixRow][matrixRow];
+    if(domainInvs[compValD] === 0 || (thisValD !== 1 && domainSize % thisValD === 0))
+    {
+        for(let jSw = matrixRow + 1; jSw < matrixSize; jSw++)
+        {
+            compValD = lightsOutMatrix[jSw][matrixRow];
+            if(domainInvs[compValD] !== 0)
+            {
+                thisValD = compValD;
+                
+                let tmpMatrixRow           = lightsOutMatrix[matrixRow];
+                lightsOutMatrix[matrixRow] = lightsOutMatrix[jSw];
+                lightsOutMatrix[jSw]       = tmpMatrixRow;
+
+                let tmpInvMatrixRow  = invMatrix[matrixRow];
+                invMatrix[matrixRow] = invMatrix[jSw];
+                invMatrix[jSw]       = tmpInvMatrixRow;
+
+                break;
+            }
+        }
+    }
+
+    let invThisValD = domainInvs[thisValD];
+    for(let jD = matrixRow + 1; jD < matrixSize; jD++)
+    {
+        compValD = lightsOutMatrix[matrixRow][matrixRow];
+        if(domainInvs[compValD] !== 0)
+        {
+            mulSubBoardInPlace(lightsOutMatrix[jD], lightsOutMatrix[matrixRow], invThisValD * compValD, domainSize);
+            mulSubBoardInPlace(invMatrix[jD],       invMatrix[matrixRow],       invThisValD * compValD, domainSize);
+        }
+    }
+}
+
+//Lights out inverse matrix calculation step 3: bottom to top, eliminating numbers from above the diagonal
+function calculateSolutionMatrixStep4Bit(lightsOutMatrix, invMatrix, domainInvs, domainSize, matrixRow)
+{
+    let thisValU    = lightsOutMatrix[matrixRow][matrixRow];
+    let invThisValU = domainInvs[thisValU];
+
+    for(let jU = matrixRow - 1; jU >= 0; jU--)
+    {
+        let compValU = lightsOutMatrix[jU][matrixRow];
+        if(domainInvs[compValU] !== 0)
+        {
+            mulSubBoardInPlace(lightsOutMatrix[jU], lightsOutMatrix[matrixRow], invThisValU * compValU, domainSize);
+            mulSubBoardInPlace(invMatrix[jU],       invMatrix[matrixRow],       invThisValU * compValU, domainSize);
+        }
+    }
+
+    if(domainInvs[thisValU] !== 0)
+    {
+        mulBoardInPlace(lightsOutMatrix[matrixRow], invThisValU, domainSize);
+        mulBoardInPlace(invMatrix[matrixRow],       invThisValU, domainSize);
+    }
+}
+
+function calculateSolutionMatrixStep5Bit(lightsOutMatrix, matrixRow, quietPatterns)
+{
+    let qp = quietPatterns;
+    if(lightsOutMatrix[matrixRow].every(val => val === 0))
+    {
+        qp = quietPatterns + 1;
+    }
+
+    return qp;
+}
+
+function calculateSolutionMatrixStep6Bit(invMatrix, matrixSize)
+{
+    for(let i = 0; i < matrixSize; i++) //Transpose for the case of non-symmetrical click rules
+    {
+        for(let j = 0; j < i; j++)
+        {
+            let temp        = invMatrix[i][j];
+            invMatrix[i][j] = invMatrix[j][i];
+            invMatrix[j][i] = temp;
+        }
+    }
+}
+
+//Calculates the inverse Lights Out matrix for the given click rule and game size. Lights Out matrix helps to calculate solutions
+//Single-execute version
+function calculateSolutionMatrix(clickRule, gameSize, domainSize, clickRuleSize, isToroid)
+{
+    //Generate a normal Lights Out matrix for the click rule
+    let lightsOutMatrix = [];
+    for(let yL = 0; yL < gameSize; yL++)
+    {
+        calculateSolutionMatrixStep1Bit(lightsOutMatrix, clickRule, clickRuleSize, gameSize, yL, isToroid);
+    }
+
+    //Generate a unit matrix. This will eventually become an inverse matrix
+    let invMatrix = [];
+    calculateSolutionMatrixStep2Bit(invMatrix, gameSize);
 
     let domainInvs = []; //For optimization purposes, cache 1/k values for every possible value in the domain. Since the maximum domain size is 255, this cache won't take a lot of memory
     for(let d = 0; d < domainSize; d++)
@@ -737,82 +828,35 @@ function calculateSolutionMatrix(clickRule, gameSize, domainSize, clickRuleSize,
     let matrixSize = gameSize * gameSize;
     for(let iD = 0; iD < matrixSize; iD++)
     {
-        let thisValD = lightsOutMatrix[iD][iD];
-        let compValD = lightsOutMatrix[iD][iD];
-        if(domainInvs[compValD] === 0 || (thisValD !== 1 && domainSize % thisValD === 0))
-        {
-            for(let jSw = iD + 1; jSw < matrixSize; jSw++)
-            {
-                compValD = lightsOutMatrix[jSw][iD];
-                if(domainInvs[compValD] !== 0)
-                {
-                    thisValD = compValD;
-                    
-                    let tmpMatrixRow     = lightsOutMatrix[iD];
-                    lightsOutMatrix[iD]  = lightsOutMatrix[jSw];
-                    lightsOutMatrix[jSw] = tmpMatrixRow;
-
-                    let tmpInvMatrixRow = invMatrix[iD];
-                    invMatrix[iD]       = invMatrix[jSw];
-                    invMatrix[jSw]      = tmpInvMatrixRow;
-
-                    break;
-                }
-            }
-        }
-
-        let invThisValD = domainInvs[thisValD];
-        for(let jD = iD + 1; jD < matrixSize; jD++)
-        {
-            compValD = lightsOutMatrix[jD][iD];
-            if(domainInvs[compValD] !== 0)
-            {
-                mulSubBoardInPlace(lightsOutMatrix[jD], lightsOutMatrix[iD], invThisValD * compValD, domainSize);
-                mulSubBoardInPlace(invMatrix[jD],       invMatrix[iD],       invThisValD * compValD, domainSize);
-            }
-        }
+        calculateSolutionMatrixStep3Bit(lightsOutMatrix, invMatrix, matrixSize, domainInvs, domainSize, iD);
     }
 
     //Second pass: bottom to top, eliminating numbers from above the diagonal
     let quietPatterns = 0;
     for(let iU = matrixSize - 1; iU >= 0; iU--)
     {
-        let thisValU    = lightsOutMatrix[iU][iU];
-        let invThisValU = domainInvs[thisValU];
-
-        for(let jU = iU - 1; jU >= 0; jU--)
-        {
-            let compValU = lightsOutMatrix[jU][iU];
-            if(domainInvs[compValU] !== 0)
-            {
-                mulSubBoardInPlace(lightsOutMatrix[jU], lightsOutMatrix[iU], invThisValU * compValU, domainSize);
-                mulSubBoardInPlace(invMatrix[jU],       invMatrix[iU],       invThisValU * compValU, domainSize);
-            }
-        }
-
-        if(domainInvs[thisValU] !== 0)
-        {
-            mulBoardInPlace(lightsOutMatrix[iU], invThisValU, domainSize);
-            mulBoardInPlace(invMatrix[iU],       invThisValU, domainSize);
-        }
-
-        if(lightsOutMatrix[iU].every(val => val === 0))
-        {
-            quietPatterns += 1;
-        }
+        calculateSolutionMatrixStep4Bit(lightsOutMatrix, invMatrix, domainInvs, domainSize, iU);
     }
 
-    for(let i = 0; i < matrixSize; i++) //Transpose for the case of non-symmetrical click rules
+    for(let iD = 0; iD < matrixSize; iD++)
     {
-        for(let j = 0; j < i; j++)
-        {
-            let temp        = invMatrix[i][j];
-            invMatrix[i][j] = invMatrix[j][i];
-            invMatrix[j][i] = temp;
-        }
+        quietPatterns = calculateSolutionMatrixStep5Bit(lightsOutMatrix, iD, quietPatterns);
     }
+
+    calculateSolutionMatrixStep6Bit(invMatrix, matrixSize);
 
     return {invmatrix: invMatrix, quietpats: quietPatterns};
+}
+
+function calculateSolutionMatrixWorkAmount(gameSize)
+{
+    //Step 1: gameSize iterations.
+    //Step 2: 1 iteration.
+    //Step 3: gameSize * gameSize iterations
+    //Step 4: gameSize * gameSize iterations
+    //Step 5: gameSize iterations
+    //Step 6: 1 iteration
+    return gameSize + 1 + gameSize * gameSize + gameSize * gameSize + gameSize + 1;
 }
 
 //Calculates the solution given the solution matrix
@@ -862,9 +906,10 @@ function main()
 {
     const canvas = document.getElementById("LightsOutCanvas");
     
-    const infoText = document.getElementById("LightsOutPuzzleInfo");
-    const qpText   = document.getElementById("QuietPatternsInfo");
-    const spText   = document.getElementById("SolutionPeriodInfo");
+    const infoText   = document.getElementById("LightsOutPuzzleInfo");
+    const matrixText = document.getElementById("SolutionMatrixCalculating");
+    const qpText     = document.getElementById("QuietPatternsInfo");
+    const spText     = document.getElementById("SolutionPeriodInfo");
 
     const renderModeSelect = document.getElementById("rendermodesel");
 
@@ -1037,8 +1082,10 @@ function main()
             }
             else
             {
-                updateSolutionMatrixIfNeeded();
-                showSolution(!flagShowSolution);
+                updateSolutionMatrixIfNeeded().then(() => 
+                {
+                    showSolution(!flagShowSolution);
+                });
             }
             break;
         }
@@ -1066,16 +1113,18 @@ function main()
         {
             if(currentTurnList.length == 0)
             {
-                updateSolutionMatrixIfNeeded();
-                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                updateSolutionTexture();
-
-                currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
-
-                flagRandomSolving = true;
-
-                flagTickLoop = true;
-                currentAnimationFrame = window.requestAnimationFrame(nextTick);
+                updateSolutionMatrixIfNeeded().then(() => 
+                {
+                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
+                    updateSolutionTexture();
+    
+                    currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
+    
+                    flagRandomSolving = true;
+    
+                    flagTickLoop = true;
+                    currentAnimationFrame = window.requestAnimationFrame(nextTick);
+                });
             }
             else
             {
@@ -1090,16 +1139,18 @@ function main()
         {
             if(currentTurnList.length == 0)
             {
-                updateSolutionMatrixIfNeeded();
-                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                updateSolutionTexture();
-
-                currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
-
-                flagRandomSolving = false;
-
-                flagTickLoop = true;
-                currentAnimationFrame = window.requestAnimationFrame(nextTick);
+                updateSolutionMatrixIfNeeded().then(() =>
+                {
+                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
+                    updateSolutionTexture();
+    
+                    currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
+    
+                    flagRandomSolving = false;
+    
+                    flagTickLoop = true;
+                    currentAnimationFrame = window.requestAnimationFrame(nextTick);
+                });
             }
             else
             {
@@ -1371,7 +1422,6 @@ function main()
         
         currentGameSize = clamp(newSize, minimumBoardSize, maximumBoardSize);
         currentSolutionMatrixRelevant = false;
-        flagSolutionMatrixComputing   = false;
 
         qpText.textContent = "Quiet patterns: ";
 
@@ -1421,7 +1471,6 @@ function main()
 
         currentDomainSize = clamp(newSize, minimumDomainSize, maximumDomainSize);
         currentSolutionMatrixRelevant = false;
-        flagSolutionMatrixComputing   = false;
 
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
         enableDefaultClickRule();
@@ -1492,7 +1541,6 @@ function main()
         flagToroidBoard               = false;
         flagDefaultClickRule          = true;
         currentSolutionMatrixRelevant = false;
-        flagSolutionMatrixComputing   = false;
 
         requestRedraw();
     }
@@ -1509,7 +1557,6 @@ function main()
         flagToroidBoard               = true;
         flagDefaultClickRule          = true;
         currentSolutionMatrixRelevant = false;
-        flagSolutionMatrixComputing   = false;
 
         requestRedraw();
     }
@@ -1522,19 +1569,78 @@ function main()
 
     function updateSolutionMatrixIfNeeded()
     {
-        if(!currentSolutionMatrixRelevant)
+        matrixText.textContent = "CALCULATING";
+
+        let promise = new Promise((resolve, reject) => 
         {
-            flagSolutionMatrixComputing = true;
+            if(!currentSolutionMatrixRelevant)
+            {
+                //Calculate solution matrix in place (instead of calling calculateSolutionMatrix())
+                //Calculate in small chunks to not block the UI
+                //(WebWorkers suck because they require to load an external file, which requires you to deal with stupid dense CORS)
 
-            let solutionMatrixRes = calculateSolutionMatrix(currentGameClickRule, currentGameSize, currentDomainSize, currentClickRuleSize, flagToroidBoard);
-            currentSolutionMatrix = solutionMatrixRes.invmatrix;
-            currentQuietPatterns  = solutionMatrixRes.quietpats;
+                let lightsOutMatrix = [];
+                let invMatrix       = [];
+                let domainInvs      = [];
+                new Promise((resolveSm, rejectSm) =>
+                {
+                    for(let yL = 0; yL < currentGameSize; yL++)
+                    {
+                        matrixText.textContent = "CALCULATING " + yL;
+                        setTimeout(() =>
+                        {
+                            calculateSolutionMatrixStep1Bit(lightsOutMatrix, currentGameClickRule, currentClickRuleSize, currentGameSize, yL, flagToroidBoard);
+                        }, 0);
+                    }
 
-            qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
+                    resolveSm();
+                })
+                .then(() => 
+                {
+                    //Generate a unit matrix. This will eventually become an inverse matrix
+                    calculateSolutionMatrixStep2Bit(invMatrix, currentGameSize);
 
-            currentSolutionMatrixRelevant = true;
-            flagSolutionMatrixComputing   = false;
-        }
+                    for(let d = 0; d < currentDomainSize; d++)
+                    {
+                        domainInvs.push(invModGcdEx(d, currentDomainSize));
+                    }
+
+                    //First pass: top to bottom, eliminating numbers from below the diagonal
+                    let matrixSize = currentGameSize * currentGameSize;
+                    for(let iD = 0; iD < matrixSize; iD++)
+                    {
+                        calculateSolutionMatrixStep3Bit(lightsOutMatrix, invMatrix, matrixSize, domainInvs, currentDomainSize, iD);
+                    }
+
+                    //Second pass: bottom to top, eliminating numbers from above the diagonal
+                    let quietPatterns = 0;
+                    for(let iU = matrixSize - 1; iU >= 0; iU--)
+                    {
+                        calculateSolutionMatrixStep4Bit(lightsOutMatrix, invMatrix, domainInvs, currentDomainSize, iU);
+                    }
+
+                    for(let iD = 0; iD < matrixSize; iD++)
+                    {
+                        quietPatterns = calculateSolutionMatrixStep5Bit(lightsOutMatrix, iD, quietPatterns);
+                    }
+
+                    calculateSolutionMatrixStep6Bit(invMatrix, matrixSize);
+
+                    matrixText.textContent = "CALCULATING FINISHED";
+
+                    currentSolutionMatrix = invMatrix;
+                    currentQuietPatterns  = quietPatterns;
+
+                    qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
+
+                    currentSolutionMatrixRelevant = true;
+
+                    resolve();
+                });          
+            }
+        });
+
+        return promise;
     }
 
     function calculateNewStabilityValue(boardToCompare)
@@ -1882,14 +1988,18 @@ function main()
         }
         case countingModes.COUNT_SOLUTION_PERIOD:
         {
-            updateSolutionMatrixIfNeeded();
-            flagPeriodCounting = true;
+            updateSolutionMatrixIfNeeded().then(() => 
+            {
+                flagPeriodCounting = true;
+            });
             break;
         }
         case countingModes.COUNT_SOLUTION_PERIOD_4X:
         {
-            updateSolutionMatrixIfNeeded();
-            flagPerio4Counting = true;
+            updateSolutionMatrixIfNeeded().then(() =>
+            {
+                flagPerio4Counting = true;
+            });
             break;
         }
         case countingModes.COUNT_INVERSE_SOLUTION_PERIOD:
@@ -1939,7 +2049,6 @@ function main()
         showLitStability(false);
 
         //We can change for normal mode here too!
-        flagSolutionMatrixComputing = false;
         flagRandomSolving           = false;
         flagPeriodCounting          = false;
         flagEigvecCounting          = false;

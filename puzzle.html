@@ -8,8 +8,8 @@
     <meta http-equiv="Expires"       content="0"/>
     
     <title>Lights Out</title>
-    <script src="js/LightsOut.js?ver=1.17.6"></script>
-    <link rel="stylesheet" type="text/css" href="css/LightsOut.css?ver=1.14"> 
+    <script src="js/LightsOut.js?ver=1.18.3"></script>
+    <link rel="stylesheet" type="text/css" href="css/LightsOut.css?ver=1.14.3"> 
 </head>
 
 <body onload="main();">
@@ -21,6 +21,7 @@
 
             <div class="rightside">
                 <p id="LightsOutPuzzleInfo">Lights Out</p><br>
+                <p id="SolutionMatrixCalculating"></p>
                 <p id="QuietPatternsInfo">Quiet patterns: </p>
                 <p id="SolutionPeriodInfo">Solution period: </p>
 
@@ -38,61 +39,59 @@
         </div>
 
         <div class="rules">
-            <p>
-                Hotkeys:</br>
-                LMB — Regular turn</br>
-                Ctrl + LMB — Construct turn</br>
-                </br>
-                + — Increase size</br>
-                - — Decrease size</br>
-                Shift + + — Increase domain</br>
-                Shift + - — Decrease domain</br> 
-                </br>
-                Shift + R — Regular click rule</br>
-                Shift + T — Toroidal click rule</br>    
-                Shift + M — Enter click rule constructing mode</br>    
-                Shift + O — Enter toroidal click rule constructing mode</br>    
-                </br>
-                Enter  — Accept click rule being constructed</br>
-                Escape — Cancel click rule construction</br>    
-                </br>
-                ← — Move board left</br>
-                → — Move board right</br>
-                ↑ — Move board up</br>
-                ↓ — Move board down</br>
-                I — Invert board</br>
-                Shift + I — Domain rotate board</br>
-                </br>
-                S — Solve (random)</br>
-                C — Solve (sequentional)</br>
-                </br>
-                Shift + V — Calculate solution period(normal)</br>
-                Shift + X — Calculate solution period(4x normal)</br>
-                Shift + Z — Calculate solution period(inverse)</br>
-                Shift + G — Calculate eigenvector via citybuilder algorithm</br>
-                Q — Show quiet pattern count</br>
-                </br>
-                V — Infinite solution interchanges(normal)</br>
-                X — Infinite solution interchanges(4x normal)</br>
-                Z — Infinite solution interchanges(inverse)</br>
-                G — Infinite citybuilder algorithm interchanges</br>
-                </br>
-                T — Show solution</br>
-                W — Show inverse solution</br>
-                A — Show stability</br>
-                Shift + A — Show lit stability</br>
-                </br>
-                E — Reset board from solution/stability</br>
-                </br>
-                F — Random board</br>
-                R — Random board(always solvable)</br>
-                </br>
-                1 — Fully lit board</br>
-                0 — Fully unlit board</br>
-                O — Border pattern</br>
-                P — Checkers pattern</br>
-                B — Chessboard pattern</br>
-            </p>
+            Hotkeys:</br>
+            LMB — Regular turn</br>
+            Ctrl + LMB — Construct turn</br>
+            </br>
+            + — Increase size</br>
+            - — Decrease size</br>
+            Shift + + — Increase domain</br>
+            Shift + - — Decrease domain</br> 
+            </br>
+            Shift + R — Regular click rule</br>
+            Shift + T — Toroidal click rule</br>    
+            Shift + M — Enter click rule constructing mode</br>    
+            Shift + O — Enter toroidal click rule constructing mode</br>    
+            </br>
+            Enter  — Accept click rule being constructed</br>
+            Escape — Cancel click rule construction</br>    
+            </br>
+            ← — Move board left</br>
+            → — Move board right</br>
+            ↑ — Move board up</br>
+            ↓ — Move board down</br>
+            I — Invert board</br>
+            Shift + I — Domain rotate board</br>
+            </br>
+            S — Solve (random)</br>
+            C — Solve (sequentional)</br>
+            </br>
+            Shift + V — Calculate solution period(normal)</br>
+            Shift + X — Calculate solution period(4x normal)</br>
+            Shift + Z — Calculate solution period(inverse)</br>
+            Shift + G — Calculate eigenvector via citybuilder algorithm</br>
+            Q — Show quiet pattern count</br>
+            </br>
+            V — Infinite solution interchanges(normal)</br>
+            X — Infinite solution interchanges(4x normal)</br>
+            Z — Infinite solution interchanges(inverse)</br>
+            G — Infinite citybuilder algorithm interchanges</br>
+            </br>
+            T — Show solution</br>
+            W — Show inverse solution</br>
+            A — Show stability</br>
+            Shift + A — Show lit stability</br>
+            </br>
+            E — Reset board from solution/stability</br>
+            </br>
+            F — Random board</br>
+            R — Random board(always solvable)</br>
+            </br>
+            1 — Fully lit board</br>
+            0 — Fully unlit board</br>
+            O — Border pattern</br>
+            P — Checkers pattern</br>
+            B — Chessboard pattern</br>
         </div>
     </div>
 </body>
