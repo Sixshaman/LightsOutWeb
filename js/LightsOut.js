@@ -681,7 +681,7 @@ function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cell
 //========================================================================================================================
 
 //Lights out inverse matrix calculation step 1: calculate lights out matrix
-function calculateSolutionMatrixStep1Bit(lightsOutMatrix, clickRule, clickRuleSize, gameSize, gridRowNumber, isToroid)
+async function calculateSolutionMatrixStep1Bit(lightsOutMatrix, clickRule, clickRuleSize, gameSize, gridRowNumber, isToroid)
 {
     for(let xL = 0; xL < gameSize; xL++)
     {
@@ -700,7 +700,7 @@ function calculateSolutionMatrixStep1Bit(lightsOutMatrix, clickRule, clickRuleSi
 }
 
 //Lights out inverse matrix calculation step 2: allocate inverse matrix
-function calculateSolutionMatrixStep2Bit(invMatrix, gameSize)
+async function calculateSolutionMatrixStep2Bit(invMatrix, gameSize)
 {
     for(let yI = 0; yI < gameSize; yI++)
     {
@@ -718,7 +718,7 @@ function calculateSolutionMatrixStep2Bit(invMatrix, gameSize)
 }
 
 //Lights out inverse matrix calculation step 3: top to bottom, eliminating numbers from below the diagonal
-function calculateSolutionMatrixStep3Bit(lightsOutMatrix, invMatrix, matrixSize, domainInvs, domainSize, matrixRow)
+async function calculateSolutionMatrixStep3Bit(lightsOutMatrix, invMatrix, matrixSize, domainInvs, domainSize, matrixRow)
 {
     let thisValD = lightsOutMatrix[matrixRow][matrixRow];
     let compValD = lightsOutMatrix[matrixRow][matrixRow];
@@ -757,7 +757,7 @@ function calculateSolutionMatrixStep3Bit(lightsOutMatrix, invMatrix, matrixSize,
 }
 
 //Lights out inverse matrix calculation step 3: bottom to top, eliminating numbers from above the diagonal
-function calculateSolutionMatrixStep4Bit(lightsOutMatrix, invMatrix, domainInvs, domainSize, matrixRow)
+async function calculateSolutionMatrixStep4Bit(lightsOutMatrix, invMatrix, domainInvs, domainSize, matrixRow)
 {
     let thisValU    = lightsOutMatrix[matrixRow][matrixRow];
     let invThisValU = domainInvs[thisValU];
@@ -779,7 +779,7 @@ function calculateSolutionMatrixStep4Bit(lightsOutMatrix, invMatrix, domainInvs,
     }
 }
 
-function calculateSolutionMatrixStep5Bit(lightsOutMatrix, matrixRow, quietPatterns)
+async function calculateSolutionMatrixStep5Bit(lightsOutMatrix, matrixRow, quietPatterns)
 {
     let qp = quietPatterns;
     if(lightsOutMatrix[matrixRow].every(val => val === 0))
@@ -790,7 +790,7 @@ function calculateSolutionMatrixStep5Bit(lightsOutMatrix, matrixRow, quietPatter
     return qp;
 }
 
-function calculateSolutionMatrixStep6Bit(invMatrix, matrixSize)
+async function calculateSolutionMatrixStep6Bit(invMatrix, matrixSize)
 {
     for(let i = 0; i < matrixSize; i++) //Transpose for the case of non-symmetrical click rules
     {
@@ -1569,78 +1569,86 @@ function main()
 
     function updateSolutionMatrixIfNeeded()
     {
-        matrixText.textContent = "CALCULATING";
-
-        let promise = new Promise((resolve, reject) => 
+        if(!currentSolutionMatrixRelevant)
         {
-            if(!currentSolutionMatrixRelevant)
+            matrixText.textContent = "CALCULATING";
+
+            //Calculate solution matrix in place (instead of calling calculateSolutionMatrix())
+            //Calculate in small chunks to not block the UI
+            //(WebWorkers suck because they require to load an external file, which requires you to deal with stupid dense CORS)
+
+            let lightsOutMatrix = [];
+            let invMatrix       = [];
+            let domainInvs      = [];
+            let quietPatterns   = 0;
+            let matrixSize      = currentGameSize * currentGameSize;
+            let promise = new Promise((resolve, reject) => 
             {
-                //Calculate solution matrix in place (instead of calling calculateSolutionMatrix())
-                //Calculate in small chunks to not block the UI
-                //(WebWorkers suck because they require to load an external file, which requires you to deal with stupid dense CORS)
-
-                let lightsOutMatrix = [];
-                let invMatrix       = [];
-                let domainInvs      = [];
-                new Promise((resolveSm, rejectSm) =>
+                for(let yL = 0; yL < currentGameSize; yL++)
                 {
-                    for(let yL = 0; yL < currentGameSize; yL++)
-                    {
-                        matrixText.textContent = "CALCULATING " + yL;
-                        setTimeout(() =>
-                        {
-                            calculateSolutionMatrixStep1Bit(lightsOutMatrix, currentGameClickRule, currentClickRuleSize, currentGameSize, yL, flagToroidBoard);
-                        }, 0);
-                    }
+                    matrixText.textContent = "CALCULATING " + yL;
+                    calculateSolutionMatrixStep1Bit(lightsOutMatrix, currentGameClickRule, currentClickRuleSize, currentGameSize, yL, flagToroidBoard);
+                }
+            })
+            .then(() => 
+            {
+                //Generate a unit matrix. This will eventually become an inverse matrix
+                calculateSolutionMatrixStep2Bit(invMatrix, currentGameSize);
 
-                    resolveSm();
-                })
-                .then(() => 
+                for(let d = 0; d < currentDomainSize; d++)
                 {
-                    //Generate a unit matrix. This will eventually become an inverse matrix
-                    calculateSolutionMatrixStep2Bit(invMatrix, currentGameSize);
+                    domainInvs.push(invModGcdEx(d, currentDomainSize));
+                }
+            })
+            .then(() =>
+            {
+                //First pass: top to bottom, eliminating numbers from below the diagonal
+                for(let iD = 0; iD < matrixSize; iD++)
+                {
+                    calculateSolutionMatrixStep3Bit(lightsOutMatrix, invMatrix, matrixSize, domainInvs, currentDomainSize, iD);
+                }
+            })
+            .then(() =>
+            {
+                //Second pass: bottom to top, eliminating numbers from above the diagonal
+                let quietPatterns = 0;
+                for(let iU = matrixSize - 1; iU >= 0; iU--)
+                {
+                    calculateSolutionMatrixStep4Bit(lightsOutMatrix, invMatrix, domainInvs, currentDomainSize, iU);
+                }
+            })
+            .then(() =>
+            {
+                for(let iD = 0; iD < matrixSize; iD++)
+                {
+                    quietPatterns = calculateSolutionMatrixStep5Bit(lightsOutMatrix, iD, quietPatterns);
+                }
+            })
+            .then(() =>
+            {
+                calculateSolutionMatrixStep6Bit(invMatrix, matrixSize);
+            })
+            .then(() =>
+            {
+                matrixText.textContent = "CALCULATING FINISHED";
 
-                    for(let d = 0; d < currentDomainSize; d++)
-                    {
-                        domainInvs.push(invModGcdEx(d, currentDomainSize));
-                    }
+                currentSolutionMatrix = invMatrix;
+                currentQuietPatterns  = quietPatterns;
 
-                    //First pass: top to bottom, eliminating numbers from below the diagonal
-                    let matrixSize = currentGameSize * currentGameSize;
-                    for(let iD = 0; iD < matrixSize; iD++)
-                    {
-                        calculateSolutionMatrixStep3Bit(lightsOutMatrix, invMatrix, matrixSize, domainInvs, currentDomainSize, iD);
-                    }
+                qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
 
-                    //Second pass: bottom to top, eliminating numbers from above the diagonal
-                    let quietPatterns = 0;
-                    for(let iU = matrixSize - 1; iU >= 0; iU--)
-                    {
-                        calculateSolutionMatrixStep4Bit(lightsOutMatrix, invMatrix, domainInvs, currentDomainSize, iU);
-                    }
+                currentSolutionMatrixRelevant = true;
+            });
 
-                    for(let iD = 0; iD < matrixSize; iD++)
-                    {
-                        quietPatterns = calculateSolutionMatrixStep5Bit(lightsOutMatrix, iD, quietPatterns);
-                    }
-
-                    calculateSolutionMatrixStep6Bit(invMatrix, matrixSize);
-
-                    matrixText.textContent = "CALCULATING FINISHED";
-
-                    currentSolutionMatrix = invMatrix;
-                    currentQuietPatterns  = quietPatterns;
-
-                    qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
-
-                    currentSolutionMatrixRelevant = true;
-
-                    resolve();
-                });          
-            }
-        });
-
-        return promise;
+            return promise;
+        }
+        else
+        {
+            return new Promise((resolve, reject) =>
+            {
+                resolve();
+            });
+        }
     }
 
     function calculateNewStabilityValue(boardToCompare)
