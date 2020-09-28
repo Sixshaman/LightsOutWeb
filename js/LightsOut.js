@@ -470,6 +470,8 @@ function main()
 
     let drawVertexBufferAttribLocation = null;
 
+    let solutionMatrixWorker = new Worker(URL.createObjectURL(new Blob(["("+solutionMatrixWorkerFunction.toString()+")()"], {type: 'text/javascript'})));
+
     enableDefaultClickRule();
 
     createTextures();
@@ -479,17 +481,6 @@ function main()
 
     changeGameSize(15);
     updateViewport();
-
-    //solutionMatrixScripts = 
-    //[
-    //    URL.createObjectURL(new Blob(["("+calculateSolutionMatrixStep1Bit.toString()+")()"], {type: 'text/javascript'})),
-    //    URL.createObjectURL(new Blob(["("+calculateSolutionMatrixStep2Bit.toString()+")()"], {type: 'text/javascript'})),
-    //    URL.createObjectURL(new Blob(["("+calculateSolutionMatrix.toString()        +")()"], {type: 'text/javascript'}))
-    //];
-
-    let solutionMatrixWorker = new Worker(URL.createObjectURL(new Blob(["("+solutionMatrixWorkerFunction.toString()+")()"], {type: 'text/javascript'})));
-    //solutionMatrixWorker.postMessage({command: "InitScripts", params: solutionMatrixScripts});
-    //solutionMatrixWorker.postMessage({command: "CalcSolutionMatrix", params: {clickRule: currentGameClickRule, gameSize: currentGameSize, domainSize: currentDomainSize, clickRuleSize: currentClickRuleSize, isToroid: flagToroidBoard}});
 
     //==========================================================================================================================================================================
 
@@ -681,89 +672,16 @@ function main()
         {
             matrixText.textContent = "CALCULATING";
 
-            //Calculate solution matrix in place (instead of calling calculateSolutionMatrix())
-            //Calculate in small chunks to not block the UI
-            //(WebWorkers suck because they require to load an external file, which requires you to deal with stupid dense CORS)
+            solutionMatrixWorker.postMessage({command: "CalcSolutionMatrix", params: {clickRule: currentGameClickRule, gameSize: currentGameSize, domainSize: currentDomainSize, clickRuleSize: currentClickRuleSize, isToroid: flagToroidBoard}});
 
-            let lightsOutMatrix = [];
-            let invMatrix       = [];
-            let domainInvs      = [];
-            let quietPatterns   = 0;
-            let matrixSize      = currentGameSize * currentGameSize;
-            let promise = new Promise((resolve, reject) => 
-            {
-                for(let yL = 0; yL < currentGameSize; yL++)
-                {
-                    matrixText.textContent = "CALCULATING " + yL;
-                    setTimeout(function()
-                    {
-                        calculateSolutionMatrixStep1Bit(lightsOutMatrix, currentGameClickRule, currentClickRuleSize, currentGameSize, yL, flagToroidBoard);
-                    }, 10);
-                }
+            matrixText.textContent = "CALCULATING FINISHED";
 
-                resolve();
-            })
-            .then(() => 
-            {
-                //Generate a unit matrix. This will eventually become an inverse matrix
+            currentSolutionMatrix = invMatrix;
+            currentQuietPatterns  = quietPatterns;
 
-                setTimeout(function()
-                {
-                    calculateSolutionMatrixStep2Bit(invMatrix, currentGameSize);
-                }, 10);
+            qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
 
-                for(let d = 0; d < currentDomainSize; d++)
-                {
-                    domainInvs.push(invModGcdEx(d, currentDomainSize));
-                }
-            })
-            .then(() =>
-            {
-                //First pass: top to bottom, eliminating numbers from below the diagonal
-                for(let iD = 0; iD < matrixSize; iD++)
-                {
-                    //calculateSolutionMatrixStep3Bit(lightsOutMatrix, invMatrix, matrixSize, domainInvs, currentDomainSize, iD);
-                }
-            })
-            .then(() =>
-            {
-                //Second pass: bottom to top, eliminating numbers from above the diagonal
-                for(let iU = matrixSize - 1; iU >= 0; iU--)
-                {
-                    //calculateSolutionMatrixStep4Bit(lightsOutMatrix, invMatrix, domainInvs, currentDomainSize, iU);
-                }
-            })
-            .then(() =>
-            {
-                for(let iD = 0; iD < matrixSize; iD++)
-                {
-                    //quietPatterns = calculateSolutionMatrixStep5Bit(lightsOutMatrix, iD, quietPatterns);
-                }
-            })
-            .then(() =>
-            {
-                //calculateSolutionMatrixStep6Bit(invMatrix, matrixSize);
-            })
-            .then(() =>
-            {
-                matrixText.textContent = "CALCULATING FINISHED";
-
-                currentSolutionMatrix = invMatrix;
-                currentQuietPatterns  = quietPatterns;
-
-                qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
-
-                currentSolutionMatrixRelevant = true;
-            });
-
-            return promise;
-        }
-        else
-        {
-            return new Promise((resolve, reject) =>
-            {
-                resolve();
-            });
+            currentSolutionMatrixRelevant = true;
         }
     }
 
