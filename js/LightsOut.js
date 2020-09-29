@@ -377,7 +377,7 @@ function main()
     const minimumDomainSize = 2;
     const maximumDomainSize = 255;
 
-    const canvasSize = 900;
+    const canvasSize = Math.max(canvas.width, canvas.height);
 
     let currentViewportWidth  = canvas.clientWidth;
     let currentViewportHeight = canvas.clientHeight;
@@ -410,12 +410,12 @@ function main()
     let currentCountedBoard     = null;
     let currentSavedBoard       = null;
 
-    let currentCellSize = 20;
-
     let currentClickRuleSize = 3;
     let currentGameSize      = 15;
     let currentSavedGameSize = 15;
     let currentDomainSize    = 2;
+
+    let currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
 
     let currentColorLit     = [0.0, 1.0, 0.0, 1.0];
     let currentColorUnlit   = [0.0, 0.0, 0.0, 1.0];
