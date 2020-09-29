@@ -339,6 +339,7 @@ function solutionMatrixWorkerFunction()
     {
         switch(e.data.command)
         {
+            //TODO: WEB WORKER LISTENER
             case "CalcSolutionMatrix":
             {
                 calculateSolutionMatrix(e.data.params.clickRule, e.data.params.gameSize, e.data.params.domainSize, e.data.params.clickRuleSize, e.data.params.isToroid);
