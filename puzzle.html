@@ -21,27 +21,40 @@
             </div>
 
             <div class="rightside">
-                <p id="LightsOutPuzzleInfo">Lights Out</p><br>
-                
-                
-                <div class="SolutionMatrixCalculating" id="SolutionMatrixBlock">
-                    <label class="mainLabel" for="SolutionMatrixProgress">Solution matrix calculating:</label>
-                    <progress id="SolutionMatrixProgress" max="1" value="0"> 0% </progress>
+                <div class="maininfo">
+                    <div id="LightsOutPuzzleInfo">Lights Out</p>  
                 </div>
-                
-                <p id="QuietPatternsInfo">Quiet patterns: </p>
-                <p id="SolutionPeriodInfo">Solution period: </p>
+                            
+                <div class="puzzleinfo">
+                    <div id="QuietPatternsInfo">Quiet patterns: </div>
+                    <div id="SolutionPeriodInfo">Solution period: </div>
+                </div>
 
-                <select class="rendermode" id="rendermodesel">
-                    <option value="Squares">Squares</option>
-                    <option value="Circles">Circles</option>
-                    <option value="Diamonds">Diamonds</option>
-                    <option value="BEAMS">BEAMS</option>
-                    <option value="Raindrops">Raindrops</option>
-                    <option value="Chains">Chains</option>
-                </select>
+                <div class="appearence">
+                    <div class="selectrendermode">
+                        <label class="mainLabel" for="RenderModeSel">Render mode: </label>
+                        <select class="rendermode" id="RenderModeSel">
+                            <option value="Squares">Squares</option>
+                            <option value="Circles">Circles</option>
+                            <option value="Diamonds">Diamonds</option>
+                            <option value="BEAMS">BEAMS</option>
+                            <option value="Raindrops">Raindrops</option>
+                            <option value="Chains">Chains</option>
+                        </select>
+                    </div>
 
-                <input type="checkbox" id="gridcheckbox" checked><label>Show grid</label></input>
+                    <div class="gridcheckbox">
+                        <label class="mainLabel" for="GridCheckBox">Show grid</label>
+                        <input type="checkbox" id="GridCheckBox" checked></input>
+                    </div>
+                </div>
+
+                <div class="solutionmatrixcalculating" id="SolutionMatrixBlock">
+                    <label class="mainLabel" for="SolutionMatrixProgress">Solution matrix calculating:</label>
+                    <progress id="SolutionMatrixProgress" max="1" value="0"></progress>
+                    <div id="SolutionMatrixProgressInfo">0%</div>
+                    <button type="button" id="SolutionMatrixCancel">Cancel</button>
+                </div>
             </div>
         </div>
 

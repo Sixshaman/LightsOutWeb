@@ -285,7 +285,7 @@ function solutionMatrixWorkerFunction()
                 }
             }
 
-            currProgress += 0.43 / matrixSize;
+            currProgress += 0.48 / matrixSize;
             postProgressMessage(currProgress);
         }
 
@@ -316,7 +316,7 @@ function solutionMatrixWorkerFunction()
                 quietPatterns += 1;
             }
 
-            currProgress += 0.43 / matrixSize;
+            currProgress += 0.48 / matrixSize;
             postProgressMessage(currProgress);
         }
 

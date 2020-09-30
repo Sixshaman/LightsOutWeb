@@ -79,46 +79,6 @@ function boardPointFromCanvasPoint(x, y, gameSize, canvasOffsetX, canvasOffsetY,
     return res;
 }
 
- //Extended Euclid algorithm for inverting (num) modulo (domainSize)
- //Returns a number T such that (num * T) % domainSize = 1
-function invModGcdEx(num, domainSize)
-{
-    if(num === 1)
-    {
-        return 1;
-    }
-    else
-    {
-        if(num === 0 || domainSize % num === 0)
-        {
-            return 0;
-        }
-        else
-        {
-            let tCurr = 0;
-            let rCurr = domainSize;
-            let tNext = 1;
-            let rNext = num;
-
-            while(rNext !== 0)
-            {
-                let quotR = Math.floor(rCurr / rNext);
-                let tPrev = tCurr;
-                let rPrev = rCurr;
-
-                tCurr = tNext;
-                rCurr = rNext;
-
-                tNext = Math.floor(tPrev - quotR * tCurr);
-                rNext = Math.floor(rPrev - quotR * rCurr);
-            }
-
-            tCurr = (tCurr + domainSize) % domainSize;
-            return tCurr;
-        }
-    }
-}
-
 //Returns (num % domainSize) with regard to the sign of num
 function wholeMod(num, domainSize)
 {
@@ -727,12 +687,14 @@ function main()
     const qpText   = document.getElementById("QuietPatternsInfo");
     const spText   = document.getElementById("SolutionPeriodInfo");
 
-    const solutionMatrixBlock    = document.getElementById("SolutionMatrixBlock");
-    const solutionMatrixProgress = document.getElementById("SolutionMatrixProgress");
+    const solutionMatrixBlock        = document.getElementById("SolutionMatrixBlock");
+    const solutionMatrixProgress     = document.getElementById("SolutionMatrixProgress");
+    const solutionMatrixProgressInfo = document.getElementById("SolutionMatrixProgressInfo");
+    const solutionMatrixCancelButton = document.getElementById("SolutionMatrixCancel");
 
-    const renderModeSelect = document.getElementById("rendermodesel");
+    const renderModeSelect = document.getElementById("RenderModeSel");
 
-    const gridCheckBox = document.getElementById("gridcheckbox");
+    const gridCheckBox = document.getElementById("GridCheckBox");
 
     const gl = canvas.getContext("webgl2");
     if (!gl)
@@ -1035,6 +997,12 @@ function main()
     {
         setGridVisible(gridCheckBox.checked);
     };
+
+    solutionMatrixCancelButton.onclick = function()
+    {
+        recreateSolutionMatrixWorker(); //This cancels the calculation
+        currentSolutionMatrixCalculated = false;
+    }
 
     let boardGenModes =
     {
@@ -1428,6 +1396,8 @@ function main()
                 solutionMatrixWorker.terminate();
             }
 
+            solutionMatrixProgressInfo.textContent = "0%";
+
             solutionMatrixWorker = new Worker(URL.createObjectURL(new Blob(["("+solutionMatrixWorkerFunction.toString()+")()"], {type: 'text/javascript'})));
             solutionMatrixWorker.addEventListener("message", function(e)
             {
@@ -1435,7 +1405,10 @@ function main()
                 {
                     case "Progress":
                     {
-                        solutionMatrixProgress.value = e.data.params.progress;
+                        let nextValue = e.data.params.progress;
+
+                        solutionMatrixProgress.value           = nextValue;
+                        solutionMatrixProgressInfo.textContent = Math.floor(100 * nextValue) + "%";
                         break;
                     }
                     case "Finish":
@@ -1445,7 +1418,8 @@ function main()
 
                         qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
 
-                        solutionMatrixBlock.hidden = true;
+                        solutionMatrixBlock.hidden             = true;
+                        solutionMatrixProgressInfo.textContent = "0%";
 
                         currentSolutionMatrixCalculating = false;
                         currentSolutionMatrixCalculated  = true;

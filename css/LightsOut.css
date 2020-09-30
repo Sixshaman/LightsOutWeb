@@ -12,6 +12,7 @@ div.container
 div.puzzle
 {
     display: flex;
+    width: 100%;
 }
 
 div.leftside
@@ -24,6 +25,7 @@ div.rightside
 {
     float: right;
     margin-left: 30px;
+    width: 100%;
 }
 
 div.rightrightside
@@ -35,14 +37,36 @@ div.rules
 {
     color: lavender;
     overflow: hidden;
+    width: 80%;
 }
 
-label.mainLabel
+div.maininfo
 {
     color: lavender;
 }
 
-p
+div.puzzleinfo
+{
+    color: lavender;
+    margin-top: 2rem;
+}
+
+div.appearence
+{
+    margin-top: 2rem;
+}
+
+div.solutionmatrixcalculating
+{
+    margin-top: 2rem;
+}
+
+progress
+{
+    width: 5rem;
+}
+
+label.mainLabel
 {
     color: lavender;
 }
