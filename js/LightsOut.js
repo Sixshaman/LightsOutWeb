@@ -1,12 +1,734 @@
+////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////    UTIL FUNCTIONS    /////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////
+
+//Clamps the value num between min and max.
+function clamp(num, min, max)
+{
+    if(num < min)
+    {
+        return min;
+    }
+
+    if(num > max)
+    {
+        return max;
+    }
+
+    return num;
+}
+
+//Computes a flat cell index from x and y for the given board size (gameSize x gameSize)
+function flatCellIndex(gameSize, x, y)
+{
+    return y * gameSize + x;
+}
+
+//Computes the size of the canvas for the given board size (gameSize x gameSize). 
+//The size is calculated in a way such that every cell is of the same size cellSize.
+//If grid is used, the size of the canvas adjusts to fit the grid
+function canvasSizeFromGameSize(gameSize, cellSize, useGrid)
+{
+    let res = {width: 0, height: 0};
+
+    if(useGrid)
+    {
+        //Grid is used: each cell has 1 pixel wide border on left and top edges. This border is included in cellSize.
+        //Cells don't have the right and bottom borders - instead, left border of the right cell and top border of the bottom cell is used.
+        //The only exception is the rightmost and bottommost cells - they need explicit 1 pixel wide border.
+        res.width  = gameSize * cellSize + 1;
+        res.height = gameSize * cellSize + 1;       
+    }
+    else
+    {
+        //Grid is not used - canvas is just the multiple of the cell size
+        res.width  = gameSize * cellSize;
+        res.height = gameSize * cellSize; 
+    }
+
+    return res;
+}
+
+//Gets 2-dimensional cell index from a canvas point (x, y) for the given board size gameSize and canvas size canvasWidth x canvasHeight.
+//Since the actual board has dynamic size and is centered on a statically sized canvas, offsets: (canvasOffsetX, canvasOffsetY) are added.
+function boardPointFromCanvasPoint(x, y, gameSize, canvasOffsetX, canvasOffsetY, canvasWidth, canvasHeight, useGrid)
+{
+    let res = {xBoard: -1, yBoard: -1};
+    if((x - canvasOffsetX) > canvasWidth || (y - canvasOffsetY) > canvasHeight)
+    {
+        return res;
+    }
+
+    let stepX = 1;
+    let stepY = 1;
+
+    if(useGrid)
+    {
+        stepX = Math.floor((canvasWidth  + 1) / gameSize);
+        stepY = Math.floor((canvasHeight + 1) / gameSize);
+    }
+    else
+    {
+        stepX = Math.floor(canvasWidth  / gameSize);
+        stepY = Math.floor(canvasHeight / gameSize);
+    }
+
+    res.xBoard = Math.floor((x - canvasOffsetX) / stepX);
+    res.yBoard = Math.floor((y - canvasOffsetY) / stepY);
+
+    return res;
+}
+
+ //Extended Euclid algorithm for inverting (num) modulo (domainSize)
+ //Returns a number T such that (num * T) % domainSize = 1
+function invModGcdEx(num, domainSize)
+{
+    if(num === 1)
+    {
+        return 1;
+    }
+    else
+    {
+        if(num === 0 || domainSize % num === 0)
+        {
+            return 0;
+        }
+        else
+        {
+            let tCurr = 0;
+            let rCurr = domainSize;
+            let tNext = 1;
+            let rNext = num;
+
+            while(rNext !== 0)
+            {
+                let quotR = Math.floor(rCurr / rNext);
+                let tPrev = tCurr;
+                let rPrev = rCurr;
+
+                tCurr = tNext;
+                rCurr = rNext;
+
+                tNext = Math.floor(tPrev - quotR * tCurr);
+                rNext = Math.floor(rPrev - quotR * rCurr);
+            }
+
+            tCurr = (tCurr + domainSize) % domainSize;
+            return tCurr;
+        }
+    }
+}
+
+//Returns (num % domainSize) with regard to the sign of num
+function wholeMod(num, domainSize)
+{
+    return ((num % domainSize) + domainSize) % domainSize;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////    CLICK RULE FUNCTIONS    /////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////////////////////
+
+//Makes a turn at (cellX, cellY) cell of the board board with regard to click rule clickRule
+function makeTurn(board, clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY, isToroid)
+{
+    if(isToroid)
+    {
+        let populatedClickRuleT = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cellY);
+        return addBoard(board, populatedClickRuleT, domainSize);
+    }
+    else
+    {
+        let populatedClickRuleP = populateClickRulePlane(clickRule, clickRuleSize, gameSize, cellX, cellY);
+        return addBoard(board, populatedClickRuleP, domainSize);
+    }
+}
+
+//Flips the state of the (cellX, cellY) cell 
+function makeConstructTurn(board, gameSize, domainSize, cellX, cellY)
+{
+    let resBoard = new Uint8Array(board);
+
+    let cellIndex = flatCellIndex(gameSize, cellX, cellY);
+    resBoard[cellIndex] = (board[cellIndex] + 1) % domainSize;
+
+    return resBoard;
+}
+
+//Fast in-place version for making turns in batch provided in turnListBoard, without populating click rules
+function makeTurns(board, clickRule, clickRuleSize, gameSize, domainSize, turnListBoard, isToroid) 
+{
+    let newBoard = board.slice();
+
+    let clickSizeHalf = Math.floor(clickRuleSize / 2);
+    for(let yBoard = 0; yBoard < gameSize; yBoard++)
+    {
+        for(let xBoard = 0; xBoard < gameSize; xBoard++)
+        {
+            let left = xBoard - clickSizeHalf;
+            let top  = yBoard - clickSizeHalf;
+
+            let clickPoint = flatCellIndex(gameSize, xBoard, yBoard);
+            let turnValue  = turnListBoard[clickPoint];
+
+            for(let yClick = 0; yClick < clickRuleSize; yClick++)
+            {
+                let yBig = yClick + top;
+                if(!isToroid)
+                {
+                    if(yBig < 0 || yBig >= gameSize)
+                    {
+                        continue;
+                    }
+                }
+                else
+                {
+                    yBig = wholeMod(yBig, gameSize);
+                }
+
+                for(let xClick = 0; xClick < clickRuleSize; xClick++)
+                {
+                    let xBig = xClick + left;
+                    if(!isToroid)
+                    {
+                        if(xBig < 0 || xBig >= gameSize)
+                        {
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        xBig = wholeMod(xBig, gameSize);
+                    }
+
+                    let bigClickIndex = flatCellIndex(gameSize, xBig, yBig);
+                    let smlClickIndex = flatCellIndex(clickRuleSize, xClick, yClick);
+
+                    newBoard[bigClickIndex] = (newBoard[bigClickIndex] + turnValue * clickRule[smlClickIndex]) % domainSize;
+                }
+            }
+        }
+    }
+
+    return newBoard;
+}
+
+//Fast in-place version for making turns in batch provided in turnListBoard, without populating click rules. Default click rule version
+function makeTurnsDefault(board, gameSize, domainSize, turnListBoard, isToroid)
+{
+    let newBoard = board.slice();
+
+    if(isToroid)
+    {
+        for(let y = 0; y < gameSize; y++)
+        {
+            let topY    = wholeMod(y - 1, gameSize);
+            let bottomY = wholeMod(y + 1, gameSize);
+
+            for(let x = 0; x < gameSize; x++)
+            {
+                let leftX   = wholeMod(x - 1, gameSize);
+                let rightX  = wholeMod(x + 1, gameSize);
+
+                let thisCellIndex   = flatCellIndex(gameSize,      x,       y);
+                let leftCellIndex   = flatCellIndex(gameSize,  leftX,       y);
+                let rightCellIndex  = flatCellIndex(gameSize, rightX,       y);
+                let topCellIndex    = flatCellIndex(gameSize,      x,    topY);
+                let bottomCellIndex = flatCellIndex(gameSize,      x, bottomY);
+
+                let turnValue = turnListBoard[thisCellIndex];
+
+                newBoard[thisCellIndex]   = (newBoard[thisCellIndex]   + turnValue) % domainSize;
+                newBoard[leftCellIndex]   = (newBoard[leftCellIndex]   + turnValue) % domainSize;
+                newBoard[rightCellIndex]  = (newBoard[rightCellIndex]  + turnValue) % domainSize;
+                newBoard[topCellIndex]    = (newBoard[topCellIndex]    + turnValue) % domainSize;
+                newBoard[bottomCellIndex] = (newBoard[bottomCellIndex] + turnValue) % domainSize;
+            }
+        }
+    }
+    else
+    {
+        for(let y = 0; y < gameSize; y++)
+        {
+            for(let x = 0; x < gameSize; x++)
+            {
+                let thisCellIndex = flatCellIndex(gameSize, x, y);
+                let turnValue     = turnListBoard[thisCellIndex];
+
+                newBoard[thisCellIndex] = (newBoard[thisCellIndex] + turnValue) % domainSize;
+
+                if(x > 0)
+                {
+                    let leftCellIndex       = flatCellIndex(gameSize, x - 1, y);
+                    newBoard[leftCellIndex] = (newBoard[leftCellIndex] + turnValue) % domainSize;
+                }
+
+                if(x < gameSize - 1)
+                {
+                    let rightCellIndex       = flatCellIndex(gameSize, x + 1, y);
+                    newBoard[rightCellIndex] = (newBoard[rightCellIndex] + turnValue) % domainSize;
+                }
+
+                if(y > 0)
+                {
+                    let topCellIndex       = flatCellIndex(gameSize, x, y - 1);
+                    newBoard[topCellIndex] = (newBoard[topCellIndex] + turnValue) % domainSize;
+                }
+
+                if(y < gameSize - 1)
+                {
+                    let bottomCellIndex       = flatCellIndex(gameSize, x, y + 1);
+                    newBoard[bottomCellIndex] = (newBoard[bottomCellIndex] + turnValue) % domainSize;
+                }
+            }
+        }
+    }
+
+    return newBoard;
+}
+
+//Translates the click rule from click rule space to the board space (regular version)
+function populateClickRulePlane(clickRule, clickRuleSize, gameSize, cellX, cellY)
+{
+    let populatedClickRule = new Uint8Array(gameSize * gameSize);
+    populatedClickRule.fill(0);
+
+    let clickSizeHalf = Math.floor(clickRuleSize / 2);
+
+    let left = cellX - clickSizeHalf;
+    let top  = cellY - clickSizeHalf;
+    
+    for(let y = 0; y < clickRuleSize; y++)
+    {
+        let yBig = y + top;
+        if(yBig < 0 || yBig >= gameSize)
+        {
+            continue;
+        }
+
+        for(let x = 0; x < clickRuleSize; x++)
+        {
+            let xBig = x + left;
+            if(xBig < 0 || xBig >= gameSize)
+            {
+                continue;
+            }
+
+            let bigClickIndex = flatCellIndex(gameSize, xBig, yBig);
+            let smlClickIndex = flatCellIndex(clickRuleSize, x, y);
+
+            populatedClickRule[bigClickIndex] = clickRule[smlClickIndex];
+        }
+    }
+
+    return populatedClickRule;
+}
+
+//Translates the click rule from click rule space to the board space (toroidal version)
+function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cellY)
+{
+    let populatedClickRule = new Uint8Array(gameSize * gameSize);
+    populatedClickRule.fill(0);
+
+    let clickSizeHalf = Math.floor(clickRuleSize / 2);
+
+    let left = cellX - clickSizeHalf;
+    let top  = cellY - clickSizeHalf;
+    
+    for(let y = 0; y < clickRuleSize; y++)
+    {
+        let yBig    = y + top;
+        let yBigMod = wholeMod(yBig, gameSize);
+
+        for(let x = 0; x < clickRuleSize; x++)
+        {
+            let xBig    = x + left;
+            let xBigMod = wholeMod(xBig, gameSize); 
+
+            let bigClickIndex = flatCellIndex(gameSize, xBigMod, yBigMod);
+            let smlClickIndex = flatCellIndex(clickRuleSize, x, y);
+
+            populatedClickRule[bigClickIndex] = clickRule[smlClickIndex];
+        }
+    }
+
+    return populatedClickRule;
+}
+
+//Calculates the solution given the solution matrix
+function calculateSolution(board, gameSize, domainSize, solutionMatrix)
+{
+    let solution = new Uint8Array(gameSize * gameSize);
+
+    for(let y = 0; y < gameSize; y++)
+    {
+        for (let x = 0; x < gameSize; x++)
+        {
+            let cellIndex = flatCellIndex(gameSize, x, y);
+            let matrixRow = solutionMatrix[cellIndex];
+
+            solution[cellIndex] = dotProductBoard(board, matrixRow, domainSize);
+        }
+    }
+
+    solution = domainInverseBoard(solution, domainSize);
+    return solution;
+}
+
+//Calculates the inverse solution
+function calculateInverseSolution(board, gameSize, domainSize, clickRule, clickRuleSize, isToroidBoard, isDefaultClickRule)
+{
+    let invSolution = new Uint8Array(gameSize * gameSize);
+    invSolution.fill(0);
+
+    if(isDefaultClickRule)
+    {
+        invSolution = makeTurnsDefault(invSolution, gameSize, domainSize, board, isToroidBoard);
+    }
+    else
+    {
+        invSolution = makeTurns(invSolution, clickRule, clickRuleSize, gameSize, domainSize, board, isToroidBoard);
+    }
+
+    return invSolution;
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////    BOARD FUNCTIONS    /////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////
+
+//Returns a new board with every cell moved left, wrapping around the left edge
+function moveBoardLeft(board, gameSize)
+{
+    let resBoard = new Uint8Array(board.length);
+    for(let y = 0; y < gameSize; y++)
+    {
+        for (let x = 0; x < gameSize; x++)
+        {
+            let leftX = wholeMod(x - 1, gameSize);
+
+            let cellIndex     = flatCellIndex(gameSize, x,     y);
+            let cellIndexLeft = flatCellIndex(gameSize, leftX, y);
+
+            resBoard[cellIndexLeft] = board[cellIndex];
+        }
+    }
+    
+    return resBoard;
+}
+
+//Returns a new board with every cell moved right, wrapping around the right edge
+function moveBoardRight(board, gameSize)
+{
+    let resBoard = new Uint8Array(board.length);
+    for(let y = 0; y < gameSize; y++)
+    {
+        for (let x = 0; x < gameSize; x++)
+        {
+            let rightX = wholeMod(x + 1, gameSize);
+
+            let cellIndex      = flatCellIndex(gameSize, x,      y);
+            let cellIndexRight = flatCellIndex(gameSize, rightX, y);
+
+            resBoard[cellIndexRight] = board[cellIndex];
+        }
+    }
+    
+    return resBoard;
+}
+
+//Returns a new board with every cell moved up, wrapping around the top edge
+function moveBoardUp(board, gameSize)
+{
+    let resBoard = new Uint8Array(board.length);
+    for(let y = 0; y < gameSize; y++)
+    {
+        for (let x = 0; x < gameSize; x++)
+        {
+            let upY = wholeMod(y - 1, gameSize);
+
+            let cellIndex   = flatCellIndex(gameSize, x, y  );
+            let cellIndexUp = flatCellIndex(gameSize, x, upY);
+
+            resBoard[cellIndexUp] = board[cellIndex];
+        }
+    }
+    
+    return resBoard;
+}
+
+//Returns a new board with every cell moved down, wrapping around the bottom edge
+function moveBoardDown(board, gameSize)
+{
+    let resBoard = new Uint8Array(board.length);
+    for(let y = 0; y < gameSize; y++)
+    {
+        for (let x = 0; x < gameSize; x++)
+        {
+            let downY = wholeMod(y + 1, gameSize);
+
+            let cellIndex     = flatCellIndex(gameSize, x, y    );
+            let cellIndexDown = flatCellIndex(gameSize, x, downY);
+
+            resBoard[cellIndexDown] = board[cellIndex];
+        }
+    }
+    
+    return resBoard;
+}
+
+//Returns a new board with every cell value domain-shifted by 1
+function domainShiftBoard(board, domainSize)
+{
+    let resBoard = new Uint8Array(board.length);
+    for(let i = 0; i < board.length; i++)
+    {
+        resBoard[i] = (board[i] + 1) % domainSize;
+    }
+
+    return resBoard;
+}
+
+//Returns a new board with every cell value domain-inverted
+function domainInverseBoard(board, domainSize)
+{
+    if(domainSize === 2)
+    {
+        return board;
+    }
+
+    let resBoard = new Uint8Array(board.length);
+    for(let i = 0; i < board.length; i++)
+    {
+        resBoard[i] = (domainSize - board[i]) % domainSize;
+    }
+
+    return resBoard;
+}
+
+//Returns a new board with every non-zero cell value domain-shifted by 1, ignoring value 0
+function domainRotateNonZeroBoard(board, domainSize)
+{
+    if(domainSize === 2)
+    {
+        return board;
+    }
+
+    let resBoard = new Uint8Array(board.length);
+    for(let i = 0; i < board.length; i++)
+    {
+        if(board[i] != 0)
+        {
+            resBoard[i] = board[i] % (domainSize - 1) + 1;
+        }
+    }
+
+    return resBoard;
+}
+
+//Adds boardLeft to boardRight component-wise and returns a new board containing the result
+function addBoard(boardLeft, boardRight, domainSize)
+{
+    if(boardLeft.length !== boardRight.length)
+    {
+        return boardLeft;
+    }
+
+    let resBoard = new Uint8Array(boardLeft.length);
+    for(let i = 0; i < boardLeft.length; i++)
+    {
+        resBoard[i] = (boardLeft[i] + boardRight[i]) % domainSize;
+    }
+
+    return resBoard;
+}
+
+//Adds boardRight to boardLeft component-wise in-place, without allocating new memory
+function addBoardInPlace(boardLeft, boardRight, domainSize)
+{
+    if(boardLeft.length !== boardRight.length)
+    {
+        return;
+    }
+
+    for(let i = 0; i < boardLeft.length; i++)
+    {
+        boardLeft[i] = (boardLeft[i] + boardRight[i]) % domainSize;
+    }
+}
+
+//Multiplies boardLeft by a fixed value component-wise and returns a new board containing the result
+function mulBoard(board, mulValue, domainSize)
+{
+    //ZERO IS EXCLUDED
+    if(board.length !== board.length || mulValue === 0)
+    {
+        return board;
+    }
+
+    let resBoard = new Uint8Array(board.length);
+    for(let i = 0; i < board.length; i++)
+    {
+        resBoard[i] = (board[i] * mulValue) % domainSize;
+    }
+
+    return resBoard;
+}
+
+//Multiplies boardLeft by a fixed value component-wise in-place, without allocating new memory
+function mulBoardInPlace(board, mulValue, domainSize)
+{
+    //ZERO IS EXCLUDED
+    if(board.length !== board.length || mulValue === 0)
+    {
+        return;
+    }
+
+    for(let i = 0; i < board.length; i++)
+    {
+        board[i] = (board[i] * mulValue) % domainSize;
+    }
+}
+
+//Multiplies boardLeft by boardRight component-wise and returns a new board containing the result
+function mulComponentWiseBoard(boardLeft, boardRight, domainSize)
+{
+    if(boardLeft.length !== boardRight.length)
+    {
+        return boardLeft;
+    }
+
+    let resBoard = new Uint8Array(boardLeft.length);
+    for(let i = 0; i < boardLeft.length; i++)
+    {
+        resBoard[i] = (boardLeft[i] * boardRight[i]) % domainSize;
+    }
+
+    return resBoard;
+}
+
+//Multiplies boardLeft by boardRight component-wise in-place, without allocating new memory
+function mulComponentWiseBoardInPlace(boardLeft, boardRight, domainSize)
+{
+    if(boardLeft.length !== boardRight.length)
+    {
+        return;
+    }
+
+    for(let i = 0; i < boardLeft.length; i++)
+    {
+        boardLeft[i] = (boardLeft[i] * boardRight[i]) % domainSize;
+    }
+}
+
+//Calculates (boardLeft - mulValue * boardRight) component-wise and returns a new board containing the result
+function mulSubBoard(boardLeft, boardRight, mulValue, domainSize)
+{
+    if(boardLeft.length !== boardRight.length || mulValue === 0)
+    {
+        return boardLeft;
+    }
+
+    let resBoard = new Uint8Array(boardLeft.length);
+    for(let i = 0; i < resBoard.length; i++)
+    {
+        resBoard[i] = wholeMod(boardLeft[i] - mulValue * boardRight[i], domainSize);
+    }
+
+    return resBoard;
+}
+
+//Calculates (boardLeft - mulValue * boardRight) component-wise in-place, without allocating new memory
+function mulSubBoardInPlace(boardLeft, boardRight, mulValue, domainSize)
+{
+    if(boardLeft.length !== boardRight.length || mulValue === 0)
+    {
+        return;
+    }
+
+    for(let i = 0; i < boardLeft.length; i++)
+    {
+        boardLeft[i] = wholeMod(boardLeft[i] - mulValue * boardRight[i], domainSize);
+    }
+}
+
+//For domainSize == 2 calculates this binary function:
+// (board & (boardCompLeft == boardCompRight))
+// component-wise. Returns a new board containing the result
+function incDifBoard(board, boardCompLeft, boardCompRight, domainSize)
+{
+    if(boardCompLeft.length !== boardCompRight.length || board.length !== boardCompLeft.length)
+    {
+        return board;
+    }
+
+    let resBoard = new Uint8Array(board.length);
+    for(let i = 0; i < board.length; i++)
+    {
+        if(boardCompLeft[i] === boardCompRight[i])
+        {
+            resBoard[i] = (board[i] * (domainSize - 1)) % domainSize; //Only works in domain 2, of course
+        }
+        else
+        {
+            resBoard[i] = 0;
+        }
+    }
+
+    return resBoard;
+}
+
+//Returns a dot product of boardLeft and boardRight
+function dotProductBoard(boardLeft, boardRight, domainSize)
+{
+    if(boardLeft.length !== boardRight.length)
+    {
+        return 0;
+    }
+
+    let sum = 0;
+    for(let i = 0; i < boardLeft.length; i++)
+    {
+        sum += boardLeft[i] * boardRight[i];
+    }
+
+    return sum % domainSize;
+}
+
+//Returns true if all values of boardLeft are equal to corresponding values of boardRight
+function equalsBoard(boardLeft, boardRight)
+{
+    if(boardLeft.length !== boardRight.length)
+    {
+        return false;
+    }
+
+    for(let i = 0; i < boardLeft.length; i++)
+    {
+        if(boardLeft[i] !== boardRight[i])
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+//////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////    MAIN    /////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+
 // eslint-disable-next-line no-unused-vars
 function main()
 {
     const canvas = document.getElementById("LightsOutCanvas");
     
-    const infoText   = document.getElementById("LightsOutPuzzleInfo");
-    const matrixText = document.getElementById("SolutionMatrixCalculating");
-    const qpText     = document.getElementById("QuietPatternsInfo");
-    const spText     = document.getElementById("SolutionPeriodInfo");
+    const infoText = document.getElementById("LightsOutPuzzleInfo");
+    const qpText   = document.getElementById("QuietPatternsInfo");
+    const spText   = document.getElementById("SolutionPeriodInfo");
+
+    const solutionMatrixBlock    = document.getElementById("SolutionMatrixBlock");
+    const solutionMatrixProgress = document.getElementById("SolutionMatrixProgress");
 
     const renderModeSelect = document.getElementById("rendermodesel");
 
@@ -133,7 +855,7 @@ function main()
         }
         case "KeyQ":
         {
-            updateSolutionMatrixIfNeeded();
+            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_NO_OP);
             break;
         }
         case "ArrowLeft":
@@ -179,10 +901,7 @@ function main()
             }
             else
             {
-                updateSolutionMatrixIfNeeded().then(() => 
-                {
-                    showSolution(!flagShowSolution);
-                });
+                updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SHOW_SOLUTION);
             }
             break;
         }
@@ -210,18 +929,7 @@ function main()
         {
             if(currentTurnList.length == 0)
             {
-                updateSolutionMatrixIfNeeded().then(() => 
-                {
-                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                    updateSolutionTexture();
-    
-                    currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
-    
-                    flagRandomSolving = true;
-    
-                    flagTickLoop = true;
-                    currentAnimationFrame = window.requestAnimationFrame(nextTick);
-                });
+                updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOLVE_RANDOM);
             }
             else
             {
@@ -236,18 +944,7 @@ function main()
         {
             if(currentTurnList.length == 0)
             {
-                updateSolutionMatrixIfNeeded().then(() =>
-                {
-                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                    updateSolutionTexture();
-    
-                    currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
-    
-                    flagRandomSolving = false;
-    
-                    flagTickLoop = true;
-                    currentAnimationFrame = window.requestAnimationFrame(nextTick);
-                });
+                updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOLVE_SEQUENTIAL);
             }
             else
             {
@@ -278,7 +975,14 @@ function main()
             }
             else
             {
-                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD, e.shiftKey);
+                if(e.shiftKey)
+                {
+                    updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIOD_WITH_STOP);
+                }
+                else
+                {
+                    updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIOD);
+                }
             }
             break;
         }
@@ -290,7 +994,14 @@ function main()
             }
             else
             {
-                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD_4X, e.shiftKey);
+                if(e.shiftKey)
+                {
+                    updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIO4_WITH_STOP);
+                }
+                else
+                {
+                    updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIO4);
+                }
             }
             break;
         } 
@@ -371,6 +1082,18 @@ function main()
         COUNT_EIGENVECTOR:             5
     };
 
+    let afterCalculationOperations =
+    {
+        CALC_NO_OP:                     1,
+        CALC_SHOW_SOLUTION:             2,
+        CALC_SOULTION_PERIOD:           3,
+        CALC_SOULTION_PERIOD_WITH_STOP: 4,
+        CALC_SOULTION_PERIO4:           5,
+        CALC_SOULTION_PERIO4_WITH_STOP: 6,
+        CALC_SOLVE_RANDOM:              7,
+        CALC_SOLVE_SEQUENTIAL:          8
+    }
+
     const minimumBoardSize = 1;
     const maximumBoardSize = 256;
 
@@ -426,7 +1149,8 @@ function main()
 
     let currentSolutionMatrix = [];
 
-    let currentSolutionMatrixRelevant = false;
+    let currentSolutionMatrixCalculating = false;
+    let currentSolutionMatrixCalculated  = false;
 
     let currentQuietPatterns = 0;
 
@@ -470,7 +1194,9 @@ function main()
 
     let drawVertexBufferAttribLocation = null;
 
-    let solutionMatrixWorker = new Worker(URL.createObjectURL(new Blob(["("+solutionMatrixWorkerFunction.toString()+")()"], {type: 'text/javascript'})));
+    let solutionMatrixWorker = null;
+
+    solutionMatrixBlock.hidden = true;
 
     enableDefaultClickRule();
 
@@ -515,12 +1241,17 @@ function main()
         showSolution(false);
         showInverseSolution(false);
 
+        if(currentWorkingMode == workingModes.LIT_BOARD)
+        {
+            recreateSolutionMatrixWorker();
+            currentSolutionMatrixCalculated = false;
+        }
+
         changeCountingMode(countingModes.COUNT_NONE, false);
         currentTurnList.length = 0;
         flagRandomSolving = false;
         
         currentGameSize = clamp(newSize, minimumBoardSize, maximumBoardSize);
-        currentSolutionMatrixRelevant = false;
 
         qpText.textContent = "Quiet patterns: ";
 
@@ -564,12 +1295,14 @@ function main()
         showSolution(false);
         showInverseSolution(false);
 
+        recreateSolutionMatrixWorker();
+        currentSolutionMatrixCalculated = false;
+
         changeCountingMode(countingModes.COUNT_NONE, false);
         currentTurnList.length = 0;
         flagRandomSolving = false;
 
         currentDomainSize = clamp(newSize, minimumDomainSize, maximumDomainSize);
-        currentSolutionMatrixRelevant = false;
 
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
         enableDefaultClickRule();
@@ -630,6 +1363,9 @@ function main()
 
     function enableDefaultClickRule()
     {   
+        recreateSolutionMatrixWorker();
+        currentSolutionMatrixCalculated = false;
+
         let clickRuleValues = [0, 1, 0, //eslint-disable-next-line indent
                                1, 1, 1, //eslint-disable-next-line indent
                                0, 1, 0];
@@ -637,15 +1373,17 @@ function main()
         currentClickRuleSize = 3;
         currentGameClickRule = new Uint8Array(clickRuleValues);
 
-        flagToroidBoard               = false;
-        flagDefaultClickRule          = true;
-        currentSolutionMatrixRelevant = false;
+        flagToroidBoard      = false;
+        flagDefaultClickRule = true;
 
         requestRedraw();
     }
 
     function enableDefaultToroidClickRule()
     {   
+        recreateSolutionMatrixWorker();
+        currentSolutionMatrixCalculated = false;
+
         let clickRuleValues = [0, 1, 0, // eslint-disable-next-line indent
                                1, 1, 1, // eslint-disable-next-line indent
                                0, 1, 0];
@@ -653,9 +1391,8 @@ function main()
         currentClickRuleSize = 3;
         currentGameClickRule = new Uint8Array(clickRuleValues);
 
-        flagToroidBoard               = true;
-        flagDefaultClickRule          = true;
-        currentSolutionMatrixRelevant = false;
+        flagToroidBoard      = true;
+        flagDefaultClickRule = true;
 
         requestRedraw();
     }
@@ -666,22 +1403,124 @@ function main()
         currentGameStability.fill(currentDomainSize - 1);
     }
 
-    function updateSolutionMatrixIfNeeded()
+    function updateSolutionMatrixIfNeeded(operationAfter)
     {
-        if(!currentSolutionMatrixRelevant)
+        //Only if it's not calculated already AND isn't being calculated now
+        if(!currentSolutionMatrixCalculating && !currentSolutionMatrixCalculated)
         {
-            matrixText.textContent = "CALCULATING";
+            currentSolutionMatrixCalculating = true;
+            solutionMatrixBlock.hidden       = false;
 
-            solutionMatrixWorker.postMessage({command: "CalcSolutionMatrix", params: {clickRule: currentGameClickRule, gameSize: currentGameSize, domainSize: currentDomainSize, clickRuleSize: currentClickRuleSize, isToroid: flagToroidBoard}});
+            solutionMatrixWorker.postMessage({command: "CalcSolutionMatrix", params: {clickRule: currentGameClickRule, gameSize: currentGameSize, domainSize: currentDomainSize, clickRuleSize: currentClickRuleSize, isToroid: flagToroidBoard, opAfter: operationAfter}});
+        }
+        else if(currentSolutionMatrixCalculated) //Matrix already calculated, do the operation specified
+        {
+            operationAfterInverseMatrix(operationAfter);
+        }
+    }
 
-            matrixText.textContent = "CALCULATING FINISHED";
+    function recreateSolutionMatrixWorker()
+    {
+        if(solutionMatrixWorker == null || currentSolutionMatrixCalculating)
+        {
+            if(solutionMatrixWorker != null)
+            {
+                solutionMatrixWorker.terminate();
+            }
 
-            currentSolutionMatrix = invMatrix;
-            currentQuietPatterns  = quietPatterns;
+            solutionMatrixWorker = new Worker(URL.createObjectURL(new Blob(["("+solutionMatrixWorkerFunction.toString()+")()"], {type: 'text/javascript'})));
+            solutionMatrixWorker.addEventListener("message", function(e)
+            {
+                switch(e.data.command)
+                {
+                    case "Progress":
+                    {
+                        solutionMatrixProgress.value = e.data.params.progress;
+                        break;
+                    }
+                    case "Finish":
+                    {
+                        currentSolutionMatrix = e.data.params.matrix;
+                        currentQuietPatterns  = e.data.params.qp;
 
-            qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
+                        qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
 
-            currentSolutionMatrixRelevant = true;
+                        solutionMatrixBlock.hidden = true;
+
+                        currentSolutionMatrixCalculating = false;
+                        currentSolutionMatrixCalculated  = true;
+
+                        operationAfterInverseMatrix(e.data.params.opAfter);
+                    }
+                }
+            });
+        }
+        
+        solutionMatrixBlock.hidden       = true;
+        currentSolutionMatrixCalculating = false;
+    }
+    
+    function operationAfterInverseMatrix(operationAfter)
+    {
+        switch(operationAfter)
+        {
+            case afterCalculationOperations.CALC_NO_OP:
+            {
+                break;
+            }
+            case afterCalculationOperations.CALC_SHOW_SOLUTION:
+            {
+                showSolution(!flagShowSolution);
+                break;
+            }
+            case afterCalculationOperations.CALC_SOULTION_PERIOD:
+            {
+                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD, false);
+                break;
+            }
+            case afterCalculationOperations.CALC_SOULTION_PERIOD_WITH_STOP:
+            {
+                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD, true);
+                break;
+            }
+            case afterCalculationOperations.CALC_SOULTION_PERIO4:
+            {
+                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD_4X, false);
+                break;
+            }
+            case afterCalculationOperations.CALC_SOULTION_PERIO4_WITH_STOP:
+            {
+                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD_4X, true);
+                break;
+            }
+            case afterCalculationOperations.CALC_SOLVE_RANDOM:
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
+                updateSolutionTexture();
+
+                currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
+
+                flagRandomSolving = true;
+
+                flagTickLoop = true;
+                currentAnimationFrame = window.requestAnimationFrame(nextTick);
+
+                break;
+            }
+            case afterCalculationOperations.CALC_SOLVE_SEQUENTIAL:
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
+                updateSolutionTexture();
+
+                currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
+
+                flagRandomSolving = false;
+
+                flagTickLoop = true;
+                currentAnimationFrame = window.requestAnimationFrame(nextTick);
+
+                break;
+            }
         }
     }
 
@@ -1007,6 +1846,11 @@ function main()
             return;
         }
 
+        if(!currentSolutionMatrixCalculated && (newCountingMode == countingModes.COUNT_SOLUTION_PERIOD || newCountingMode == countingModes.COUNT_SOLUTION_PERIOD_4X))
+        {
+            return;
+        }
+
         flagPeriodCounting     = false;
         flagPeriodBackCounting = false;
         flagPerio4Counting     = false;
@@ -1030,18 +1874,18 @@ function main()
         }
         case countingModes.COUNT_SOLUTION_PERIOD:
         {
-            updateSolutionMatrixIfNeeded().then(() => 
+            if(currentSolutionMatrixCalculated)
             {
                 flagPeriodCounting = true;
-            });
+            }
             break;
         }
         case countingModes.COUNT_SOLUTION_PERIOD_4X:
         {
-            updateSolutionMatrixIfNeeded().then(() =>
+            if(currentSolutionMatrixCalculated)
             {
                 flagPerio4Counting = true;
-            });
+            }
             break;
         }
         case countingModes.COUNT_INVERSE_SOLUTION_PERIOD:
@@ -1124,6 +1968,9 @@ function main()
             {
                 flagToroidBoard = true;
             }
+
+            recreateSolutionMatrixWorker();
+            currentSolutionMatrixCalculated = false;
 
             currentGameClickRule = currentGameBoard.slice();
             currentClickRuleSize = currentGameSize;

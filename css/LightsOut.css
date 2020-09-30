@@ -37,6 +37,11 @@ div.rules
     overflow: hidden;
 }
 
+label.mainLabel
+{
+    color: lavender;
+}
+
 p
 {
     color: lavender;
