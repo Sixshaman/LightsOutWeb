@@ -57,12 +57,6 @@ function solutionMatrixWorkerFunction()
         }
     }
 
-    //Returns (num % domainSize) with regard to the sign of num
-    function wholeMod(num, domainSize)
-    {
-        return ((num % domainSize) + domainSize) % domainSize;
-    }
-
     //////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////    CLICK RULE FUNCTIONS    /////////////////////////////////
     //////////////////////////////////////////////////////////////////////////////////////////////
@@ -154,20 +148,6 @@ function solutionMatrixWorkerFunction()
         }
     }
 
-    //Calculates (boardLeft - mulValue * boardRight) component-wise in-place, without allocating new memory
-    function mulSubBoardInPlace(boardLeft, boardRight, mulValue, domainSize)
-    {
-        if(boardLeft.length !== boardRight.length || mulValue === 0)
-        {
-            return;
-        }
-
-        for(let i = 0; i < boardLeft.length; i++)
-        {
-            boardLeft[i] = wholeMod(boardLeft[i] - mulValue * boardRight[i], domainSize);
-        }
-    }
-
     //Calculates (boardLeft - mulValue * boardRight) component-wise in-place, taking the value from a cache
     //Assumes mulValue is always positive
     //Makes function ~35% faster in domain 2.
@@ -178,10 +158,11 @@ function solutionMatrixWorkerFunction()
             return;
         }
 
+        const domainSizeCacheOffset = (domainSize - 1) * (domainSize - 1);
         mulValue = mulValue % domainSize;
         for(let i = 0; i < boardLeft.length; i++)
         {
-            boardLeft[i] = wholeModCache[boardLeft[i] - mulValue * boardRight[i] + domainSize - 1];
+            boardLeft[i] = wholeModCache[boardLeft[i] - mulValue * boardRight[i] + domainSizeCacheOffset];
         }
     }
 
@@ -255,11 +236,14 @@ function solutionMatrixWorkerFunction()
         currProgress = 0.02;
         postProgressMessage(currProgress);
 
-        let wholeModCache = new Uint8Array((2 * domainSize - 1));
+        //For more optimization, cache all possible values of Whole Mod of A - B * C too
+        //Cache makes mod calculations 35% faster (1.8s vs 2.3s without cache on 50x50 domain 2)
+        const domainSizeCacheOffset = (domainSize - 1) * (domainSize - 1);
+        let wholeModCache = new Uint8Array((domainSize - 1) * (domainSize - 1) + domainSize); //(domainSize - 1) for positive cache and (domainSize * domainSize - 1) for negative cache
         for(let i = 0; i < wholeModCache.length; i++)
         {
-            let divisor = i - (domainSize - 1); //[-domainSize + 1, domainSize - 1]
-            wholeModCache[i] = wholeMod(divisor, domainSize);
+            let divisor      = i - domainSizeCacheOffset;                         //[-domainSizeCacheOffset, domainSize - 1]
+            wholeModCache[i] = ((divisor % domainSize) + domainSize) % domainSize; //Whole mod
         }
 
         //First pass: top to bottom, eliminating numbers from below the diagonal
@@ -293,7 +277,7 @@ function solutionMatrixWorkerFunction()
             let invThisValD = domainInvs[thisValD];
             for(let jD = iD + 1; jD < matrixSize; jD++)
             {
-                compValD = lightsOutMatrix[jD][iD];
+                let compValD = lightsOutMatrix[jD][iD];
                 if(domainInvs[compValD] !== 0)
                 {
                     mulSubBoardInPlaceCached(lightsOutMatrix[jD], lightsOutMatrix[iD], invThisValD * compValD, domainSize, wholeModCache);
@@ -311,7 +295,6 @@ function solutionMatrixWorkerFunction()
         {
             let thisValU    = lightsOutMatrix[iU][iU];
             let invThisValU = domainInvs[thisValU];
-
             for(let jU = iU - 1; jU >= 0; jU--)
             {
                 let compValU = lightsOutMatrix[jU][iU];
@@ -358,13 +341,9 @@ function solutionMatrixWorkerFunction()
             case "CalcSolutionMatrix":
             {
                 let operationAfter = e.data.params.opAfter;
-
-                console.time("calculateSolutionMatrix");
-
+                
                 let calcResult = calculateSolutionMatrix(e.data.params.clickRule, e.data.params.gameSize, e.data.params.domainSize, e.data.params.clickRuleSize, e.data.params.isToroid);
                 postMessage({command: "Finish", params: {matrix: calcResult.invM, qp: calcResult.quietP, opAfter: operationAfter}});
-
-                console.timeEnd("calculateSolutionMatrix");
 
                 break;
             }
