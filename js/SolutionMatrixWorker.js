@@ -12,6 +12,12 @@ function solutionMatrixWorkerFunction()
         return y * gameSize + x;
     }
 
+    //Returns (num % domainSize) with regard to the sign of num
+    function wholeMod(num, domainSize)
+    {
+        return ((num % domainSize) + domainSize) % domainSize;
+    }
+
     function postProgressMessage(progressValue)
     {
         postMessage({command: "Progress", params: {progress: progressValue}});
