@@ -75,6 +75,11 @@ div.saveboard
     margin-top: 2rem;  
 }
 
+canvas.lightsoutcanvas
+{
+    box-shadow: 0px 0px 3px 1px grey;
+}
+
 progress
 {
     width: 5rem;
