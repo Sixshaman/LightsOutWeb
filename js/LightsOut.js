@@ -651,6 +651,8 @@ function main()
 
     const gridCheckBox = document.getElementById("GridCheckBox");
 
+    const saveBoardButton = document.getElementById("SaveBoardButton");
+
     const gl = canvas.getContext("webgl2");
     if (!gl)
     {
@@ -959,6 +961,12 @@ function main()
         currentSolutionMatrixCalculated = false;
     }
 
+    saveBoardButton.onclick = function()
+    {
+        flagNeedToSaveBoard = true;
+        requestRedraw();
+    }
+
     let boardGenModes =
     {
         BOARDGEN_FULL_RANDOM:  1, //Generate a random board
@@ -1050,6 +1058,7 @@ function main()
     let flagToroidBoard             = false;
     let flagTickLoop                = false;
     let flagDefaultClickRule        = false;
+    let flagNeedToSaveBoard         = false;
 
     let currentGameClickRule    = null;
     let currentGameBoard        = null;
@@ -2379,6 +2388,16 @@ function main()
         {
             currentAnimationFrame = window.requestAnimationFrame(nextTick);
         }
+    }
+
+    function saveBoardToImage()
+    {
+        let link      = document.createElement("a");
+        link.href     = canvas.toDataURL("image/png");
+        link.download = "LightsOut.png";
+
+        link.click();
+        link.remove();
     }
 
     function requestRedraw()
@@ -4027,5 +4046,11 @@ function main()
 
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, null);
+
+        if(flagNeedToSaveBoard) //Can only save immediately after drawing, saving in other places will save black screen
+        {
+            saveBoardToImage();
+            flagNeedToSaveBoard = false;
+        }
     }
 }
