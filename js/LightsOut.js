@@ -79,6 +79,179 @@ function boardPointFromCanvasPoint(x, y, gameSize, canvasOffsetX, canvasOffsetY,
     return res;
 }
 
+//Returns the position in string "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+"
+function decodeBase64Char(charCode)
+{
+    //A-Z
+    if(charCode >= 65 && charCode <= 90)
+    {
+        return charCode - 65;
+    }
+
+    //a-z
+    if(charCode >= 97 && charCode <= 122)
+    {
+        return (charCode - 97) + 26;
+    }
+
+    //0-9
+    if(charCode >= 48 && charCode <= 57)
+    {
+        return (charCode - 48) + 52;
+    }
+
+    //+
+    if(charCode === 43)
+    {
+        return 62;
+    }
+
+    //-
+    if(charCode === 45)
+    {
+        return 63;
+    }
+
+    return -1;
+}
+
+function encodeBase64ClickRule(clickRule, isToroid)
+{
+    let encodeStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+";
+
+    let base64Str = "";
+    if(isToroid) //Encode toroid flag in the first character
+    {
+        base64Str += "T";
+    }
+    else
+    {
+        base64Str += "C";
+    }
+
+    let remainder = clickRule.length % 3;
+    for(let i = 0; i < clickRule.length - remainder; i += 3) //Encode each 3 bytes into 4 base64 characters
+    {
+        //Little-endian encoding
+        let base64Char1 =                                            (clickRule[i + 0] & 0b00111111);       //First 6 bits of the first byte
+        let base64Char2 = (((clickRule[i + 0] >> 6) & 0b00000011) | ((clickRule[i + 1] & 0b00001111) << 2)) //Last 2 bits of the first byte and first 4 bits of the second one
+        let base64Char3 = (((clickRule[i + 1] >> 4) & 0b00001111) | ((clickRule[i + 2] & 0b00000011) << 4)) //Last 4 bits of the second byte and first 2 bits of the third one
+        let base64Char4 =  ((clickRule[i + 2] >> 2) & 0b00111111);                                          //Last 6 bits of the third byte
+        
+        base64Str += encodeStr[base64Char1];
+        base64Str += encodeStr[base64Char2];
+        base64Str += encodeStr[base64Char3];
+        base64Str += encodeStr[base64Char4];
+    }
+
+    if(remainder > 0)
+    {
+        //Last padding bytes
+        let lastByte1 = 0;
+        let lastByte2 = 0;
+        let lastByte3 = 0;
+
+        if(remainder == 1)
+        {
+            lastByte1 = clickRule[clickRule.length - 1];
+            lastByte2 = 0;
+            lastByte3 = 0;
+        }
+        else if(remainder == 2)
+        {
+            lastByte1 = clickRule[clickRule.length - 2];
+            lastByte2 = clickRule[clickRule.length - 1];
+            lastByte3 = 0;
+        }
+
+        //Little-endian encoding
+        let base64Char1 =                                     (lastByte1 & 0b00111111);       //First 6 bits of the first byte
+        let base64Char2 = (((lastByte1 >> 6) & 0b00000011) | ((lastByte2 & 0b00001111) << 2)) //Last 2 bits of the first byte and first 4 bits of the second one
+        let base64Char3 = (((lastByte2 >> 4) & 0b00001111) | ((lastByte3 & 0b00000011) << 4)) //Last 4 bits of the second byte and first 2 bits of the third one
+        let base64Char4 =  ((lastByte3 >> 2) & 0b00111111);                                   //Last 6 bits of the third byte
+        
+        base64Str += encodeStr[base64Char1];
+        base64Str += encodeStr[base64Char2];
+        base64Str += encodeStr[base64Char3];
+        base64Str += encodeStr[base64Char4];
+    }
+
+    return base64Str;
+}
+
+function decodeBase64ClickRule(base64Str, domainSize, minSize, maxSize)
+{
+    let clickRuleArray = [];
+    let isToroid       = false;
+    let clickRuleSize  = 0;
+
+    if(base64Str.length == 0 || (base64Str[0] != 'C' && base64Str[0] != 'T'))
+    {
+        //Return default values
+        let defaultClickRule = new Uint8Array([0, 1, 0, 1, 1, 1, 0, 1, 0]);
+        return {clickrule: defaultClickRule, clickrulesize: 3, istoroid: false};
+    }
+
+    if(base64Str[0] == 'C')
+    {
+        isToroid = false;
+    }
+    else if(base64Str[0] == 'T')
+    {
+        isToroid = true;
+    }
+
+    //The remainder of the base64 string should be divisible by 4
+    if(((base64Str.length - 1) % 4) != 0)
+    {
+        //Return default values
+        let defaultClickRule = new Uint8Array([0, 1, 0, 1, 1, 1, 0, 1, 0]);
+        return {clickrule: defaultClickRule, clickrulesize: 3, istoroid: false};
+    }
+
+    for(let i = 1; i < base64Str.length; i += 4)
+    {
+        let base64Char1 = decodeBase64Char(base64Str.charCodeAt(i + 0));
+        let base64Char2 = decodeBase64Char(base64Str.charCodeAt(i + 1));
+        let base64Char3 = decodeBase64Char(base64Str.charCodeAt(i + 2));
+        let base64Char4 = decodeBase64Char(base64Str.charCodeAt(i + 3));
+
+        let byte1 =  ((base64Char1       & 0b00111111) | ((base64Char2 & 0b00000011) << 6));
+        let byte2 = (((base64Char2 >> 2) & 0b00001111) | ((base64Char3 & 0b00001111) << 4));
+        let byte3 = (((base64Char3 >> 4) & 0b00000011) | ((base64Char4 & 0b00111111) << 2));
+
+        clickRuleArray.push(byte1);
+        clickRuleArray.push(byte2);
+        clickRuleArray.push(byte3);
+    }
+
+    //Click rule size should be a full square
+    clickRuleSize = Math.floor(Math.sqrt(clickRuleArray.length)); //Even if there's some extra bytes, just ignore them
+    let cellCount = clickRuleSize * clickRuleSize;
+    
+    //Only odd-sized click rules are acceptable
+    if(clickRuleSize < minSize || clickRuleSize > maxSize || clickRuleSize % 2 == 0)
+    {
+        //Return default values
+        let defaultClickRule = new Uint8Array([0, 1, 0, 1, 1, 1, 0, 1, 0]);
+        return {clickrule: defaultClickRule, clickrulesize: 3, istoroid: false};
+    }
+
+    for(let i = 0; i < cellCount; i++)
+    {
+        //Click rule should be valid for the domain
+        if(clickRuleArray[i] >= domainSize)
+        {
+            //Return default values
+            let defaultClickRule = new Uint8Array([0, 1, 0, 1, 1, 1, 0, 1, 0]);
+            return {clickrule: defaultClickRule, clickrulesize: 3, istoroid: false};   
+        }
+    }
+
+    let clickRule = new Uint8Array(clickRuleArray.slice(0, cellCount));
+    return {clickrule: clickRule, clickrulesize: clickRuleSize, istoroid: isToroid};
+}
+
 //Returns (num % domainSize) with regard to the sign of num
 function wholeMod(num, domainSize)
 {
@@ -592,6 +765,20 @@ function incDifBoard(board, boardCompLeft, boardCompRight, domainSize)
     return resBoard;
 }
 
+//Invalidates all elements of the board modulo domainSize, in-place
+function invalidateBoardDomainInPlace(board, domainSize)
+{
+    if(domainSize === 0)
+    {
+        return;
+    }
+
+    for(let i = 0; i < board.length; i++)
+    {
+        board[i] = board[i] % domainSize;
+    }
+}
+
 //Returns a dot product of boardLeft and boardRight
 function dotProductBoard(boardLeft, boardRight, domainSize)
 {
@@ -748,6 +935,7 @@ function main()
             if(e.shiftKey)
             {
                 enableDefaultClickRule();
+                requestRedraw();
             }
             else
             {
@@ -817,6 +1005,7 @@ function main()
             if(e.shiftKey)
             {
                 enableDefaultToroidClickRule();
+                requestRedraw();
             }
             else
             {
@@ -953,6 +1142,7 @@ function main()
     gridCheckBox.onclick = function()
     {
         setGridVisible(gridCheckBox.checked);
+        updateAddressBar(20);
     };
 
     solutionMatrixCancelButton.onclick = function()
@@ -1131,16 +1321,17 @@ function main()
 
     let solutionMatrixWorker = null;
 
+    let updateAddressBarTimeout = null;
+    let currentEncodedClickRule = "Default";
+
     solutionMatrixBlock.hidden = true;
 
-    enableDefaultClickRule();
+    let queryString = new URLSearchParams(window.location.search);
 
     createTextures();
     createShaders();
 
-    setRenderMode("Squares");
-
-    changeGameSize(15);
+    initPuzzleContents();
     updateViewport();
 
     //==========================================================================================================================================================================
@@ -1194,6 +1385,8 @@ function main()
         {
             resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
+
+            updateAddressBar(500); //Update the address bar with 1000ms delay
         }
         else
         {
@@ -1244,11 +1437,15 @@ function main()
 
         currentDomainSize = clamp(newSize, minimumDomainSize, maximumDomainSize);
 
+        updateAddressBar(500); //Update the address bar with 1000ms delay
+
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
-        enableDefaultClickRule();
+        invalidateBoardDomainInPlace(currentGameClickRule, newSize); //Click rule invalidation
 
         infoText.textContent = "Lights Out  " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         updateBoardTexture();
+
+        requestRedraw();
     }
 
     function clickAtPoint(x, y, isConstruct)
@@ -1316,7 +1513,8 @@ function main()
         flagToroidBoard      = false;
         flagDefaultClickRule = true;
 
-        requestRedraw();
+        currentEncodedClickRule = "Default";
+        updateAddressBar(50);
     }
 
     function enableDefaultToroidClickRule()
@@ -1334,7 +1532,23 @@ function main()
         flagToroidBoard      = true;
         flagDefaultClickRule = true;
 
-        requestRedraw();
+        currentEncodedClickRule = "Toroid";
+        updateAddressBar(50);
+    }
+
+    function enableCustomClickRule(clickRule, clickRuleSize, isToroid)
+    {
+        recreateSolutionMatrixWorker();
+        currentSolutionMatrixCalculated = false;
+
+        currentGameClickRule = clickRule;
+        currentClickRuleSize = clickRuleSize;
+
+        flagToroidBoard      = isToroid;
+        flagDefaultClickRule = false;
+
+        currentEncodedClickRule = encodeBase64ClickRule(clickRule, isToroid);
+        updateAddressBar(50);
     }
 
     function resetStability()
@@ -1910,22 +2124,18 @@ function main()
     {
         if(currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE_TOROID)
         {
+            let isToroid = false;
             if(currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
             {
-                flagToroidBoard = true;
+                isToroid = true;
             }
 
-            recreateSolutionMatrixWorker();
-            currentSolutionMatrixCalculated = false;
-
-            currentGameClickRule = currentGameBoard.slice();
-            currentClickRuleSize = currentGameSize;
+            enableCustomClickRule(currentGameBoard.slice(), currentGameSize, isToroid);
 
             changeGameSize(currentSavedGameSize);
             currentGameBoard = currentSavedBoard.slice();
 
             updateBoardTexture();
-            flagDefaultClickRule = false;
 
             requestRedraw();
             changeWorkingMode(workingModes.LIT_BOARD);
@@ -2089,32 +2299,38 @@ function main()
         {
         case "Squares":
         {
-            currentShaderProgram = squaresShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = squaresShaderProgram;
             break;
         }
         case "Circles":
         {
-            currentShaderProgram = circlesShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = circlesShaderProgram;
             break;
         }
         case "Diamonds":
         {
-            currentShaderProgram = diamondsShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = diamondsShaderProgram;
             break;
         }
         case "BEAMS":
         {
-            currentShaderProgram = beamsShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = beamsShaderProgram;
             break;
         }
         case "Raindrops":
         {
-            currentShaderProgram = raindropsShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = raindropsShaderProgram;
             break;
         }
         case "Chains":
         {
-            currentShaderProgram = chainsShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = chainsShaderProgram;
             break;
         }
         default:
@@ -2123,6 +2339,8 @@ function main()
             break;
         }
         }
+
+        updateAddressBar(50);
 
         boardSizeUniformLocation  = gl.getUniformLocation(currentShaderProgram, "gBoardSize");
         cellSizeUniformLocation   = gl.getUniformLocation(currentShaderProgram, "gCellSize");
@@ -2398,6 +2616,106 @@ function main()
 
         link.click();
         link.remove();
+    }
+
+    function initPuzzleContents()
+    {
+        let gameSize         = 15;
+        let domainSize       = 2;
+        let renderMode       = "Squares";
+        let encodedClickRule = "";
+        let showGrid         = true;
+
+        const gameSizeStr = queryString.get("size");
+        if(gameSizeStr !== null && gameSizeStr !== "")
+        {
+            let gameSizeVal = parseInt(gameSizeStr, 10);
+            if(!isNaN(gameSizeVal))
+            {
+                gameSize = Math.floor(gameSizeVal);
+            }
+        }
+
+        const domainSizeStr = queryString.get("domain");
+        if(domainSizeStr !== null && domainSizeStr !== "")
+        {
+            let domainSizeVal = parseInt(domainSizeStr, 10);
+            if(!isNaN(domainSizeVal))
+            {
+                domainSize = Math.floor(domainSizeVal);
+            }
+        }
+
+        const allRenderModes = ["Squares", "Circles", "Diamonds", "BEAMS", "Raindrops", "Chains"];
+        const renderModeStr  = queryString.get("renderMode");
+        if(renderModeStr !== null && allRenderModes.includes(renderModeStr))
+        {
+            renderMode = renderModeStr;
+        }
+
+        const clickRuleStr = queryString.get("clickRule");
+        if(clickRuleStr !== null)
+        {
+            encodedClickRule = clickRuleStr;
+        }
+
+        const showGridStr = queryString.get("showGrid");
+        if(showGridStr !== null)
+        {
+            showGrid = !(showGridStr === "false");
+        }
+
+        //-----------------------Everything is read, initialize it-----------------------
+
+        if(encodedClickRule === "" || encodedClickRule.toUpperCase() === "Default".toUpperCase())
+        {
+            enableDefaultClickRule(); //For initialization we should already have a click rule
+        }
+        else if(encodedClickRule.toUpperCase() === "Toroid".toUpperCase())
+        {
+            enableDefaultToroidClickRule();
+        }
+        else
+        {
+            let decodedClickRuleData = decodeBase64ClickRule(encodedClickRule, domainSize, minimumBoardSize, maximumBoardSize);
+            enableCustomClickRule(decodedClickRuleData.clickrule, decodedClickRuleData.clickrulesize, decodedClickRuleData.istoroid);
+        }
+
+        changeGameSize(gameSize);
+        changeDomainSize(domainSize);
+
+        setRenderMode(renderMode);
+
+        gridCheckBox.checked = showGrid;
+        setGridVisible(showGrid);
+        
+        requestRedraw();
+    }
+
+    function updateAddressBar(delay)
+    {
+        clearTimeout(updateAddressBarTimeout);
+
+        updateAddressBarTimeout = setTimeout(function()
+        {
+            let gameSize = 0;
+            if(currentWorkingMode == workingModes.LIT_BOARD)
+            {
+                gameSize = currentGameSize;
+            }
+            else
+            {
+                gameSize = currentSavedGameSize;
+            }            
+
+            queryString.set("size",       gameSize);
+            queryString.set("domain",     currentDomainSize);
+            queryString.set("renderMode", renderModeSelect.value);
+            queryString.set("showGrid",   gridCheckBox.checked);
+            queryString.set("clickRule",  currentEncodedClickRule);
+
+            window.history.replaceState({}, '', window.location.pathname + "?" + queryString);
+        }, delay);
     }
 
     function requestRedraw()
