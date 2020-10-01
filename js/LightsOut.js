@@ -1131,16 +1131,16 @@ function main()
 
     let solutionMatrixWorker = null;
 
+    let updateAddressBarTimeout = null;
+
     solutionMatrixBlock.hidden = true;
 
-    enableDefaultClickRule();
+    let queryString = new URLSearchParams(window.location.search);
 
     createTextures();
     createShaders();
 
-    setRenderMode("Squares");
-
-    changeGameSize(15);
+    initPuzzleContents();
     updateViewport();
 
     //==========================================================================================================================================================================
@@ -1194,6 +1194,8 @@ function main()
         {
             resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
+
+            updateAddressBar(500); //Update the address bar with 1000ms delay
         }
         else
         {
@@ -1243,6 +1245,8 @@ function main()
         flagRandomSolving = false;
 
         currentDomainSize = clamp(newSize, minimumDomainSize, maximumDomainSize);
+
+        updateAddressBar(500); //Update the address bar with 1000ms delay
 
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
         enableDefaultClickRule();
@@ -2089,32 +2093,38 @@ function main()
         {
         case "Squares":
         {
-            currentShaderProgram = squaresShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = squaresShaderProgram;
             break;
         }
         case "Circles":
         {
-            currentShaderProgram = circlesShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = circlesShaderProgram;
             break;
         }
         case "Diamonds":
         {
-            currentShaderProgram = diamondsShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = diamondsShaderProgram;
             break;
         }
         case "BEAMS":
         {
-            currentShaderProgram = beamsShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = beamsShaderProgram;
             break;
         }
         case "Raindrops":
         {
-            currentShaderProgram = raindropsShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = raindropsShaderProgram;
             break;
         }
         case "Chains":
         {
-            currentShaderProgram = chainsShaderProgram;
+            renderModeSelect.value = renderMode;
+            currentShaderProgram   = chainsShaderProgram;
             break;
         }
         default:
@@ -2123,6 +2133,8 @@ function main()
             break;
         }
         }
+
+        updateAddressBar(0);
 
         boardSizeUniformLocation  = gl.getUniformLocation(currentShaderProgram, "gBoardSize");
         cellSizeUniformLocation   = gl.getUniformLocation(currentShaderProgram, "gCellSize");
@@ -2398,6 +2410,71 @@ function main()
 
         link.click();
         link.remove();
+    }
+
+    function initPuzzleContents()
+    {
+        let gameSize   = 15;
+        let domainSize = 2;
+        let renderMode = "Squares";
+
+        const gameSizeStr = queryString.get("size");
+        if(gameSizeStr !== null && gameSizeStr !== "")
+        {
+            let gameSizeVal = parseInt(gameSizeStr, 10);
+            if(!isNaN(gameSizeVal))
+            {
+                gameSize = Math.floor(gameSizeVal);
+            }
+        }
+
+        const domainSizeStr = queryString.get("domain");
+        if(domainSizeStr !== null && domainSizeStr !== "")
+        {
+            let domainSizeVal = parseInt(domainSizeStr, 10);
+            if(!isNaN(domainSizeVal))
+            {
+                domainSize = Math.floor(domainSizeVal);
+            }
+        }
+
+        const allRenderModes = ["Squares", "Circles", "Diamonds", "BEAMS", "Raindrops", "Chains"];
+        const renderModeStr  = queryString.get("renderMode");
+        if(renderModeStr !== null && allRenderModes.includes(renderModeStr))
+        {
+            renderMode = renderModeStr;
+        }
+
+        enableDefaultClickRule(); //For initialization we should already have a click rule
+
+        changeGameSize(gameSize);
+        changeDomainSize(domainSize);
+
+        setRenderMode(renderMode);
+    }
+
+    function updateAddressBar(delay)
+    {
+        clearTimeout(updateAddressBarTimeout);
+
+        updateAddressBarTimeout = setTimeout(function()
+        {
+            let gameSize = 0;
+            if(currentWorkingMode == workingModes.LIT_BOARD)
+            {
+                gameSize = currentGameSize;
+            }
+            else
+            {
+                gameSize = currentSavedGameSize;
+            }            
+
+            queryString.set("size",       gameSize);
+            queryString.set("domain",     currentDomainSize);
+            queryString.set("renderMode", renderModeSelect.value);
+
+            window.history.replaceState({}, '', window.location.pathname + "?" + queryString);
+        }, delay);
     }
 
     function requestRedraw()
