@@ -17,15 +17,24 @@ div.puzzle
 
 div.leftside
 {
-    width: fit-content;
+    /*Make it about 900 x 900 px*/
+    min-width:  56.3rem;
+    min-height: 56.3rem;
+    max-width:  56.3rem;
+    max-height: 56.3rem;
+
+    display:         flex;
+    justify-content: center;
+    align-items:     center;
+
     float: left;
 }
 
 div.rightside
 {
-    float: right;
-    margin-left: 30px;
-    width: 100%;
+    float:       right;
+    margin-left: 2rem;
+    width:       100%;
 }
 
 div.rightrightside
@@ -59,6 +68,11 @@ div.appearence
 div.solutionmatrixcalculating
 {
     margin-top: 2rem;
+}
+
+div.saveboard
+{
+    margin-top: 2rem;  
 }
 
 progress

@@ -9,15 +9,15 @@
     
     <title>Lights Out</title>
     <script src="js/SolutionMatrixWorker.js?ver=1.1.3"></script>
-    <script src="js/LightsOut.js?ver=1.19.3"></script>
-    <link rel="stylesheet" type="text/css" href="css/LightsOut.css?ver=1.16"> 
+    <script src="js/LightsOut.js?ver=1.20"></script>
+    <link rel="stylesheet" type="text/css" href="css/LightsOut.css?ver=1.17"> 
 </head>
 
 <body onload="main();">
     <div class="container">
         <div class="puzzle">
-            <div class="leftside">
-                <canvas id="LightsOutCanvas" width="900" height="900"></canvas>
+            <div class="leftside" id="LightsOutCanvasContainer">
+                <canvas id="LightsOutCanvas"></canvas>
             </div>
 
             <div class="rightside">
@@ -54,6 +54,10 @@
                     <progress id="SolutionMatrixProgress" max="1" value="0"></progress>
                     <div id="SolutionMatrixProgressInfo">0%</div>
                     <button type="button" id="SolutionMatrixCancel">Cancel</button>
+                </div>
+
+                <div class="saveboard">
+                    <button type="button" id="SaveBoardButton">Save board</button>
                 </div>
             </div>
         </div>
@@ -109,6 +113,7 @@
             </br>
             1 — Fully lit board</br>
             0 — Fully unlit board</br>
+            4 — 4 corners pattern</br>
             O — Border pattern</br>
             P — Checkers pattern</br>
             B — Chessboard pattern</br>

@@ -635,8 +635,9 @@ function equalsBoard(boardLeft, boardRight)
 // eslint-disable-next-line no-unused-vars
 function main()
 {
-    const canvas = document.getElementById("LightsOutCanvas");
-    
+    const canvas          = document.getElementById("LightsOutCanvas");
+    const canvasContainer = document.getElementById("LightsOutCanvasContainer");
+
     const infoText = document.getElementById("LightsOutPuzzleInfo");
     const qpText   = document.getElementById("QuietPatternsInfo");
     const spText   = document.getElementById("SolutionPeriodInfo");
@@ -649,6 +650,8 @@ function main()
     const renderModeSelect = document.getElementById("RenderModeSel");
 
     const gridCheckBox = document.getElementById("GridCheckBox");
+
+    const saveBoardButton = document.getElementById("SaveBoardButton");
 
     const gl = canvas.getContext("webgl2");
     if (!gl)
@@ -958,6 +961,12 @@ function main()
         currentSolutionMatrixCalculated = false;
     }
 
+    saveBoardButton.onclick = function()
+    {
+        flagNeedToSaveBoard = true;
+        requestRedraw();
+    }
+
     let boardGenModes =
     {
         BOARDGEN_FULL_RANDOM:  1, //Generate a random board
@@ -1022,10 +1031,13 @@ function main()
     const minimumDomainSize = 2;
     const maximumDomainSize = 255;
 
-    const canvasSize = Math.max(canvas.width, canvas.height);
+    const canvasContainerWidth  = canvasContainer.clientWidth;
+    const canvasContainerHeight = canvasContainer.clientHeight;
 
-    let currentViewportWidth  = canvas.clientWidth;
-    let currentViewportHeight = canvas.clientHeight;
+    const canvasSize = Math.max(canvasContainerWidth, canvasContainerHeight);
+
+    let currentViewportWidth  = canvasContainerWidth;
+    let currentViewportHeight = canvasContainerHeight;
 
     let currentViewportOffsetX = 0;
     let currentViewportOffsetY = 0;
@@ -1046,6 +1058,7 @@ function main()
     let flagToroidBoard             = false;
     let flagTickLoop                = false;
     let flagDefaultClickRule        = false;
+    let flagNeedToSaveBoard         = false;
 
     let currentGameClickRule    = null;
     let currentGameBoard        = null;
@@ -1198,6 +1211,11 @@ function main()
         let newCanvasSize     = canvasSizeFromGameSize(currentGameSize, currentCellSize, !flagNoGrid);
         currentViewportWidth  = newCanvasSize.width;
         currentViewportHeight = newCanvasSize.height;
+
+        canvas.width        = currentViewportWidth;
+        canvas.height       = currentViewportHeight;
+        canvas.clientWidth  = currentViewportWidth;
+        canvas.clientHeight = currentViewportHeight;
 
         updateBoardTexture();
 
@@ -2157,15 +2175,18 @@ function main()
         currentViewportWidth  = newCanvasSize.width;
         currentViewportHeight = newCanvasSize.height;
 
+        canvas.width        = currentViewportWidth;
+        canvas.height       = currentViewportHeight;
+        canvas.clientWidth  = currentViewportWidth;
+        canvas.clientHeight = currentViewportHeight;
+
         updateViewport();
         requestRedraw();
     }
 
     function updateViewport()
     {
-        currentViewportOffsetX = (canvas.width  - currentViewportWidth)  / 2;
-        currentViewportOffsetY = (canvas.height - currentViewportHeight) / 2;
-
+        currentViewportOffsetY = (canvas.height - currentViewportHeight);                                         //If I don't do this, the image will be from bottom to top
         gl.viewport(currentViewportOffsetX, currentViewportOffsetY, currentViewportWidth, currentViewportHeight); //Very careful here. 
     }
 
@@ -2367,6 +2388,16 @@ function main()
         {
             currentAnimationFrame = window.requestAnimationFrame(nextTick);
         }
+    }
+
+    function saveBoardToImage()
+    {
+        let link      = document.createElement("a");
+        link.href     = canvas.toDataURL("image/png");
+        link.download = "LightsOut.png";
+
+        link.click();
+        link.remove();
     }
 
     function requestRedraw()
@@ -4015,5 +4046,11 @@ function main()
 
         gl.activeTexture(gl.TEXTURE2);
         gl.bindTexture(gl.TEXTURE_2D, null);
+
+        if(flagNeedToSaveBoard) //Can only save immediately after drawing, saving in other places will save black screen
+        {
+            saveBoardToImage();
+            flagNeedToSaveBoard = false;
+        }
     }
 }
