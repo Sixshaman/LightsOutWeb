@@ -635,8 +635,9 @@ function equalsBoard(boardLeft, boardRight)
 // eslint-disable-next-line no-unused-vars
 function main()
 {
-    const canvas = document.getElementById("LightsOutCanvas");
-    
+    const canvas          = document.getElementById("LightsOutCanvas");
+    const canvasContainer = document.getElementById("LightsOutCanvasContainer");
+
     const infoText = document.getElementById("LightsOutPuzzleInfo");
     const qpText   = document.getElementById("QuietPatternsInfo");
     const spText   = document.getElementById("SolutionPeriodInfo");
@@ -1022,10 +1023,13 @@ function main()
     const minimumDomainSize = 2;
     const maximumDomainSize = 255;
 
-    const canvasSize = Math.max(canvas.width, canvas.height);
+    const canvasContainerWidth  = canvasContainer.clientWidth;
+    const canvasContainerHeight = canvasContainer.clientHeight;
 
-    let currentViewportWidth  = canvas.clientWidth;
-    let currentViewportHeight = canvas.clientHeight;
+    const canvasSize = Math.max(canvasContainerWidth, canvasContainerHeight);
+
+    let currentViewportWidth  = canvasContainerWidth;
+    let currentViewportHeight = canvasContainerHeight;
 
     let currentViewportOffsetX = 0;
     let currentViewportOffsetY = 0;
@@ -1198,6 +1202,11 @@ function main()
         let newCanvasSize     = canvasSizeFromGameSize(currentGameSize, currentCellSize, !flagNoGrid);
         currentViewportWidth  = newCanvasSize.width;
         currentViewportHeight = newCanvasSize.height;
+
+        canvas.width        = currentViewportWidth;
+        canvas.height       = currentViewportHeight;
+        canvas.clientWidth  = currentViewportWidth;
+        canvas.clientHeight = currentViewportHeight;
 
         updateBoardTexture();
 
@@ -2157,15 +2166,18 @@ function main()
         currentViewportWidth  = newCanvasSize.width;
         currentViewportHeight = newCanvasSize.height;
 
+        canvas.width        = currentViewportWidth;
+        canvas.height       = currentViewportHeight;
+        canvas.clientWidth  = currentViewportWidth;
+        canvas.clientHeight = currentViewportHeight;
+
         updateViewport();
         requestRedraw();
     }
 
     function updateViewport()
     {
-        currentViewportOffsetX = (canvas.width  - currentViewportWidth)  / 2;
-        currentViewportOffsetY = (canvas.height - currentViewportHeight) / 2;
-
+        currentViewportOffsetY = (canvas.height - currentViewportHeight);                                         //If I don't do this, the image will be from bottom to top
         gl.viewport(currentViewportOffsetX, currentViewportOffsetY, currentViewportWidth, currentViewportHeight); //Very careful here. 
     }
 
