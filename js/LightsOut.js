@@ -535,21 +535,6 @@ function mulBoard(board, mulValue, domainSize)
     return resBoard;
 }
 
-//Multiplies boardLeft by a fixed value component-wise in-place, without allocating new memory
-function mulBoardInPlace(board, mulValue, domainSize)
-{
-    //ZERO IS EXCLUDED
-    if(board.length !== board.length || mulValue === 0)
-    {
-        return;
-    }
-
-    for(let i = 0; i < board.length; i++)
-    {
-        board[i] = (board[i] * mulValue) % domainSize;
-    }
-}
-
 //Multiplies boardLeft by boardRight component-wise and returns a new board containing the result
 function mulComponentWiseBoard(boardLeft, boardRight, domainSize)
 {
@@ -578,37 +563,6 @@ function mulComponentWiseBoardInPlace(boardLeft, boardRight, domainSize)
     for(let i = 0; i < boardLeft.length; i++)
     {
         boardLeft[i] = (boardLeft[i] * boardRight[i]) % domainSize;
-    }
-}
-
-//Calculates (boardLeft - mulValue * boardRight) component-wise and returns a new board containing the result
-function mulSubBoard(boardLeft, boardRight, mulValue, domainSize)
-{
-    if(boardLeft.length !== boardRight.length || mulValue === 0)
-    {
-        return boardLeft;
-    }
-
-    let resBoard = new Uint8Array(boardLeft.length);
-    for(let i = 0; i < resBoard.length; i++)
-    {
-        resBoard[i] = wholeMod(boardLeft[i] - mulValue * boardRight[i], domainSize);
-    }
-
-    return resBoard;
-}
-
-//Calculates (boardLeft - mulValue * boardRight) component-wise in-place, without allocating new memory
-function mulSubBoardInPlace(boardLeft, boardRight, mulValue, domainSize)
-{
-    if(boardLeft.length !== boardRight.length || mulValue === 0)
-    {
-        return;
-    }
-
-    for(let i = 0; i < boardLeft.length; i++)
-    {
-        boardLeft[i] = wholeMod(boardLeft[i] - mulValue * boardRight[i], domainSize);
     }
 }
 
