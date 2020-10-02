@@ -972,21 +972,25 @@ function main()
         case "ArrowLeft":
         {
             resetGameBoard(resetModes.RESET_LEFT, currentGameSize, currentDomainSize);
+            e.preventDefault();
             break;
         }
         case "ArrowRight":
         {
             resetGameBoard(resetModes.RESET_RIGHT, currentGameSize, currentDomainSize);
+            e.preventDefault();
             break;
         }
         case "ArrowUp":
         {
             resetGameBoard(resetModes.RESET_UP, currentGameSize, currentDomainSize);
+            e.preventDefault();
             break;
         }
         case "ArrowDown":
         {
             resetGameBoard(resetModes.RESET_DOWN, currentGameSize, currentDomainSize);
+            e.preventDefault();
             break;
         }
         case "Enter":

@@ -237,6 +237,11 @@ input[type="checkbox"].maincheckbox
     position:           relative;
 }
 
+input[type="checkbox"].maincheckbox:hover
+{
+    background-color: lavenderblush;
+}
+
 input[type="checkbox"].maincheckbox:checked::after
 {
 	content:   '\2714';
@@ -252,6 +257,31 @@ span.checkboxlabel
     display:    inline-block;
     text-align: left;
     transform: translateY(-50%);
+}
+
+select.rendermode
+{
+    padding:     0.2rem;
+    background:lavender;
+    color:     midnightblue;
+    border:      none;
+    outline:     none;
+    appearance:  none;
+    width:       50%;
+
+    background-image:
+        linear-gradient(45deg, transparent 50%, midnightblue 50%),
+        linear-gradient(135deg, midnightblue 50%, transparent 50%),
+        linear-gradient(to right, lavender, lavender);
+    background-position:
+        calc(100% - 0.8rem), calc(100% - 0.3rem), 
+        100%, 100%, 
+        100%, 0;
+    background-size:
+        0.5rem 0.5rem, 
+        0.5rem 0.5rem, 
+        1.5rem 2.5rem;
+    background-repeat: no-repeat;
 }
 
 progress
