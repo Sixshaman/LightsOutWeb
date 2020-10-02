@@ -10,7 +10,7 @@
     <title>Lights Out</title>
     <script src="js/SolutionMatrixWorker.js?ver=1.1.3"></script>
     <script src="js/LightsOut.js?ver=1.21"></script>
-    <link rel="stylesheet" type="text/css" href="css/LightsOut.css?ver=1.18"> 
+    <link rel="stylesheet" type="text/css" href="css/LightsOut.css?ver=1.19"> 
 </head>
 
 <body onload="main();">
@@ -63,60 +63,110 @@
         </div>
 
         <div class="rules">
-            Hotkeys:</br>
-            LMB — Regular turn</br>
-            Ctrl + LMB — Construct turn</br>
-            </br>
-            + — Increase size</br>
-            - — Decrease size</br>
-            Shift + + — Increase domain</br>
-            Shift + - — Decrease domain</br> 
-            </br>
-            Shift + R — Regular click rule</br>
-            Shift + T — Toroidal click rule</br>    
-            Shift + M — Enter click rule constructing mode</br>    
-            Shift + O — Enter toroidal click rule constructing mode</br>    
-            </br>
-            Enter  — Accept click rule being constructed</br>
-            Escape — Cancel click rule construction</br>    
-            </br>
-            ← — Move board left</br>
-            → — Move board right</br>
-            ↑ — Move board up</br>
-            ↓ — Move board down</br>
-            I — Invert board</br>
-            Shift + I — Domain rotate board</br>
-            </br>
-            S — Solve (random)</br>
-            C — Solve (sequentional)</br>
-            </br>
-            Shift + V — Calculate solution period(normal)</br>
-            Shift + X — Calculate solution period(4x normal)</br>
-            Shift + Z — Calculate solution period(inverse)</br>
-            Shift + G — Calculate eigenvector via citybuilder algorithm</br>
-            Q — Show quiet pattern count</br>
-            </br>
-            V — Infinite solution interchanges(normal)</br>
-            X — Infinite solution interchanges(4x normal)</br>
-            Z — Infinite solution interchanges(inverse)</br>
-            G — Infinite citybuilder algorithm interchanges</br>
-            </br>
-            T — Show solution</br>
-            W — Show inverse solution</br>
-            A — Show stability</br>
-            Shift + A — Show lit stability</br>
-            </br>
-            E — Reset board from solution/stability</br>
-            </br>
-            F — Random board</br>
-            R — Random board(always solvable)</br>
-            </br>
-            1 — Fully lit board</br>
-            0 — Fully unlit board</br>
-            4 — 4 corners pattern</br>
-            O — Border pattern</br>
-            P — Checkers pattern</br>
-            B — Chessboard pattern</br>
+            <div class="hotkeyturns">
+                <p class="rules">
+                    <span>Hotkeys:</span>
+                    <span>LMB — Regular turn</span>
+                    <span>Ctrl + LMB — Construct turn</span>
+                </p>
+            </div>
+
+            <div class="hotkeysize">
+                <p class="rules" id="IncreaseSizeHints">
+                    <span>+ — Increase size</span>
+                    <span>- — Decrease size</span>
+                </p>
+                <p class="rules" id="IncreaseDomainHints">
+                    <span>Shift + + — Increase domain</span>
+                    <span>Shift + - — Decrease domain</span>
+                </p>
+            </div>
+
+            <div class="hotkeyworkingmodes">
+                <p class="rules">
+                    <span>Shift + R — Regular click rule</span>
+                    <span>Shift + T — Toroidal click rule</span>
+                    <span>Shift + M — Enter click rule constructing mode</span>
+                    <span>Shift + O — Enter toroidal click rule constructing mode</span>
+                </p>
+            </div>
+
+            <div class="hotkeyclickrules" id="ClickRuleConstructionHints">
+                <p class="rules">
+                    <span>Enter  — Accept click rule being constructed</span>
+                    <span>Escape — Cancel click rule construction</span>
+                </p>
+            </div>
+
+            <div class="hotkeyboardmanipulation">
+                <p class="rules">
+                    <span>← — Move board left</span>
+                    <span>→ — Move board right</span>
+                    <span>↑ — Move board up</span>
+                    <span>↓ — Move board down</span>
+                    <span>I — Invert board</span>
+                    <span>Shift + I — Domain rotate board</span>
+                </p>
+            </div>
+
+            <div class="hotkeysolution">
+                <p class="rules">
+                    <span>S — Solve (random)</span>
+                    <span>C — Solve (sequentional)</span>
+                </p>
+            </div>
+
+            <div class="hotkeysolutionperiods">
+                <p class="rules">
+                    <span>Shift + V — Calculate solution period(normal)</span>
+                    <span>Shift + X — Calculate solution period(4x normal)</span>
+                    <span>Shift + Z — Calculate solution period(inverse)</span>
+                    <span>Shift + G — Calculate eigenvector via citybuilder algorithm</span>
+                </p>
+            </div>
+
+            <div class="hotkeysolutionvisuals">
+                <p class="rules">
+                    <span>V — Infinite solution interchanges(normal)</span>
+                    <span>X — Infinite solution interchanges(4x normal)</span>
+                    <span>Z — Infinite solution interchanges(inverse)</span>
+                    <span>G — Infinite citybuilder algorithm interchanges</span>
+                </p>
+            </div>
+
+            <div class="hotkeymetaboards">
+                <p class="rules">
+                    <span>T — Show solution</span>
+                    <span>W — Show inverse solution</span>
+                    <span>A — Show stability</span>
+                    <span>Shift + A — Show lit stability</span>
+                </p>
+            </div>
+
+            <div class="hotkeymiscellaneous">
+                <p class="rules">
+                    <span>E — Reset board from solution/stability</span>
+                    <span>Q — Show quiet pattern count</span>
+                </p>
+            </div>
+
+            <div class="hotkeyresetrandom">
+                <p class="rules">
+                    <span>F — Random board</span>
+                    <span>R — Random board(always solvable)</span>
+                </p>
+            </div>
+
+            <div class="hotkeyresetfixed">
+                <p class="rules">
+                    <span>1 — Fully lit board</span>
+                    <span>0 — Fully unlit board</span>
+                    <span>4 — 4 corners pattern</span>
+                    <span>O — Border pattern</span>
+                    <span>P — Checkers pattern</span>
+                    <span>B — Chessboard pattern</span>
+                </p>
+            </div>
         </div>
     </div>
 </body>

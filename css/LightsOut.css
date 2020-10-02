@@ -75,9 +75,80 @@ div.saveboard
     margin-top: 2rem;  
 }
 
+div.hotkeyturns
+{
+    margin-top: 1rem;
+}
+
+div.hotkeysize
+{
+    margin-top: 2rem;
+}
+
+div.hotkeyworkingmodes
+{
+    margin-top: 2rem;
+}
+
+div.hotkeyclickrules
+{
+    margin-top: 2rem;
+}
+
+div.hotkeyboardmanipulation
+{
+    margin-top: 2rem;
+}
+
+div.hotkeysolution
+{
+    margin-top: 2rem;
+}
+
+div.hotkeysolutionperiods
+{
+    margin-top: 2rem;
+}
+
+div.hotkeysolutionvisuals
+{
+    margin-top: 2rem;
+}
+
+div.hotkeymetaboards
+{
+    margin-top: 2rem;
+}
+
+div.hotkeymiscellaneous
+{
+    margin-top: 2rem;
+}
+
+div.hotkeyresetrandom
+{
+    margin-top: 2rem;
+}
+
+div.hotkeyresetfixed
+{
+    margin-top: 2rem;
+}
+
 canvas.lightsoutcanvas
 {
     box-shadow: 0px 0px 3px 1px grey;
+}
+
+p.rules
+{
+    /*To remove spacing*/
+    margin-top: -1rem; 
+}
+
+p.rules span
+{
+    display: block;
 }
 
 progress
