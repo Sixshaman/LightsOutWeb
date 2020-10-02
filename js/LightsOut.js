@@ -491,17 +491,12 @@ function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cell
 //Calculates the solution given the solution matrix
 function calculateSolution(board, gameSize, domainSize, solutionMatrix)
 {
-    let solution = new Uint8Array(gameSize * gameSize);
+    let matrixSize = gameSize * gameSize;
+    let solution   = new Uint8Array(matrixSize);
 
-    for(let y = 0; y < gameSize; y++)
+    for(let cellIndex = 0; cellIndex < matrixSize; cellIndex++)
     {
-        for (let x = 0; x < gameSize; x++)
-        {
-            let cellIndex = flatCellIndex(gameSize, x, y);
-            let matrixRow = solutionMatrix[cellIndex];
-
-            solution[cellIndex] = dotProductBoard(board, matrixRow, domainSize);
-        }
+        solution[cellIndex] = dotProductBoard(board, solutionMatrix[cellIndex], domainSize);
     }
 
     solution = domainInverseBoard(solution, domainSize);
@@ -775,7 +770,7 @@ function invalidateBoardDomainInPlace(board, domainSize)
 
     for(let i = 0; i < board.length; i++)
     {
-        board[i] = board[i] % domainSize;
+        board[i] = Math.min(board[i], domainSize - 1);
     }
 }
 
@@ -839,6 +834,15 @@ function main()
     const gridCheckBox = document.getElementById("GridCheckBox");
 
     const saveBoardButton = document.getElementById("SaveBoardButton");
+
+    const increaseDomainHints      = document.getElementById("IncreaseDomainHints");
+    const changeClickRuleHints     = document.getElementById("ClickRuleHints");
+    const acceptClickRuleHints     = document.getElementById("ClickRuleAcceptanceHints");
+    const solutionPeriodHints      = document.getElementById("SolutionPeriodHints");
+    const solutionInterchangeHints = document.getElementById("SolutionInterchangeHints");
+    const boardSolveHints          = document.getElementById("BoardSolveHints"); 
+    const metaBoardHints           = document.getElementById("MetaBoardHints");
+    const miscellaneousHints       = document.getElementById("MiscellaneousHints"); 
 
     const gl = canvas.getContext("webgl2");
     if (!gl)
@@ -968,21 +972,25 @@ function main()
         case "ArrowLeft":
         {
             resetGameBoard(resetModes.RESET_LEFT, currentGameSize, currentDomainSize);
+            e.preventDefault();
             break;
         }
         case "ArrowRight":
         {
             resetGameBoard(resetModes.RESET_RIGHT, currentGameSize, currentDomainSize);
+            e.preventDefault();
             break;
         }
         case "ArrowUp":
         {
             resetGameBoard(resetModes.RESET_UP, currentGameSize, currentDomainSize);
+            e.preventDefault();
             break;
         }
         case "ArrowDown":
         {
             resetGameBoard(resetModes.RESET_DOWN, currentGameSize, currentDomainSize);
+            e.preventDefault();
             break;
         }
         case "Enter":
@@ -1144,6 +1152,13 @@ function main()
         setGridVisible(gridCheckBox.checked);
         updateAddressBar(20);
     };
+
+    //solutionMatrixProgress and solutionMatrixCancelButton should act as a whole
+    solutionMatrixProgressInfo.onclick = function()
+    {
+        recreateSolutionMatrixWorker(); //This cancels the calculation
+        currentSolutionMatrixCalculated = false;
+    }
 
     solutionMatrixCancelButton.onclick = function()
     {
@@ -1324,9 +1339,10 @@ function main()
     let updateAddressBarTimeout = null;
     let currentEncodedClickRule = "Default";
 
-    solutionMatrixBlock.hidden = true;
-
     let queryString = new URLSearchParams(window.location.search);
+
+    solutionMatrixBlock.hidden  = true; //Only show it during solution matrix calculation
+    acceptClickRuleHints.hidden = true; //Only show it when click rule is constructed
 
     createTextures();
     createShaders();
@@ -1439,8 +1455,11 @@ function main()
 
         updateAddressBar(500); //Update the address bar with 1000ms delay
 
+        //I don't like that, leave it here
+        //domainRotateHints.hidden = (currentDomainSize === 2); //Hide the domain rotation for domain 2 (it does nothing there)
+
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
-        invalidateBoardDomainInPlace(currentGameClickRule, newSize); //Click rule invalidation
+        invalidateBoardDomainInPlace(currentGameClickRule, currentDomainSize); //Click rule invalidation
 
         infoText.textContent = "Lights Out  " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         updateBoardTexture();
@@ -1582,7 +1601,7 @@ function main()
                 solutionMatrixWorker.terminate();
             }
 
-            solutionMatrixProgressInfo.textContent = "0%";
+            solutionMatrixProgressInfo.textContent = "Solution matrix: 0%";
 
             solutionMatrixWorker = new Worker(URL.createObjectURL(new Blob(["("+solutionMatrixWorkerFunction.toString()+")()"], {type: 'text/javascript'})));
             solutionMatrixWorker.addEventListener("message", function(e)
@@ -1593,8 +1612,9 @@ function main()
                     {
                         let nextValue = e.data.params.progress;
 
-                        solutionMatrixProgress.value           = nextValue;
-                        solutionMatrixProgressInfo.textContent = Math.floor(100 * nextValue) + "%";
+                        let solutionCalcWidthPercent           = Math.floor(100 * nextValue) + "%";
+                        solutionMatrixProgressInfo.textContent = "Solution matrix: " + solutionCalcWidthPercent;
+                        solutionMatrixProgress.style.width     = solutionCalcWidthPercent;
                         break;
                     }
                     case "Finish":
@@ -1605,7 +1625,7 @@ function main()
                         qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
 
                         solutionMatrixBlock.hidden             = true;
-                        solutionMatrixProgressInfo.textContent = "0%";
+                        solutionMatrixProgressInfo.textContent = "Solution matrix: 0%";
 
                         currentSolutionMatrixCalculating = false;
                         currentSolutionMatrixCalculated  = true;
@@ -1655,29 +1675,35 @@ function main()
             }
             case afterCalculationOperations.CALC_SOLVE_RANDOM:
             {
-                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                updateSolutionTexture();
-
-                currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
-
-                flagRandomSolving = true;
-
-                flagTickLoop = true;
-                currentAnimationFrame = window.requestAnimationFrame(nextTick);
+                if(currentWorkingMode == workingModes.LIT_BOARD)
+                {
+                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
+                    updateSolutionTexture();
+    
+                    currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
+    
+                    flagRandomSolving = true;
+    
+                    flagTickLoop = true;
+                    currentAnimationFrame = window.requestAnimationFrame(nextTick);
+                }
 
                 break;
             }
             case afterCalculationOperations.CALC_SOLVE_SEQUENTIAL:
             {
-                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                updateSolutionTexture();
-
-                currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
-
-                flagRandomSolving = false;
-
-                flagTickLoop = true;
-                currentAnimationFrame = window.requestAnimationFrame(nextTick);
+                if(currentWorkingMode == workingModes.LIT_BOARD)
+                {
+                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
+                    updateSolutionTexture();
+    
+                    currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
+    
+                    flagRandomSolving = false;
+    
+                    flagTickLoop = true;
+                    currentAnimationFrame = window.requestAnimationFrame(nextTick);
+                }
 
                 break;
             }
@@ -2114,7 +2140,27 @@ function main()
             currentGameBoard = currentGameClickRule;
             updateBoardTexture();
 
-            infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
+           infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
+
+           acceptClickRuleHints.hidden     = false;
+           increaseDomainHints.hidden      = true;
+           changeClickRuleHints.hidden     = true;
+           solutionPeriodHints.hidden      = true;
+           solutionInterchangeHints.hidden = true;
+           boardSolveHints.hidden          = true;
+           metaBoardHints.hidden           = true;
+           miscellaneousHints.hidden       = true;
+        }
+        else
+        {
+            acceptClickRuleHints.hidden     = true;
+            increaseDomainHints.hidden      = false;
+            changeClickRuleHints.hidden     = false;
+            solutionPeriodHints.hidden      = false;
+            solutionInterchangeHints.hidden = false;
+            boardSolveHints.hidden          = false;
+            metaBoardHints.hidden           = false;
+            miscellaneousHints.hidden       = false;
         }
 
         requestRedraw();
@@ -2159,7 +2205,6 @@ function main()
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         }
     }
-
 
     function buildTurnList(board, gameSize)
     {

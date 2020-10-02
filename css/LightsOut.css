@@ -3,16 +3,12 @@ body
     background-color: black;
 }
 
-div.container
-{
-    display: flex;
-    justify-content: space-between;
-}
-
 div.puzzle
 {
-    display: flex;
-    width: 100%;
+    display:         flex;
+    flex-direction:  row;
+    flex-wrap:       wrap;
+    width:           100%;
 }
 
 div.leftside
@@ -32,9 +28,10 @@ div.leftside
 
 div.rightside
 {
-    float:       right;
+    float:       left;
     margin-left: 2rem;
-    width:       100%;
+    display:     flex;
+    flex-grow:   1;
 }
 
 div.rightrightside
@@ -44,9 +41,10 @@ div.rightrightside
 
 div.rules
 {
-    color: lavender;
-    overflow: hidden;
-    width: 80%;
+    color:     lavender;
+    overflow:    hidden;
+    margin-left: auto; 
+    margin-right: 0;
 }
 
 div.maininfo
@@ -60,14 +58,31 @@ div.puzzleinfo
     margin-top: 2rem;
 }
 
-div.appearence
+div.selectrendermode
+{
+    margin-top: 2rem;
+}
+
+div.gridcheckbox
 {
     margin-top: 2rem;
 }
 
 div.solutionmatrixcalculating
 {
-    margin-top: 2rem;
+    margin-top:         2rem;
+    background-color: lavender;
+}
+
+div.solutionmatrixcalculating:hover
+{
+    background-color: lavenderblush;
+}
+
+div.solutionmatrixcalculating:active
+{
+    background-color: lavenderblush;
+    text-transform:     uppercase;
 }
 
 div.saveboard
@@ -75,9 +90,198 @@ div.saveboard
     margin-top: 2rem;  
 }
 
+div.hotkeyturns
+{
+    margin-top: 1rem;
+}
+
+div.hotkeysize
+{
+    margin-top: 2rem;
+}
+
+div.hotkeyworkingmodes
+{
+    margin-top: 2rem;
+}
+
+div.hotkeyclickrules
+{
+    margin-top: 2rem;
+}
+
+div.hotkeyboardmanipulation
+{
+    margin-top: 2rem;
+}
+
+div.hotkeysolution
+{
+    margin-top: 2rem;
+}
+
+div.hotkeysolutionperiods
+{
+    margin-top: 2rem;
+}
+
+div.hotkeysolutionvisuals
+{
+    margin-top: 2rem;
+}
+
+div.hotkeymetaboards
+{
+    margin-top: 2rem;
+}
+
+div.hotkeymiscellaneous
+{
+    margin-top: 2rem;
+}
+
+div.hotkeyresetrandom
+{
+    margin-top: 2rem;
+}
+
+div.hotkeyresetfixed
+{
+    margin-top: 2rem;
+}
+
+div.progressbarcontainer
+{
+    background-color: inherit;
+    border:           black;
+    position:           relative;
+    height:             1.2rem;
+}
+
+div.progressbar
+{
+    background-color:limegreen;
+    width:             0%;
+    height:            1.2rem;
+    position:          absolute;
+    z-index:           1;
+}
+
+span.progressbarinfo
+{
+    color:        midnightblue;
+    position:       absolute;
+    text-align:     center;
+    text-transform: none;
+    z-index:        2;
+    width:          100%;
+}
+
 canvas.lightsoutcanvas
 {
-    box-shadow: 0px 0px 3px 1px grey;
+    box-shadow: 0px 0px 2px 1px lavender;
+}
+
+p.rules
+{
+    /*To remove spacing*/
+    margin-top: -1rem; 
+}
+
+p.rules span
+{
+    display: block;
+}
+
+button.mainbutton
+{
+    background-color: lavender;
+    border: none;
+    font-size: 20px;
+    padding: 10px;
+    padding-left: 20px;
+    padding-right: 20px;
+    width: 100%;
+}
+
+button.mainbutton:hover
+{
+    background-color: lavenderblush;
+}
+
+button.mainbutton:active
+{
+    background-color: lavenderblush;
+    text-transform:     uppercase;
+}
+
+button.progresscancelbutton
+{
+    background-color: inherit;
+    text-transform:   inherit;
+    border: none;
+    font-size: 16px;
+    padding: 10px;
+    padding-left: 20px;
+    padding-right: 20px;
+    width: 100%;
+}
+
+input[type="checkbox"].maincheckbox
+{
+    appearance:         none;
+    display:            inline-block;
+    background-color: lavender;
+	border:             1px solid grey;
+	padding:            0.7rem;
+    position:           relative;
+}
+
+input[type="checkbox"].maincheckbox:hover
+{
+    background-color: lavenderblush;
+}
+
+input[type="checkbox"].maincheckbox:checked::after
+{
+	content:   '\2714';
+    font-size: 1rem;
+    top:       0;
+	left:      0.3rem;
+    color:   midnightblue;
+    position:  absolute;
+}
+
+span.checkboxlabel
+{
+    display:    inline-block;
+    text-align: left;
+    transform: translateY(-50%);
+}
+
+select.rendermode
+{
+    padding:     0.2rem;
+    background:lavender;
+    color:     midnightblue;
+    border:      none;
+    outline:     none;
+    appearance:  none;
+    width:       50%;
+
+    background-image:
+        linear-gradient(45deg, transparent 50%, midnightblue 50%),
+        linear-gradient(135deg, midnightblue 50%, transparent 50%),
+        linear-gradient(to right, lavender, lavender);
+    background-position:
+        calc(100% - 0.8rem), calc(100% - 0.3rem), 
+        100%, 100%, 
+        100%, 0;
+    background-size:
+        0.5rem 0.5rem, 
+        0.5rem 0.5rem, 
+        1.5rem 2.5rem;
+    background-repeat: no-repeat;
 }
 
 progress
