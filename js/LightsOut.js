@@ -491,17 +491,12 @@ function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cell
 //Calculates the solution given the solution matrix
 function calculateSolution(board, gameSize, domainSize, solutionMatrix)
 {
-    let solution = new Uint8Array(gameSize * gameSize);
+    let matrixSize = gameSize * gameSize;
+    let solution   = new Uint8Array(matrixSize);
 
-    for(let y = 0; y < gameSize; y++)
+    for(let cellIndex = 0; cellIndex < matrixSize; cellIndex++)
     {
-        for (let x = 0; x < gameSize; x++)
-        {
-            let cellIndex = flatCellIndex(gameSize, x, y);
-            let matrixRow = solutionMatrix[cellIndex];
-
-            solution[cellIndex] = dotProductBoard(board, matrixRow, domainSize);
-        }
+        solution[cellIndex] = dotProductBoard(board, solutionMatrix[cellIndex], domainSize);
     }
 
     solution = domainInverseBoard(solution, domainSize);
@@ -775,7 +770,7 @@ function invalidateBoardDomainInPlace(board, domainSize)
 
     for(let i = 0; i < board.length; i++)
     {
-        board[i] = board[i] % domainSize;
+        board[i] = Math.min(board[i], domainSize - 1);
     }
 }
 
@@ -1440,7 +1435,7 @@ function main()
         updateAddressBar(500); //Update the address bar with 1000ms delay
 
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
-        invalidateBoardDomainInPlace(currentGameClickRule, newSize); //Click rule invalidation
+        invalidateBoardDomainInPlace(currentGameClickRule, currentDomainSize); //Click rule invalidation
 
         infoText.textContent = "Lights Out  " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         updateBoardTexture();
