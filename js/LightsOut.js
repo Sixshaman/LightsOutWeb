@@ -1149,6 +1149,13 @@ function main()
         updateAddressBar(20);
     };
 
+    //solutionMatrixProgress and solutionMatrixCancelButton should act as a whole
+    solutionMatrixProgressInfo.onclick = function()
+    {
+        recreateSolutionMatrixWorker(); //This cancels the calculation
+        currentSolutionMatrixCalculated = false;
+    }
+
     solutionMatrixCancelButton.onclick = function()
     {
         recreateSolutionMatrixWorker(); //This cancels the calculation
@@ -1590,7 +1597,7 @@ function main()
                 solutionMatrixWorker.terminate();
             }
 
-            solutionMatrixProgressInfo.textContent = "0%";
+            solutionMatrixProgressInfo.textContent = "Solution matrix: 0%";
 
             solutionMatrixWorker = new Worker(URL.createObjectURL(new Blob(["("+solutionMatrixWorkerFunction.toString()+")()"], {type: 'text/javascript'})));
             solutionMatrixWorker.addEventListener("message", function(e)
@@ -1601,8 +1608,9 @@ function main()
                     {
                         let nextValue = e.data.params.progress;
 
-                        solutionMatrixProgress.value           = nextValue;
-                        solutionMatrixProgressInfo.textContent = Math.floor(100 * nextValue) + "%";
+                        let solutionCalcWidthPercent           = Math.floor(100 * nextValue) + "%";
+                        solutionMatrixProgressInfo.textContent = "Solution matrix: " + solutionCalcWidthPercent;
+                        solutionMatrixProgress.style.width     = solutionCalcWidthPercent;
                         break;
                     }
                     case "Finish":
@@ -1613,7 +1621,7 @@ function main()
                         qpText.textContent = "Quiet patterns: " + currentQuietPatterns;
 
                         solutionMatrixBlock.hidden             = true;
-                        solutionMatrixProgressInfo.textContent = "0%";
+                        solutionMatrixProgressInfo.textContent = "Solution matrix: 0%";
 
                         currentSolutionMatrixCalculating = false;
                         currentSolutionMatrixCalculated  = true;
