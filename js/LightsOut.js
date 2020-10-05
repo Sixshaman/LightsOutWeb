@@ -18,6 +18,46 @@ function clamp(num, min, max)
     return num;
 }
 
+//Extended Euclid algorithm for inverting (num) modulo (domainSize)
+//Returns a number T such that (num * T) % domainSize = 1
+function invModGcdEx(num, domainSize)
+{
+    if(num === 1)
+    {
+        return 1;
+    }
+    else
+    {
+        if(num === 0 || domainSize % num === 0)
+        {
+            return 0;
+        }
+        else
+        {
+            let tCurr = 0;
+            let rCurr = domainSize;
+            let tNext = 1;
+            let rNext = num;
+
+            while(rNext !== 0)
+            {
+                let quotR = Math.floor(rCurr / rNext);
+                let tPrev = tCurr;
+                let rPrev = rCurr;
+
+                tCurr = tNext;
+                rCurr = rNext;
+
+                tNext = Math.floor(tPrev - quotR * tCurr);
+                rNext = Math.floor(rPrev - quotR * rCurr);
+            }
+
+            tCurr = (tCurr + domainSize) % domainSize;
+            return tCurr;
+        }
+    }
+}
+
 //Computes a flat cell index from x and y for the given board size (gameSize x gameSize)
 function flatCellIndex(gameSize, x, y)
 {
@@ -518,6 +558,7 @@ function calculateInverseSolution(board, gameSize, domainSize, clickRule, clickR
         invSolution = makeTurns(invSolution, clickRule, clickRuleSize, gameSize, domainSize, board, isToroidBoard);
     }
 
+    invSolution = domainInverseBoard(invSolution, domainSize);
     return invSolution;
 }
 
@@ -808,6 +849,61 @@ function equalsBoard(boardLeft, boardRight)
     }
 
     return true;
+}
+
+//Returns true if all values of boardLeft are equal to corresponding values of boardRight, multiplied by some number
+function equalsMultipliedBoard(boardLeft, boardRight, domainSize)
+{
+    if(boardLeft.length !== boardRight.length)
+    {
+        return false;
+    }
+
+    if(boardLeft.length ===0 && boardRight.length === 0)
+    {
+        return true;
+    }
+
+    let firstNonZeroElement = -1;
+    for(let i = 0; i < boardLeft.length; i++)
+    {
+        if(boardLeft[i] !== 0)
+        {
+            firstNonZeroElement = i;
+            break;
+        }
+    }
+
+    if(firstNonZeroElement === -1)
+    {
+        for(let i = 0; i < boardLeft.length; i++)
+        {
+            if(boardLeft[i] !== boardRight[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+    else
+    {
+        if(boardRight[firstNonZeroElement] === 0)
+        {
+            return false;
+        }
+
+        let multiplier = (invModGcdEx(boardLeft[firstNonZeroElement], domainSize) * boardRight[firstNonZeroElement]) % domainSize;
+        for(let i = 0; i < boardLeft.length; i++)
+        {
+            if(((boardLeft[i] * multiplier) % domainSize) !== boardRight[i])
+            {
+                return false;
+            }
+        }
+    
+        return true;
+    }
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -2613,7 +2709,7 @@ function main()
             let citybuilderBoard = addBoard(currentGameBoard, currentCountedBoard, currentDomainSize);
 
             currentGameSolution = calculateInverseSolution(citybuilderBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
-            if(flagStopCountingWhenFound && equalsBoard(currentGameSolution, citybuilderBoard)) //Solution is the current board => we found an eigenvector
+            if(flagStopCountingWhenFound && equalsMultipliedBoard(currentGameSolution, citybuilderBoard, currentDomainSize)) //Solution is the current board multiplied by a number => we found an eigenvector
             {
                 flagStopCountingWhenFound = false;
                 changeCountingMode(countingModes.COUNT_NONE, false);
