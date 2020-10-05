@@ -5,10 +5,10 @@ body
 
 div.puzzle
 {
-    display:         flex;
-    flex-direction:  row;
-    flex-wrap:       wrap;
-    width:           100%;
+    display:            flex;
+    flex-direction:     row;
+    flex-wrap:          wrap;
+    width:              100%;
 }
 
 div.leftside
@@ -28,10 +28,10 @@ div.leftside
 
 div.rightside
 {
-    float:       left;
-    margin-left: 2rem;
-    display:     flex;
-    flex-grow:   1;
+    float:            left;
+    margin-left:      2rem;
+    display:          flex;
+    flex-grow:        1;
 }
 
 div.rightrightside
@@ -41,10 +41,12 @@ div.rightrightside
 
 div.rules
 {
-    color:     lavender;
-    overflow:    hidden;
-    margin-left: auto; 
-    margin-right: 0;
+    background-color: lavender;
+    color:            midnightblue;
+    overflow:           hidden;
+    margin-left:        auto; 
+    margin-right:       0;
+    margin-top:        -1rem;
 }
 
 div.maininfo
@@ -90,64 +92,14 @@ div.saveboard
     margin-top: 2rem;  
 }
 
-div.hotkeyturns
-{
-    margin-top: 1rem;
-}
-
-div.hotkeysize
+div.hotkey
 {
     margin-top: 2rem;
 }
 
-div.hotkeyworkingmodes
+div.hotkey:hover
 {
-    margin-top: 2rem;
-}
-
-div.hotkeyclickrules
-{
-    margin-top: 2rem;
-}
-
-div.hotkeyboardmanipulation
-{
-    margin-top: 2rem;
-}
-
-div.hotkeysolution
-{
-    margin-top: 2rem;
-}
-
-div.hotkeysolutionperiods
-{
-    margin-top: 2rem;
-}
-
-div.hotkeysolutionvisuals
-{
-    margin-top: 2rem;
-}
-
-div.hotkeymetaboards
-{
-    margin-top: 2rem;
-}
-
-div.hotkeymiscellaneous
-{
-    margin-top: 2rem;
-}
-
-div.hotkeyresetrandom
-{
-    margin-top: 2rem;
-}
-
-div.hotkeyresetfixed
-{
-    margin-top: 2rem;
+    background-color: lavenderblush;
 }
 
 div.progressbarcontainer
