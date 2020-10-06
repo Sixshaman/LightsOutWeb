@@ -2198,6 +2198,8 @@ function main()
             currentCountedBoard = currentGameBoard.slice();
             currentGameBoard    = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
 
+            currentGameBoard = domainInverseBoard(currentGameBoard, currentDomainSize);
+
             flagTickLoop = true;
             currentAnimationFrame = window.requestAnimationFrame(nextTick);
         }
@@ -2718,6 +2720,8 @@ function main()
 
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
+
+            currentGameBoard = domainInverseBoard(currentGameBoard, currentDomainSize);
 
             updateBoardTexture();
 
