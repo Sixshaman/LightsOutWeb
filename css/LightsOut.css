@@ -101,6 +101,21 @@ div.hotkey:hover
     background-color: lavenderblush;
 }
 
+div.hotkeyclickdisabled
+{
+    background-color: lavender;
+}
+
+div.hotkeyclickdisabled:hover
+{
+    background-color: lavenderblush;
+}
+
+div.hotkeyclickenabled
+{
+    background-color: lavenderblush;
+}
+
 div.progressbarcontainer
 {
     background-color: inherit;

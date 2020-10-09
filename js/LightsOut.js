@@ -938,7 +938,9 @@ function main()
     const solutionInterchangeHints = document.getElementById("SolutionInterchangeHints");
     const boardSolveHints          = document.getElementById("BoardSolveHints"); 
     const metaBoardHints           = document.getElementById("MetaBoardHints");
-    const miscellaneousHints       = document.getElementById("MiscellaneousHints"); 
+    const miscellaneousHints       = document.getElementById("MiscellaneousHints");
+
+    const constructModeEnableButton = document.getElementById("ConstructModeEnable");
 
     const gl = canvas.getContext("webgl2");
     if (!gl)
@@ -952,7 +954,7 @@ function main()
         let x = e.pageX - canvas.offsetLeft;
         let y = e.pageY - canvas.offsetTop;
 
-        clickAtPoint(x, y, e.ctrlKey);
+        clickAtPoint(x, y, flagConstructClicks);
     };
 
     document.onkeydown = function (e)
@@ -1228,13 +1230,37 @@ function main()
                 changeCountingMode(countingModes.COUNT_INVERSE_SOLUTION_PERIOD, e.shiftKey);
             }
             break;
-        } 
+        }
+        case "ControlLeft":
+        {
+            flagConstructClicks = true;
+            constructModeEnableButton.className = "hotkeyclickenabled";
+            break;
+        }
         default:
         {
             break;
         }
         }
     };
+
+    document.onkeyup = function(e)
+    {
+        if(document.activeElement === renderModeSelect)
+        {
+            return;
+        }
+
+        switch(e.code)
+        {
+        case "ControlLeft":
+        {
+            flagConstructClicks = false;
+            constructModeEnableButton.className = "hotkeyclickdisabled";
+            break;
+        }
+        }
+    }
 
     renderModeSelect.onchange = function()
     {
@@ -1266,6 +1292,19 @@ function main()
     {
         flagNeedToSaveBoard = true;
         requestRedraw();
+    }
+
+    constructModeEnableButton.onclick = function()
+    {
+        flagConstructClicks = !flagConstructClicks;
+        if(flagConstructClicks)
+        {
+            constructModeEnableButton.className = "hotkeyclickenabled";
+        }
+        else
+        {
+            constructModeEnableButton.className = "hotkeyclickdisabled";
+        }
     }
 
     let boardGenModes =
@@ -1359,6 +1398,7 @@ function main()
     let flagToroidBoard             = false;
     let flagTickLoop                = false;
     let flagDefaultClickRule        = false;
+    let flagConstructClicks         = false;
     let flagNeedToSaveBoard         = false;
 
     let currentGameClickRule    = null;
