@@ -1551,9 +1551,6 @@ function main()
 
         updateAddressBar(500); //Update the address bar with 1000ms delay
 
-        //I don't like that, leave it here
-        //domainRotateHints.hidden = (currentDomainSize === 2); //Hide the domain rotation for domain 2 (it does nothing there)
-
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
         invalidateBoardDomainInPlace(currentGameClickRule, currentDomainSize); //Click rule invalidation
 
