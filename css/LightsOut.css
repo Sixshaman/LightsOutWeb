@@ -5,10 +5,10 @@ body
 
 div.puzzle
 {
-    display:         flex;
-    flex-direction:  row;
-    flex-wrap:       wrap;
-    width:           100%;
+    display:            flex;
+    flex-direction:     row;
+    flex-wrap:          wrap;
+    width:              100%;
 }
 
 div.leftside
@@ -28,10 +28,10 @@ div.leftside
 
 div.rightside
 {
-    float:       left;
-    margin-left: 2rem;
-    display:     flex;
-    flex-grow:   1;
+    float:            left;
+    margin-left:      2rem;
+    display:          flex;
+    flex-grow:        1;
 }
 
 div.rightrightside
@@ -41,10 +41,12 @@ div.rightrightside
 
 div.rules
 {
-    color:     lavender;
-    overflow:    hidden;
-    margin-left: auto; 
-    margin-right: 0;
+    background-color: lavender;
+    color:            midnightblue;
+    overflow:           hidden;
+    margin-left:        auto; 
+    margin-right:       0;
+    width:              25%;
 }
 
 div.maininfo
@@ -90,64 +92,41 @@ div.saveboard
     margin-top: 2rem;  
 }
 
-div.hotkeyturns
+div.spacing
 {
-    margin-top: 1rem;
+    height: 1rem;
 }
 
-div.hotkeysize
+div.hotkeywrapper
 {
-    margin-top: 2rem;
+    margin-left: 1rem;
 }
 
-div.hotkeyworkingmodes
+div.hotkey:hover
 {
-    margin-top: 2rem;
+    background-color: lavenderblush;
 }
 
-div.hotkeyclickrules
+div.hotkeydisabled
 {
-    margin-top: 2rem;
+    background-color: lavender;
+    text-transform:   none;
 }
 
-div.hotkeyboardmanipulation
+div.hotkeydisabled:hover
 {
-    margin-top: 2rem;
+    background-color: lavenderblush;
 }
 
-div.hotkeysolution
+div.hotkeydisabled:active
 {
-    margin-top: 2rem;
+    text-transform: uppercase;
 }
 
-div.hotkeysolutionperiods
+div.hotkeyenabled
 {
-    margin-top: 2rem;
-}
-
-div.hotkeysolutionvisuals
-{
-    margin-top: 2rem;
-}
-
-div.hotkeymetaboards
-{
-    margin-top: 2rem;
-}
-
-div.hotkeymiscellaneous
-{
-    margin-top: 2rem;
-}
-
-div.hotkeyresetrandom
-{
-    margin-top: 2rem;
-}
-
-div.hotkeyresetfixed
-{
-    margin-top: 2rem;
+    background-color: lavenderblush;
+    text-transform:   uppercase;
 }
 
 div.progressbarcontainer
@@ -180,17 +159,6 @@ span.progressbarinfo
 canvas.lightsoutcanvas
 {
     box-shadow: 0px 0px 2px 1px lavender;
-}
-
-p.rules
-{
-    /*To remove spacing*/
-    margin-top: -1rem; 
-}
-
-p.rules span
-{
-    display: block;
 }
 
 button.mainbutton
