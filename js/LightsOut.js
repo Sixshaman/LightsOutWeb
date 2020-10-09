@@ -940,7 +940,47 @@ function main()
     const metaBoardHints           = document.getElementById("MetaBoardHints");
     const miscellaneousHints       = document.getElementById("MiscellaneousHints");
 
-    const constructModeEnableButton = document.getElementById("ConstructModeEnable");
+    const constructModeButton                  = document.getElementById("ConstructModeButton");
+    const increaseSizeButton                   = document.getElementById("IncreaseSizeButton");
+    const decreaseSizeButton                   = document.getElementById("DecreaseSizeButton");
+    const increaseDomainButton                 = document.getElementById("IncreaseDomainButton");
+    const decreaseDomainButton                 = document.getElementById("DecreaseDomainButton");
+    const regularClickRuleButton               = document.getElementById("RegularClickRuleButton");
+    const toroidalClickRuleButton              = document.getElementById("ToroidalClickRuleButton");
+    const constructClickRuleButton             = document.getElementById("ConstructClickRuleButton");
+    const constructToroidalClickRuleButton     = document.getElementById("ConstructToroidalClickRuleButton");
+    const acceptClickRuleButton                = document.getElementById("AcceptClickRuleButton");
+    const cancelClickRuleButton                = document.getElementById("CancelClickRuleButton");
+    const moveBoardLeftButton                  = document.getElementById("MoveBoardLeftButton");
+    const moveBoardRightButton                 = document.getElementById("MoveBoardRightButton");
+    const moveBoardUpButton                    = document.getElementById("MoveBoardUpButton");
+    const moveBoardDownButton                  = document.getElementById("MoveBoardDownButton");
+    const invertBoardButton                    = document.getElementById("InvertBoardButton");
+    const domainRotateBoardButton              = document.getElementById("DomainRotateBoardButton");
+    const solveRandomButton                    = document.getElementById("SolveRandomButton");
+    const solveSequentionalButton              = document.getElementById("SolveSequentionalButton");
+    const calculateSolutionPeriodButton        = document.getElementById("CalculateSolutionPeriodButton");
+    const calculateSolutionPerio4Button        = document.getElementById("CalculateSolutionPerio4Button");
+    const calculateInverseSolutionPeriodButton = document.getElementById("CalculateInverseSolutionPeriodButton");
+    const calculateEigenvectorButton           = document.getElementById("CalculateEigenvectorButton");
+    const solutionInterchangesButton           = document.getElementById("SolutionInterchangesButton");
+    const solution4xInterchangesButton         = document.getElementById("Solution4xInterchangesButton");
+    const solutionInverseInterchangesButton    = document.getElementById("SolutionInverseInterchangesButton");
+    const citybuilderInterchangesButton        = document.getElementById("CitybuilderInterchangesButton");
+    const showSolutionButton                   = document.getElementById("ShowSolutionButton");
+    const showInverseSolutionButton            = document.getElementById("ShowInverseSolutionButton");
+    const showStabilityButton                  = document.getElementById("ShowStabilityButton");
+    const showLitStabilityButton               = document.getElementById("ShowLitStabilityButton");
+    const singleInterchangeButton              = document.getElementById("SingleInterchangeButton");
+    const quietPatternsButton                  = document.getElementById("QuietPatternsButton");
+    const randomBoardButton                    = document.getElementById("RandomBoardButton");
+    const solvableRandomBoardButton            = document.getElementById("SolvableRandomBoardButton");
+    const litBoardButton                       = document.getElementById("LitBoardButton");
+    const unlitBoardButton                     = document.getElementById("UnlitBoardButton");
+    const cornersBoardButton                   = document.getElementById("CornersBoardButton");
+    const borderBoardButton                    = document.getElementById("BorderBoardButton");
+    const checkersBoardButton                  = document.getElementById("CheckersBoardButton");
+    const chessboardBoardButton                = document.getElementById("ChessboardBoardButton");
 
     const gl = canvas.getContext("webgl2");
     if (!gl)
@@ -970,10 +1010,12 @@ function main()
         {
             if(e.shiftKey)
             {
+                increaseDomainButton.className = "hotkeyenabled";
                 changeDomainSize(currentDomainSize + 1);
             }
             else
             {
+                increaseSizeButton.className = "hotkeyenabled";
                 incrementGameSize();
             }
             break;
@@ -982,26 +1024,31 @@ function main()
         {
             if(e.shiftKey)
             {
+                decreaseDomainButton.className = "hotkeyenabled";
                 changeDomainSize(currentDomainSize - 1);
             }
             else
             {
+                decreaseSizeButton.className = "hotkeyenabled";
                 decrementGameSize();
             }
             break;
         }
         case "Digit0":
         {
+            unlitBoardButton.className = "hotkeyenabled";
             resetGameBoard(resetModes.RESET_ZERO, currentGameSize, currentDomainSize);
             break;
         }
         case "Digit1":
         {
+            litBoardButton.className = "hotkeyenabled";
             resetGameBoard(resetModes.RESET_ONE, currentGameSize, currentDomainSize);
             break;
         }
         case "Digit4":
         {
+            cornersBoardButton.className = "hotkeyenabled";
             resetGameBoard(resetModes.RESET_FOUR_CORNERS, currentGameSize, currentDomainSize);
             break;
         }
@@ -1009,26 +1056,31 @@ function main()
         {
             if(e.shiftKey)
             {
+                constructToroidalClickRuleButton.className = "hotkeyenabled";
                 changeWorkingMode(workingModes.CONSTRUCT_CLICKRULE_TOROID);
             }  
             else
             {
+                borderBoardButton.className = "hotkeyenabled";
                 resetGameBoard(resetModes.RESET_BORDER, currentGameSize, currentDomainSize);
             }
             break;
         }
         case "KeyB":
         {
+            chessboardBoardButton.className = "hotkeyenabled";
             resetGameBoard(resetModes.RESET_BLATNOY, currentGameSize, currentDomainSize);
             break;
         }
         case "KeyP":
         {
+            checkersBoardButton.className = "hotkeyenabled";
             resetGameBoard(resetModes.RESET_PIETIA, currentGameSize, currentDomainSize);
             break;
         }
         case "KeyF":
         {
+            randomBoardButton.className = "hotkeyenabled";
             resetGameBoard(resetModes.RESET_FULL_RANDOM, currentGameSize, currentDomainSize);
             break;
         }
@@ -1036,11 +1088,13 @@ function main()
         {
             if(e.shiftKey)
             {
+                regularClickRuleButton.className = "hotkeyenabled";
                 enableDefaultClickRule();
                 requestRedraw();
             }
             else
             {
+                solvableRandomBoardButton.className = "hotkeyenabled";
                 resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
             }
             break;
@@ -1049,60 +1103,71 @@ function main()
         {
             if(e.shiftKey)
             {
+                domainRotateBoardButton.className = "hotkeyenabled";
                 resetGameBoard(resetModes.RESET_DOMAIN_ROTATE_NONZERO, currentGameSize, currentDomainSize);
             }
             else
             {
+                invertBoardButton.className = "hotkeyenabled";
                 resetGameBoard(resetModes.RESET_INVERTO, currentGameSize, currentDomainSize);
             }
             break;
         }
         case "KeyE":
         {
+            singleInterchangeButton.className = "hotkeyenabled";
             resetGameBoard(resetModes.RESET_SOLUTION, currentGameSize, currentDomainSize);
             break;
         }
         case "KeyQ":
         {
+            quietPatternsButton.className = "hotkeyenabled";
             updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_NO_OP);
             break;
         }
         case "ArrowLeft":
         {
+            moveBoardLeftButton.className = "hotkeyenabled";
             resetGameBoard(resetModes.RESET_LEFT, currentGameSize, currentDomainSize);
             e.preventDefault();
             break;
         }
         case "ArrowRight":
         {
+            moveBoardRightButton.className = "hotkeyenabled";
             resetGameBoard(resetModes.RESET_RIGHT, currentGameSize, currentDomainSize);
             e.preventDefault();
             break;
         }
         case "ArrowUp":
         {
+            moveBoardUpButton.className = "hotkeyenabled";
             resetGameBoard(resetModes.RESET_UP, currentGameSize, currentDomainSize);
             e.preventDefault();
             break;
         }
         case "ArrowDown":
         {
+            moveBoardDownButton.className = "hotkeyenabled";
             resetGameBoard(resetModes.RESET_DOWN, currentGameSize, currentDomainSize);
             e.preventDefault();
             break;
         }
         case "Enter":
         {
-            acceptClickRule();
+            acceptClickRuleButton.className = "hotkeyenabled";
+            acceptClickRule(); 
             break;
         }
         case "Escape":
         {
+            cancelClickRuleButton.className = "hotkeyenabled";
             rejectClickRule();
             break;
         }
         case "KeyW":
         {
+            showInverseSolutionButton.className = "hotkeyenabled";
             showInverseSolution(!flagShowInverseSolution);
             break;
         }
@@ -1110,11 +1175,13 @@ function main()
         {
             if(e.shiftKey)
             {
+                toroidalClickRuleButton.className = "hotkeyenabled";
                 enableDefaultToroidClickRule();
                 requestRedraw();
             }
             else
             {
+                showSolutionButton.className = "hotkeyenabled";
                 updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SHOW_SOLUTION);
             }
             break;
@@ -1123,6 +1190,7 @@ function main()
         {
             if(e.shiftKey)
             {
+                constructClickRuleButton.className = "hotkeyenabled";
                 changeWorkingMode(workingModes.CONSTRUCT_CLICKRULE);
             }
             break;
@@ -1131,46 +1199,39 @@ function main()
         {
             if(e.shiftKey)
             {
+                showLitStabilityButton.className = "hotkeyenabled";
                 showLitStability(!flagShowLitStability && !flagShowStability);
             }
             else
             {
+                showStabilityButton.className = "hotkeyenabled";
                 showStability(!flagShowLitStability && !flagShowStability);
             }
             break;
         }
         case "KeyS":
         {
-            if(currentTurnList.length == 0)
-            {
-                updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOLVE_RANDOM);
-            }
-            else
-            {
-                currentTurnList.length = 0;
-                window.cancelAnimationFrame(currentAnimationFrame);
-                flagTickLoop = false;
-            }
-
+            solveRandomButton.className = "hotkeyenabled";
+            toggleSolveBoard(afterCalculationOperations.CALC_SOLVE_RANDOM);
             break;
         }
         case "KeyC":
         {
-            if(currentTurnList.length == 0)
-            {
-                updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOLVE_SEQUENTIAL);
-            }
-            else
-            {
-                currentTurnList.length = 0;
-                window.cancelAnimationFrame(currentAnimationFrame);
-                flagTickLoop = false;
-            }
-
+            solveSequentionalButton.className = "hotkeyenabled";
+            toggleSolveBoard(afterCalculationOperations.CALC_SOLVE_SEQUENTIAL);
             break;
         }
         case "KeyG":
         {
+            if(e.shiftKey)
+            {
+                calculateEigenvectorButton.className = "hotkeyenabled";
+            }
+            else
+            {
+                citybuilderInterchangesButton.className = "hotkeyenabled";
+            }
+
             if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
             {
                 changeCountingMode(countingModes.COUNT_NONE, false);
@@ -1183,6 +1244,15 @@ function main()
         }    
         case "KeyV":
         {
+            if(e.shiftKey)
+            {
+                calculateSolutionPeriodButton.className = "hotkeyenabled";
+            }
+            else
+            {
+                solutionInterchangesButton.className = "hotkeyenabled";
+            }
+
             if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
             {
                 changeCountingMode(countingModes.COUNT_NONE, false);
@@ -1202,6 +1272,15 @@ function main()
         }
         case "KeyX":
         {
+            if(e.shiftKey)
+            {
+                calculateSolutionPerio4Button.className = "hotkeyenabled";
+            }
+            else
+            {
+                solution4xInterchangesButton.className = "hotkeyenabled";
+            }
+
             if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
             {
                 changeCountingMode(countingModes.COUNT_NONE, false);
@@ -1221,6 +1300,15 @@ function main()
         } 
         case "KeyZ":
         {
+            if(e.shiftKey)
+            {
+                calculateInverseSolutionPeriodButton.className = "hotkeyenabled";
+            }
+            else
+            {
+                solutionInverseInterchangesButton.className = "hotkeyenabled";
+            }
+
             if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
             {
                 changeCountingMode(countingModes.COUNT_NONE, false);
@@ -1233,8 +1321,8 @@ function main()
         }
         case "ControlLeft":
         {
+            constructModeButton.className = "hotkeyenabled";
             flagConstructClicks = true;
-            constructModeEnableButton.className = "hotkeyclickenabled";
             break;
         }
         default:
@@ -1253,10 +1341,186 @@ function main()
 
         switch(e.code)
         {
+        case "Equal": //Actually +
+        {
+            increaseDomainButton.className = "hotkeydisabled";
+            increaseSizeButton.className = "hotkeydisabled";
+            break;
+        }
+        case "Minus":
+        {
+            decreaseDomainButton.className = "hotkeydisabled";
+            decreaseSizeButton.className   = "hotkeydisabled";
+            break;
+        }
         case "ControlLeft":
         {
             flagConstructClicks = false;
-            constructModeEnableButton.className = "hotkeyclickdisabled";
+            constructModeButton.className = "hotkeydisabled";
+            break;
+        }
+        case "Digit0":
+        {
+            unlitBoardButton.className = "hotkeydisabled";
+            break;
+        }
+        case "Digit1":
+        {
+            litBoardButton.className = "hotkeydisabled";
+            break;
+        }
+        case "Digit4":
+        {
+            cornersBoardButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyO":
+        {
+            constructToroidalClickRuleButton.className = "hotkeydisabled";
+            borderBoardButton.className                = "hotkeydisabled";
+            break;
+        }
+        case "KeyB":
+        {
+            chessboardBoardButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyP":
+        {
+            checkersBoardButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyF":
+        {
+            randomBoardButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyR":
+        {
+            regularClickRuleButton.className    = "hotkeydisabled";
+            solvableRandomBoardButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyI":
+        {
+            domainRotateBoardButton.className = "hotkeydisabled";
+            invertBoardButton.className       = "hotkeydisabled";
+            break;
+        }
+        case "KeyE":
+        {
+            singleInterchangeButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyQ":
+        {
+            quietPatternsButton.className = "hotkeydisabled";
+            break;
+        }
+        case "ArrowLeft":
+        {
+            moveBoardLeftButton.className = "hotkeydisabled";
+            break;
+        }
+        case "ArrowRight":
+        {
+            moveBoardRightButton.className = "hotkeydisabled";
+            break;
+        }
+        case "ArrowUp":
+        {
+            moveBoardUpButton.className = "hotkeydisabled";
+            break;
+        }
+        case "ArrowDown":
+        {
+            moveBoardDownButton.className = "hotkeydisabled";
+            break;
+        }
+        case "Enter":
+        {
+            acceptClickRuleButton.className = "hotkeydisabled";
+            break;
+        }
+        case "Escape":
+        {
+            cancelClickRuleButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyW":
+        {
+            showInverseSolutionButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyT":
+        {
+            toroidalClickRuleButton.className = "hotkeydisabled";
+            showSolutionButton.className      = "hotkeydisabled";
+            break;
+        }
+        case "KeyM":
+        {
+            constructClickRuleButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyA":
+        {
+            showLitStabilityButton.className = "hotkeydisabled";
+            showStabilityButton.className    = "hotkeydisabled";
+            break;
+        }
+        case "KeyS":
+        {
+            solveRandomButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyC":
+        {
+            solveSequentionalButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyG":
+        {
+            calculateEigenvectorButton.className    = "hotkeyenabled";
+            citybuilderInterchangesButton.className = "hotkeyenabled";
+            break;
+        }    
+        case "KeyV":
+        {
+            calculateSolutionPeriodButton.className = "hotkeyenabled";
+            solutionInterchangesButton.className    = "hotkeyenabled";
+            break;
+        }
+        case "KeyX":
+        {
+            calculateSolutionPerio4Button.className = "hotkeyenabled";
+            solution4xInterchangesButton.className  = "hotkeyenabled";
+            break;
+        } 
+        case "KeyZ":
+        {
+            calculateInverseSolutionPeriodButton.className = "hotkeyenabled";
+            solutionInverseInterchangesButton.className    = "hotkeyenabled";
+            break;
+        }
+        case "ShiftLeft":
+        {
+            increaseDomainButton.className                 = "hotkeydisabled";
+            decreaseDomainButton.className                 = "hotkeydisabled";
+            regularClickRuleButton.className               = "hotkeydisabled";
+            toroidalClickRuleButton.className              = "hotkeydisabled";
+            constructClickRuleButton.className             = "hotkeydisabled";
+            constructToroidalClickRuleButton.className     = "hotkeydisabled";
+            showLitStabilityButton.className               = "hotkeydisabled";
+            domainRotateBoardButton.className              = "hotkeydisabled";
+            calculateSolutionPeriodButton.className        = "hotkeydisabled";
+            calculateSolutionPerio4Button.className        = "hotkeydisabled";
+            calculateInverseSolutionPeriodButton.className = "hotkeydisabled";
+            calculateEigenvectorButton.className           = "hotkeydisabled";
+            break;
+        }
+        default:
+        {
             break;
         }
         }
@@ -1294,16 +1558,274 @@ function main()
         requestRedraw();
     }
 
-    constructModeEnableButton.onclick = function()
+    constructModeButton.onclick = function()
     {
         flagConstructClicks = !flagConstructClicks;
         if(flagConstructClicks)
         {
-            constructModeEnableButton.className = "hotkeyclickenabled";
+            constructModeButton.className = "hotkeyenabled";
         }
         else
         {
-            constructModeEnableButton.className = "hotkeyclickdisabled";
+            constructModeButton.className = "hotkeydisabled";
+        }
+    }
+
+    increaseSizeButton.onclick = function()
+    {
+        incrementGameSize();
+    }
+    
+    decreaseSizeButton.onclick = function()
+    {
+        decrementGameSize();
+    }
+
+    increaseDomainButton.onclick = function()
+    {
+        changeDomainSize(currentDomainSize + 1);
+    }
+
+    decreaseDomainButton.onclick = function()
+    {
+        changeDomainSize(currentDomainSize - 1);
+    }
+
+    unlitBoardButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_ZERO, currentGameSize, currentDomainSize);
+    }
+
+    litBoardButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_ONE, currentGameSize, currentDomainSize);
+    }
+
+    cornersBoardButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_FOUR_CORNERS, currentGameSize, currentDomainSize);
+    }
+
+    constructToroidalClickRuleButton.onclick = function()
+    {
+        changeWorkingMode(workingModes.CONSTRUCT_CLICKRULE_TOROID);
+    }  
+
+    borderBoardButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_BORDER, currentGameSize, currentDomainSize);
+    }
+
+    chessboardBoardButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_BLATNOY, currentGameSize, currentDomainSize);
+    }
+
+    checkersBoardButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_PIETIA, currentGameSize, currentDomainSize);
+    }
+
+    randomBoardButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_FULL_RANDOM, currentGameSize, currentDomainSize);
+    }
+
+    regularClickRuleButton.onclick = function()
+    {
+        enableDefaultClickRule();
+        requestRedraw();
+    }
+
+    solvableRandomBoardButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
+    }
+
+    domainRotateBoardButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_DOMAIN_ROTATE_NONZERO, currentGameSize, currentDomainSize);
+    }
+
+    invertBoardButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_INVERTO, currentGameSize, currentDomainSize);
+    }
+
+    singleInterchangeButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_SOLUTION, currentGameSize, currentDomainSize);
+    }
+
+    quietPatternsButton.onclick = function()
+    {
+        updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_NO_OP);
+    }
+
+    moveBoardLeftButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_LEFT, currentGameSize, currentDomainSize);
+    }
+
+    moveBoardRightButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_RIGHT, currentGameSize, currentDomainSize);
+    }
+
+    moveBoardUpButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_UP, currentGameSize, currentDomainSize);
+    }
+
+    moveBoardDownButton.onclick = function()
+    {
+        resetGameBoard(resetModes.RESET_DOWN, currentGameSize, currentDomainSize);
+    }
+
+    acceptClickRuleButton.onclick = function()
+    {
+        acceptClickRule(); 
+    }
+
+    cancelClickRuleButton.onclick = function()
+    {
+        rejectClickRule();
+    }
+
+    showInverseSolutionButton.onclick = function()
+    {
+        showInverseSolution(!flagShowInverseSolution);
+    }
+
+    toroidalClickRuleButton.onclick = function()
+    {
+        enableDefaultToroidClickRule();
+        requestRedraw();
+    }
+
+    showSolutionButton.onclick = function()
+    {
+        updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SHOW_SOLUTION);
+    }
+
+    constructClickRuleButton.onclick = function()
+    {
+        changeWorkingMode(workingModes.CONSTRUCT_CLICKRULE);
+    }
+
+    showLitStabilityButton.onclick = function()
+    {
+        showLitStability(!flagShowLitStability && !flagShowStability);
+    }
+
+    showStabilityButton.onclick = function()
+    {
+        showStability(!flagShowLitStability && !flagShowStability);
+    }
+
+    solveRandomButton.onclick = function()
+    {
+        toggleSolveBoard(afterCalculationOperations.CALC_SOLVE_RANDOM);
+    }
+
+    solveSequentionalButton.onclick = function()
+    {
+        toggleSolveBoard(afterCalculationOperations.CALC_SOLVE_SEQUENTIAL);
+    }
+
+    calculateEigenvectorButton.onclick = function()
+    {
+        if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
+        {
+            changeCountingMode(countingModes.COUNT_NONE, false);
+        }
+        else
+        {
+            changeCountingMode(countingModes.COUNT_EIGENVECTOR, true);
+        }
+    }
+
+    citybuilderInterchangesButton.onclick = function()
+    {
+        if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
+        {
+            changeCountingMode(countingModes.COUNT_NONE, false);
+        }
+        else
+        {
+            changeCountingMode(countingModes.COUNT_EIGENVECTOR, false);
+        }
+    }
+
+    calculateSolutionPeriodButton.onclick = function()
+    {
+        if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
+        {
+            changeCountingMode(countingModes.COUNT_NONE, false);
+        }
+        else
+        {
+            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIOD_WITH_STOP);
+        }
+    }
+    
+    solutionInterchangesButton.onclick = function()
+    {
+        if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
+        {
+            changeCountingMode(countingModes.COUNT_NONE, false);
+        }
+        else
+        {
+            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIOD);
+        }
+    }
+    
+    calculateSolutionPerio4Button.onclick = function()
+    {
+        if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
+        {
+            changeCountingMode(countingModes.COUNT_NONE, false);
+        }
+        else
+        {
+            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIO4_WITH_STOP);
+        }
+    }
+    
+    solution4xInterchangesButton.onclick = function()
+    {
+        if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
+        {
+            changeCountingMode(countingModes.COUNT_NONE, false);
+        }
+        else
+        {
+            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIO4);
+        }
+    }
+
+    calculateInverseSolutionPeriodButton.onclick = function()
+    {
+        if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
+        {
+            changeCountingMode(countingModes.COUNT_NONE, false);
+        }
+        else
+        {
+            changeCountingMode(countingModes.COUNT_INVERSE_SOLUTION_PERIOD, true);
+        }
+    }
+
+    solutionInverseInterchangesButton.onclick = function()
+    {
+        if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
+        {
+            changeCountingMode(countingModes.COUNT_NONE, false);
+        }
+        else
+        {
+            changeCountingMode(countingModes.COUNT_INVERSE_SOLUTION_PERIOD, false);
         }
     }
 
@@ -2156,6 +2678,20 @@ function main()
         }
 
         return generatedBoard;
+    }
+
+    function toggleSolveBoard(type)
+    {
+        if(currentTurnList.length == 0)
+        {
+            updateSolutionMatrixIfNeeded(type);
+        }
+        else
+        {
+            currentTurnList.length = 0;
+            window.cancelAnimationFrame(currentAnimationFrame);
+            flagTickLoop = false;
+        }
     }
 
     function changeCountingMode(newCountingMode, stopWhenReturned)

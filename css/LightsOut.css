@@ -46,6 +46,7 @@ div.rules
     overflow:           hidden;
     margin-left:        auto; 
     margin-right:       0;
+    width:              25%;
 }
 
 div.maininfo
@@ -96,24 +97,36 @@ div.spacing
     height: 1rem;
 }
 
+div.hotkeywrapper
+{
+    margin-left: 1rem;
+}
+
 div.hotkey:hover
 {
     background-color: lavenderblush;
 }
 
-div.hotkeyclickdisabled
+div.hotkeydisabled
 {
     background-color: lavender;
+    text-transform:   none;
 }
 
-div.hotkeyclickdisabled:hover
+div.hotkeydisabled:hover
 {
     background-color: lavenderblush;
 }
 
-div.hotkeyclickenabled
+div.hotkeydisabled:active
+{
+    text-transform: uppercase;
+}
+
+div.hotkeyenabled
 {
     background-color: lavenderblush;
+    text-transform:   uppercase;
 }
 
 div.progressbarcontainer
