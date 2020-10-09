@@ -1481,26 +1481,26 @@ function main()
         }
         case "KeyG":
         {
-            calculateEigenvectorButton.className    = "hotkeyenabled";
-            citybuilderInterchangesButton.className = "hotkeyenabled";
+            calculateEigenvectorButton.className    = "hotkeydisabled";
+            citybuilderInterchangesButton.className = "hotkeydisabled";
             break;
         }    
         case "KeyV":
         {
-            calculateSolutionPeriodButton.className = "hotkeyenabled";
-            solutionInterchangesButton.className    = "hotkeyenabled";
+            calculateSolutionPeriodButton.className = "hotkeydisabled";
+            solutionInterchangesButton.className    = "hotkeydisabled";
             break;
         }
         case "KeyX":
         {
-            calculateSolutionPerio4Button.className = "hotkeyenabled";
-            solution4xInterchangesButton.className  = "hotkeyenabled";
+            calculateSolutionPerio4Button.className = "hotkeydisabled";
+            solution4xInterchangesButton.className  = "hotkeydisabled";
             break;
         } 
         case "KeyZ":
         {
-            calculateInverseSolutionPeriodButton.className = "hotkeyenabled";
-            solutionInverseInterchangesButton.className    = "hotkeyenabled";
+            calculateInverseSolutionPeriodButton.className = "hotkeydisabled";
+            solutionInverseInterchangesButton.className    = "hotkeydisabled";
             break;
         }
         case "ShiftLeft":
