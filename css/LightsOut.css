@@ -1,6 +1,8 @@
 body
 {
     background-color: black;
+    width: 100%;
+    overflow-x: hidden;
 }
 
 div.puzzle
@@ -32,6 +34,7 @@ div.rightside
     margin-left:      2rem;
     display:          flex;
     flex-grow:        1;
+    overflow: hidden;
 }
 
 div.rightrightside
@@ -42,11 +45,20 @@ div.rightrightside
 div.rules
 {
     background-color: lavender;
-    color:            midnightblue;
-    overflow:           hidden;
-    margin-left:        auto; 
-    margin-right:       0;
-    width:              25%;
+    color: midnightblue;
+    overflow: hidden;
+    width: 0px;
+    height: 100%;
+    position: fixed;
+    transition: .5s;
+    bottom: 0px;
+    right: -10px;
+    opacity: 0;
+}
+
+.rules.active {
+    width: 480px;
+    opacity: 1;
 }
 
 div.maininfo
@@ -271,4 +283,75 @@ select
 {
     background-color: black;
     color: lavender;
+}
+
+.accordion {
+    background-color: #CFD8DC;
+    color: #fff;
+    cursor: pointer;
+    padding: 16px;
+    width: 100%;
+    border: none;
+    text-align: left;
+    outline: none;
+    font-size: 18px;
+    transition: 0.5s;
+}
+
+.active, .accordion:hover {
+    background-color: #607D8B;
+}
+
+.accordion:after {
+    content: '\002B';
+    color: #fff;
+    font-size: 18px;
+    font-weight: bold;
+    float: right;
+    margin-left: 5px;
+}
+
+.active:after {
+    content: "\2212";
+}
+
+.panel {
+    padding: 0 18px;
+    color: #212121;
+    background-color:#e6e6fa;
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease-out;
+}
+#btnMenu {
+    width: 300px;
+    height: 200px;
+}
+@media all and (max-width: 800px) {
+    .rules {
+        height: 0% !important;
+        right: 0px !important;
+        display: flex;
+        width: auto !important;
+        align-items: center;
+        justify-content: center;
+        transform: translateX(1270vw);
+        min-width: 100%;
+        float: left;
+    }
+    .rules.active {
+        height: 50% !important;
+    }
+    .accordion {
+        display: none;
+    }
+    .panel {
+        max-height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100%;
+        width: 200vw;
+        margin: 0px calc(100vw/2);
+    }
 }

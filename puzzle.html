@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html>
 <head>
     <meta charset="utf-8">
@@ -6,7 +7,7 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate"/>
     <meta http-equiv="Pragma"        content="no-cache"/>
     <meta http-equiv="Expires"       content="0"/>
-    
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Lights Out</title>
     <script src="js/SolutionMatrixWorker.js?ver=1.1.3"></script>
     <script src="js/LightsOut.js?ver=1.23.1"></script>
@@ -59,196 +60,209 @@
             <div class="saveboard">
                 <button type="button" class="mainbutton" id="SaveBoardButton">Save board</button>
             </div>
+            <button id="btnMenu">fdsfd</button>
         </div>
     </div>
 
     <div class="rules">
-        <div class="hotkeywrapper">
-            <div class="hotkeydisabled" id="ConstructModeButton">
-                <span class="control">Construct mode</span><span class="controlhotkey">(Hold Ctrl)</span>
-            </div>
+        <button class="accordion">Вопрос 1</button>
+        <div class="panel">
+            <div class="hotkeywrapper">
+                <div class="hotkeydisabled" id="ConstructModeButton">
+                    <span class="control">Construct mode</span><span class="controlhotkey">(Hold Ctrl)</span>
+                </div>
 
-            <div class="hotkeyspacing">&nbsp;</div>
+                <div class="hotkeyspacing">&nbsp;</div>
+            </div>
+            <div class="hotkeywrapper" id="IncreaseSizeHints">
+                <div class="hotkeydisabled" id="IncreaseSizeButton">
+                    <span>Increase size (+)</span>
+                </div>
+                <div class="hotkeydisabled" id="DecreaseSizeButton">
+                    <span>Decrease size (-)</span>
+                </div>
+            </div>
+        
+
+            <div class="hotkeywrapper" id="IncreaseDomainHints">
+                <div class="hotkeydisabled" id="IncreaseDomainButton">
+                    <span>Increase domain (Shift +)</span>
+                </div>
+                <div class="hotkeydisabled" id="DecreaseDomainButton">
+                    <span>Decrease domain (Shift -)</span>
+                </div>
+            </div>
         </div>
+        <button class="accordion">Вопрос 2</button>
+        <div class="panel">
+            <div class="hotkeywrapper" id="ClickRuleHints">
+                <div class="hotkeyspacing">&nbsp;</div>
 
-        <div class="hotkeywrapper" id="IncreaseSizeHints">
-            <div class="hotkeydisabled" id="IncreaseSizeButton">
-                <span>Increase size (+)</span>
-            </div>
-            <div class="hotkeydisabled" id="DecreaseSizeButton">
-                <span>Decrease size (-)</span>
+                <div class="hotkeydisabled" id="RegularClickRuleButton">
+                    <span>Regular click rule (Shift R)</span>
+                </div>
+                <div class="hotkeydisabled" id="ToroidalClickRuleButton">
+                    <span>Toroidal click rule (Shift T)</span>
+                </div>
+                <div class="hotkeydisabled" id="ConstructClickRuleButton">
+                    <span>Construct a click rule (Shift M)</span>
+                </div>
+                <div class="hotkeydisabled" id="ConstructToroidalClickRuleButton">
+                    <span>Construct a toroidal click rule (Shift O)</span>
+                </div>
+
+                <div class="hotkeyspacing">&nbsp;</div>
             </div>
         </div>
+        <button class="accordion">Вопрос 3</button>
+        <div class="panel">
+            <div class="hotkeywrapper" id="ClickRuleAcceptanceHints">
+                <div class="hotkeyspacing">&nbsp;</div>
 
-        <div class="hotkeywrapper" id="IncreaseDomainHints">
-            <div class="hotkeydisabled" id="IncreaseDomainButton">
-                <span>Increase domain (Shift +)</span>
+                <div class="hotkeydisabled" id="AcceptClickRuleButton">
+                    <span>Accept click rule being constructed (Enter)</span>
+                </div>
+                <div class="hotkeydisabled" id="CancelClickRuleButton">
+                    <span>Cancel click rule construction (Escape)</span>
+                </div>
+
+                <div class="hotkeyspacing">&nbsp;</div>
             </div>
-            <div class="hotkeydisabled" id="DecreaseDomainButton">
-                <span>Decrease domain (Shift -)</span>
+
+            <div class="hotkeywrapper" id="GeneralBoardManipulations">
+                <div class="hotkeydisabled" id="MoveBoardLeftButton">
+                    <span>Move board left (←)</span>
+                </div>
+                <div class="hotkeydisabled" id="MoveBoardRightButton">
+                    <span>Move board right (→)</span>
+                </div>
+                <div class="hotkeydisabled" id="MoveBoardUpButton">
+                    <span>Move board up (↑)</span>
+                </div>
+                <div class="hotkeydisabled" id="MoveBoardDownButton">
+                    <span>Move board down (↓)</span>
+                </div>
+                <div class="hotkeydisabled" id="InvertBoardButton">
+                    <span>Invert board (I)</span>
+                </div>
+                <div class="hotkeydisabled" id="DomainRotateBoardButton">
+                    <span>Domain rotate board (Shift I)</span>
+                </div>
+
+                <div class="hotkeyspacing">&nbsp;</div>
             </div>
         </div>
+        <button class="accordion">Вопрос 4</button>
+        <div class="panel">
+            <div class="hotkeywrapper" id="BoardSolveHints">
+                <div class="hotkeydisabled" id="SolveRandomButton">
+                    <span>Solve with random selection (S)</span>
+                </div>
+                <div class="hotkeydisabled" id="SolveSequentionalButton">
+                    <span>Solve with sequentional selection (C)</span>
+                </div>
 
-        <div class="hotkeywrapper" id="ClickRuleHints">
-            <div class="hotkeyspacing">&nbsp;</div>
-
-            <div class="hotkeydisabled" id="RegularClickRuleButton">
-                <span>Regular click rule (Shift R)</span>
-            </div>
-            <div class="hotkeydisabled" id="ToroidalClickRuleButton">
-                <span>Toroidal click rule (Shift T)</span>
-            </div>
-            <div class="hotkeydisabled" id="ConstructClickRuleButton">
-                <span>Construct a click rule (Shift M)</span>
-            </div>
-            <div class="hotkeydisabled" id="ConstructToroidalClickRuleButton">
-                <span>Construct a toroidal click rule (Shift O)</span>
+                <div class="hotkeyspacing">&nbsp;</div>
             </div>
 
-            <div class="hotkeyspacing">&nbsp;</div>
+            <div class="hotkeywrapper" id="SolutionPeriodHints">
+                <div class="hotkeydisabled" id="CalculateSolutionPeriodButton">
+                    <span>Calculate solution period (Shift V)</span>
+                </div>
+                <div class="hotkeydisabled" id="CalculateSolutionPerio4Button">
+                    <span>Calculate solution period 4x (Shift X)</span>
+                </div>
+                <div class="hotkeydisabled" id="CalculateInverseSolutionPeriodButton">
+                    <span>Calculate inverse solution period (Shift Z)</span>
+                </div>
+                <div class="hotkeydisabled" id="CalculateEigenvectorButton">
+                    <span>Calculate eigenvector via citybuilder (Shift G)</span>
+                </div>
+
+                <div class="hotkeyspacing">&nbsp;</div>
+            </div>
+
+            <div class="hotkeywrapper" id="SolutionInterchangeHints">
+                <div class="hotkeydisabled" id="SolutionInterchangesButton">
+                    <span>Infinite solution interchanges (V)</span>
+                </div>
+                <div class="hotkeydisabled" id="Solution4xInterchangesButton">
+                    <span>Infinite 4x solution interchanges (X)</span>
+                </div>
+                <div class="hotkeydisabled" id="SolutionInverseInterchangesButton">
+                    <span>Infinite inverse solution interchanges (Z)</span>
+                </div>
+                <div class="hotkeydisabled" id="CitybuilderInterchangesButton">
+                    <span>Infinite citybuilder algorithm interchanges (G)</span>
+                </div>
+
+                <div class="hotkeyspacing">&nbsp;</div>
+            </div>
         </div>
+        <button class="accordion">Вопрос 5</button>
+        <div class="panel">
+            <div class="hotkeywrapper" id="MetaBoardHints">
+                <div class="hotkeydisabled" id="ShowSolutionButton">
+                    <span>Show solution (T)</span>
+                </div>
+                <div class="hotkeydisabled" id="ShowInverseSolutionButton">
+                    <span>Show inverse solution (W)</span>
+                </div>
+                <div class="hotkeydisabled" id="ShowStabilityButton">
+                    <span>Show stability (A)</span>
+                </div>
+                <div class="hotkeydisabled" id="ShowLitStabilityButton">
+                    <span>Show lit stability (Shift A)</span>
+                </div>
 
-        <div class="hotkeywrapper" id="ClickRuleAcceptanceHints">
-            <div class="hotkeyspacing">&nbsp;</div>
-
-            <div class="hotkeydisabled" id="AcceptClickRuleButton">
-                <span>Accept click rule being constructed (Enter)</span>
-            </div>
-            <div class="hotkeydisabled" id="CancelClickRuleButton">
-                <span>Cancel click rule construction (Escape)</span>
-            </div>
-
-            <div class="hotkeyspacing">&nbsp;</div>
-        </div>
-
-        <div class="hotkeywrapper" id="GeneralBoardManipulations">
-            <div class="hotkeydisabled" id="MoveBoardLeftButton">
-                <span>Move board left (←)</span>
-            </div>
-            <div class="hotkeydisabled" id="MoveBoardRightButton">
-                <span>Move board right (→)</span>
-            </div>
-            <div class="hotkeydisabled" id="MoveBoardUpButton">
-                <span>Move board up (↑)</span>
-            </div>
-            <div class="hotkeydisabled" id="MoveBoardDownButton">
-                <span>Move board down (↓)</span>
-            </div>
-            <div class="hotkeydisabled" id="InvertBoardButton">
-                <span>Invert board (I)</span>
-            </div>
-            <div class="hotkeydisabled" id="DomainRotateBoardButton">
-                <span>Domain rotate board (Shift I)</span>
+                <div class="hotkeyspacing">&nbsp;</div>
             </div>
 
-            <div class="hotkeyspacing">&nbsp;</div>
-        </div>
+            <div class="hotkeywrapper" id="MiscellaneousHints">
+                <div class="hotkeydisabled" id="SingleInterchangeButton">
+                    <span>Reset board from solution/stability (E)</span>
+                </div>
+                <div class="hotkeydisabled" id="QuietPatternsButton">
+                    <span>Show quiet pattern count (Q)</span>
+                </div>
 
-        <div class="hotkeywrapper" id="BoardSolveHints">
-            <div class="hotkeydisabled" id="SolveRandomButton">
-                <span>Solve with random selection (S)</span>
-            </div>
-            <div class="hotkeydisabled" id="SolveSequentionalButton">
-                <span>Solve with sequentional selection (C)</span>
-            </div>
-
-            <div class="hotkeyspacing">&nbsp;</div>
-        </div>
-
-        <div class="hotkeywrapper" id="SolutionPeriodHints">
-            <div class="hotkeydisabled" id="CalculateSolutionPeriodButton">
-                <span>Calculate solution period (Shift V)</span>
-            </div>
-            <div class="hotkeydisabled" id="CalculateSolutionPerio4Button">
-                <span>Calculate solution period 4x (Shift X)</span>
-            </div>
-            <div class="hotkeydisabled" id="CalculateInverseSolutionPeriodButton">
-                <span>Calculate inverse solution period (Shift Z)</span>
-            </div>
-            <div class="hotkeydisabled" id="CalculateEigenvectorButton">
-                <span>Calculate eigenvector via citybuilder (Shift G)</span>
+                <div class="hotkeyspacing">&nbsp;</div>
             </div>
 
-            <div class="hotkeyspacing">&nbsp;</div>
-        </div>
+            <div class="hotkeywrapper">
+                <div class="hotkeydisabled" id="RandomBoardButton">
+                    <span>Random board (F)</span>
+                </div>
+                <div class="hotkeydisabled" id="SolvableRandomBoardButton">
+                    <span>Solvable random board (R)</span>
+                </div>
 
-        <div class="hotkeywrapper" id="SolutionInterchangeHints">
-            <div class="hotkeydisabled" id="SolutionInterchangesButton">
-                <span>Infinite solution interchanges (V)</span>
-            </div>
-            <div class="hotkeydisabled" id="Solution4xInterchangesButton">
-                <span>Infinite 4x solution interchanges (X)</span>
-            </div>
-            <div class="hotkeydisabled" id="SolutionInverseInterchangesButton">
-                <span>Infinite inverse solution interchanges (Z)</span>
-            </div>
-            <div class="hotkeydisabled" id="CitybuilderInterchangesButton">
-                <span>Infinite citybuilder algorithm interchanges (G)</span>
+                <div class="hotkeyspacing">&nbsp;</div>
             </div>
 
-            <div class="hotkeyspacing">&nbsp;</div>
-        </div>
-
-        <div class="hotkeywrapper" id="MetaBoardHints">
-            <div class="hotkeydisabled" id="ShowSolutionButton">
-                <span>Show solution (T)</span>
-            </div>
-            <div class="hotkeydisabled" id="ShowInverseSolutionButton">
-                <span>Show inverse solution (W)</span>
-            </div>
-            <div class="hotkeydisabled" id="ShowStabilityButton">
-                <span>Show stability (A)</span>
-            </div>
-            <div class="hotkeydisabled" id="ShowLitStabilityButton">
-                <span>Show lit stability (Shift A)</span>
-            </div>
-
-            <div class="hotkeyspacing">&nbsp;</div>
-        </div>
-
-        <div class="hotkeywrapper" id="MiscellaneousHints">
-            <div class="hotkeydisabled" id="SingleInterchangeButton">
-                <span>Reset board from solution/stability (E)</span>
-            </div>
-            <div class="hotkeydisabled" id="QuietPatternsButton">
-                <span>Show quiet pattern count (Q)</span>
-            </div>
-
-            <div class="hotkeyspacing">&nbsp;</div>
-        </div>
-
-        <div class="hotkeywrapper">
-            <div class="hotkeydisabled" id="RandomBoardButton">
-                <span>Random board (F)</span>
-            </div>
-            <div class="hotkeydisabled" id="SolvableRandomBoardButton">
-                <span>Solvable random board (R)</span>
-            </div>
-
-            <div class="hotkeyspacing">&nbsp;</div>
-        </div>
-
-        <div class="hotkeywrapper">
-            <div class="hotkeydisabled" id="LitBoardButton">
-                <span>Fully lit board (1)</span>
-            </div>
-            <div class="hotkeydisabled" id="UnlitBoardButton">
-                <span>Fully unlit board (0)</span>
-            </div>
-            <div class="hotkeydisabled" id="CornersBoardButton">
-                <span>4 corners pattern (4)</span>
-            </div>
-            <div class="hotkeydisabled" id="BorderBoardButton">
-                <span>Border pattern (O)</span>
-            </div>
-            <div class="hotkeydisabled" id="CheckersBoardButton">
-                <span>Checkers pattern (P)</span>
-            </div>
-            <div class="hotkeydisabled" id="ChessboardBoardButton">
-                <span>Chessboard pattern (B)</span>
+            <div class="hotkeywrapper">
+                <div class="hotkeydisabled" id="LitBoardButton">
+                    <span>Fully lit board (1)</span>
+                </div>
+                <div class="hotkeydisabled" id="UnlitBoardButton">
+                    <span>Fully unlit board (0)</span>
+                </div>
+                <div class="hotkeydisabled" id="CornersBoardButton">
+                    <span>4 corners pattern (4)</span>
+                </div>
+                <div class="hotkeydisabled" id="BorderBoardButton">
+                    <span>Border pattern (O)</span>
+                </div>
+                <div class="hotkeydisabled" id="CheckersBoardButton">
+                    <span>Checkers pattern (P)</span>
+                </div>
+                <div class="hotkeydisabled" id="ChessboardBoardButton">
+                    <span>Chessboard pattern (B)</span>
+                </div>
             </div>
         </div>
     </div>
+    <script src="./js/main.js"></script>
 </body>
 
 </html>
