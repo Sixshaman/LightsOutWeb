@@ -289,7 +289,7 @@ select
 .accordion 
 {
     background-color: #CFD8DC;
-    color: #fff;
+    color: cornflowerblue;
     cursor: pointer;
     padding: 16px;
     width: 100%;
@@ -308,7 +308,7 @@ select
 .accordion:after 
 {
     content: '\002B';
-    color: #fff;
+    color: cornflowerblue;
     font-size: 18px;
     font-weight: bold;
     float: right;
