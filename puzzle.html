@@ -60,12 +60,11 @@
             <div class="saveboard">
                 <button type="button" class="mainbutton" id="SaveBoardButton">Save board</button>
             </div>
-            <button id="btnMenu">fdsfd</button>
         </div>
     </div>
 
-    <div class="rules">
-        <button class="accordion">Вопрос 1</button>
+    <div class="rules" id="RulesSidebar">
+        <button class="accordion">General</button>
         <div class="panel">
             <div class="hotkeywrapper">
                 <div class="hotkeydisabled" id="ConstructModeButton">
@@ -93,7 +92,7 @@
                 </div>
             </div>
         </div>
-        <button class="accordion">Вопрос 2</button>
+        <button class="accordion">Click rules</button>
         <div class="panel">
             <div class="hotkeywrapper" id="ClickRuleHints">
                 <div class="hotkeyspacing">&nbsp;</div>
@@ -113,9 +112,7 @@
 
                 <div class="hotkeyspacing">&nbsp;</div>
             </div>
-        </div>
-        <button class="accordion">Вопрос 3</button>
-        <div class="panel">
+
             <div class="hotkeywrapper" id="ClickRuleAcceptanceHints">
                 <div class="hotkeyspacing">&nbsp;</div>
 
@@ -128,7 +125,9 @@
 
                 <div class="hotkeyspacing">&nbsp;</div>
             </div>
-
+        </div>
+        <button class="accordion">Board operations</button>
+        <div class="panel">
             <div class="hotkeywrapper" id="GeneralBoardManipulations">
                 <div class="hotkeydisabled" id="MoveBoardLeftButton">
                     <span>Move board left (←)</span>
@@ -152,7 +151,7 @@
                 <div class="hotkeyspacing">&nbsp;</div>
             </div>
         </div>
-        <button class="accordion">Вопрос 4</button>
+        <button class="accordion">Iterative</button>
         <div class="panel">
             <div class="hotkeywrapper" id="BoardSolveHints">
                 <div class="hotkeydisabled" id="SolveRandomButton">
@@ -199,7 +198,7 @@
                 <div class="hotkeyspacing">&nbsp;</div>
             </div>
         </div>
-        <button class="accordion">Вопрос 5</button>
+        <button class="accordion">Solution/Stability</button>
         <div class="panel">
             <div class="hotkeywrapper" id="MetaBoardHints">
                 <div class="hotkeydisabled" id="ShowSolutionButton">
@@ -228,7 +227,10 @@
 
                 <div class="hotkeyspacing">&nbsp;</div>
             </div>
+        </div>
 
+        <button class="accordion">Board reset</button>
+        <div class="panel">
             <div class="hotkeywrapper">
                 <div class="hotkeydisabled" id="RandomBoardButton">
                     <span>Random board (F)</span>
@@ -262,7 +264,6 @@
             </div>
         </div>
     </div>
-    <script src="./js/main.js"></script>
 </body>
 
 </html>

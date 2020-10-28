@@ -927,6 +927,8 @@ function main()
 
     const saveBoardButton = document.getElementById("SaveBoardButton");
 
+    const rulesSidebar = document.getElementById("RulesSidebar");
+
     const increaseDomainHints      = document.getElementById("IncreaseDomainHints");
     const changeClickRuleHints     = document.getElementById("ClickRuleHints");
     const acceptClickRuleHints     = document.getElementById("ClickRuleAcceptanceHints");
@@ -977,6 +979,8 @@ function main()
     const borderBoardButton                    = document.getElementById("BorderBoardButton");
     const checkersBoardButton                  = document.getElementById("CheckersBoardButton");
     const chessboardBoardButton                = document.getElementById("ChessboardBoardButton");
+
+    const sidebarAccordion = document.getElementsByClassName("accordion"); 
 
     const gl = canvas.getContext("webgl2");
     if (!gl)
@@ -1520,6 +1524,26 @@ function main()
             break;
         }
         }
+    }
+
+    //Can change to do it on button click
+    rulesSidebar.classList.toggle("active");   
+    for (let i = 0; i < sidebarAccordion.length; i++) 
+    {
+        sidebarAccordion[i].addEventListener("click", function() 
+        {
+            this.classList.toggle("active");
+
+            let panel = this.nextElementSibling;
+            if(panel.style.maxHeight)
+            {
+                panel.style.maxHeight = null;
+            }
+            else 
+            {
+                panel.style.maxHeight = panel.scrollHeight + "px";
+            } 
+        });
     }
 
     renderModeSelect.onchange = function()
@@ -4145,7 +4169,7 @@ function main()
                 enablePower              += dot(vec4(insideV),           regVPower);
 
                 outColor = mix(gColorNone, gColorEnabled, enablePower);
-                
+
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
 		            uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;

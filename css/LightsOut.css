@@ -112,11 +112,12 @@ div.spacing
 div.hotkeywrapper
 {
     margin-left: 1rem;
+    font-size: 16pt ;
 }
 
 div.hotkey:hover
 {
-    background-color: lavenderblush;
+    background-color: lavenderblush;;
 }
 
 div.hotkeydisabled
@@ -285,7 +286,8 @@ select
     color: lavender;
 }
 
-.accordion {
+.accordion 
+{
     background-color: #CFD8DC;
     color: #fff;
     cursor: pointer;
@@ -298,11 +300,13 @@ select
     transition: 0.5s;
 }
 
-.active, .accordion:hover {
+.active, .accordion:hover 
+{
     background-color: #607D8B;
 }
 
-.accordion:after {
+.accordion:after 
+{
     content: '\002B';
     color: #fff;
     font-size: 18px;
@@ -311,11 +315,13 @@ select
     margin-left: 5px;
 }
 
-.active:after {
+.active:after 
+{
     content: "\2212";
 }
 
-.panel {
+.panel 
+{
     padding: 0 18px;
     color: #212121;
     background-color:#e6e6fa;
@@ -323,12 +329,11 @@ select
     overflow: hidden;
     transition: max-height 0.3s ease-out;
 }
-#btnMenu {
-    width: 300px;
-    height: 200px;
-}
-@media all and (max-width: 800px) {
-    .rules {
+
+@media all and (max-width: 800px) 
+{
+    .rules 
+    {
         height: 0% !important;
         right: 0px !important;
         display: flex;
@@ -339,13 +344,16 @@ select
         min-width: 100%;
         float: left;
     }
-    .rules.active {
+    .rules.active 
+    {
         height: 50% !important;
     }
-    .accordion {
+    .accordion 
+    {
         display: none;
     }
-    .panel {
+    .panel 
+    {
         max-height: 100%;
         display: flex;
         justify-content: center;
