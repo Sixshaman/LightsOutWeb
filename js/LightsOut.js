@@ -320,12 +320,8 @@ function makeTurn(board, clickRule, clickRuleSize, gameSize, domainSize, cellX, 
 //Flips the state of the (cellX, cellY) cell 
 function makeConstructTurn(board, gameSize, domainSize, cellX, cellY)
 {
-    let resBoard = new Uint8Array(board);
-
     let cellIndex = flatCellIndex(gameSize, cellX, cellY);
-    resBoard[cellIndex] = (board[cellIndex] + 1) % domainSize;
-
-    return resBoard;
+    board[cellIndex] = (board[cellIndex] + 1) % domainSize;
 }
 
 //Fast in-place version for making turns in batch provided in turnListBoard, without populating click rules
@@ -2133,7 +2129,7 @@ function main()
         {
             if(isConstruct)
             {
-                currentGameBoard = makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
+                makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
             }
             else
             {
@@ -2142,7 +2138,7 @@ function main()
         }
         else if(currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE_TOROID)
         {
-            currentGameBoard = makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
+            makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
         }
 
         resetStability();
@@ -4033,7 +4029,9 @@ function main()
                 
                 mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
-                bool insideCentralDiamond = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
+                //Fix for 1 pixel off
+                bool insideCentralDiamond  = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
+                bool outsideCentralDiamond = (abs(cellCoord.x) + abs(cellCoord.y) >= diamondRadius);
 
                 bool insideHorizontalBeamLeft  = (abs(cellCoord.y) <= 0.707f * float(gCellSize - 1) / 2.0f && cellCoord.x <= 0.0f);
                 bool insideHorizontalBeamRight = (abs(cellCoord.y) <= 0.707f * float(gCellSize - 1) / 2.0f && cellCoord.x >= 0.0f);
@@ -4047,6 +4045,8 @@ function main()
 
                 bvec4 insideB = b4nd(insideBeam.xzzx,     insideBeam.yyww ,                       bvec4(!insideCentralDiamond)); //B-A, B-B, B-C, B-D
                 bvec4 insideI = b4nd(insideBeam.xyzw, not(insideBeam.yxwz), not(insideBeam.wzyx), bvec4( insideCentralDiamond)); //I-A, I-B, I-C, I-D
+
+                bvec4 outsideB = b4nd(insideBeam.xzzx, insideBeam.yyww, bvec4(!outsideCentralDiamond)); //B-A, B-B, B-C, B-D
 
                 bvec4 insideYTopRight   = b4nd(insideBeam.yyzz, not(insideBeam.xzyw), bvec4(!insideCentralDiamond), insideSide.xzyw); //Y-A, Y-B, Y-C, Y-D
                 bvec4 insideYBottomLeft = b4nd(insideBeam.wwxx, not(insideBeam.zxwy), bvec4(!insideCentralDiamond), insideSide.zxwy); //Y-E, Y-F, Y-G, Y-H
@@ -4145,7 +4145,7 @@ function main()
                 enablePower              += dot(vec4(insideV),           regVPower);
 
                 outColor = mix(gColorNone, gColorEnabled, enablePower);
-
+                
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
 		            uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
