@@ -1957,6 +1957,10 @@ function main()
     let currentDomainSize    = 2;
 
     let currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
+    if((!flagNoGrid && (currentCellSize % 2) !== 0) || (flagNoGrid && (currentCellSize % 2) === 0))
+    {
+        currentCellSize = currentCellSize - 1; //Ensure the cell size with respect to grid is odd
+    }
 
     let currentColorLit     = [0.0, 1.0, 0.0, 1.0];
     let currentColorUnlit   = [0.0, 0.0, 0.0, 1.0];
@@ -2094,8 +2098,12 @@ function main()
         }
 
         currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
+        if((!flagNoGrid && (currentCellSize % 2) !== 0) || (flagNoGrid && (currentCellSize % 2) === 0))
+        {
+            currentCellSize = currentCellSize - 1; //Ensure the cell size with respect to grid is odd
+        }
 
-        let newCanvasSize     = canvasSizeFromGameSize(currentGameSize, currentCellSize, !flagNoGrid);
+        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, !flagNoGrid);
         currentViewportWidth  = newCanvasSize.width;
         currentViewportHeight = newCanvasSize.height;
 
@@ -3124,8 +3132,14 @@ function main()
     function setGridVisible(visible)
     {
         flagNoGrid = !visible;
-        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, visible);
 
+        currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
+        if((!flagNoGrid && (currentCellSize % 2) !== 0) || (flagNoGrid && (currentCellSize % 2) === 0))
+        {
+            currentCellSize = currentCellSize - 1; //Ensure the cell size with respect to grid is odd
+        }
+
+        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, visible);
         currentViewportWidth  = newCanvasSize.width;
         currentViewportHeight = newCanvasSize.height;
 
@@ -3614,15 +3628,17 @@ function main()
                 uint          cellValue = texelFetch(gBoard, cellNumber, 0).x;
                 mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
 
-                mediump vec2  cellCoord    = (vec2(screenPos) - vec2(cellNumber * gCellSize) - vec2(gCellSize) / 2.0f);
-                mediump float circleRadius = float(gCellSize - 1) / 2.0f;
+                int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+
+                mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+                mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
                 
                 ivec2 leftCell   = cellNumber + ivec2(-1,  0);
                 ivec2 rightCell  = cellNumber + ivec2( 1,  0);
                 ivec2 topCell    = cellNumber + ivec2( 0, -1);
                 ivec2 bottomCell = cellNumber + ivec2( 0,  1);
         
-                bool insideCircle = (dot(cellCoord, cellCoord) < circleRadius * circleRadius);
+                bool insideCircle = (dot(cellCoord, cellCoord) <= circleRadius * circleRadius);
         
                 bool nonLeftEdge   = cellNumber.x > 0;
                 bool nonRightEdge  = cellNumber.x < gBoardSize - 1;
@@ -3757,8 +3773,10 @@ function main()
                 highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
 
-                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize) / 2.0f);
-                mediump float diamondRadius = float(gCellSize - 1) / 2.0f;
+                int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+
+                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+                mediump float diamondRadius = float(cellSizeCorrected - 1) / 2.0f;
                 
                 mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
@@ -4048,19 +4066,23 @@ function main()
                 highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
 
-                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize) / 2.0f);
-                mediump float diamondRadius = float(gCellSize - 1) / 2.0f;
+                int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+
+                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+                mediump float diamondRadius = float(cellSizeCorrected) / 2.0f;
                 
                 mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
-                //Fix for 1 pixel off
-                bool insideCentralDiamond  = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
-                bool outsideCentralDiamond = (abs(cellCoord.x) + abs(cellCoord.y) >= diamondRadius);
+                mediump vec2 absCellCoord = abs(cellCoord);
 
-                bool insideHorizontalBeamLeft  = (abs(cellCoord.y) <= 0.707f * float(gCellSize - 1) / 2.0f && cellCoord.x <= 0.0f);
-                bool insideHorizontalBeamRight = (abs(cellCoord.y) <= 0.707f * float(gCellSize - 1) / 2.0f && cellCoord.x >= 0.0f);
-                bool insideVerticalBeamTop     = (abs(cellCoord.x) <= 0.707f * float(gCellSize - 1) / 2.0f && cellCoord.y <= 0.0f);
-                bool insideVerticalBeamBottom  = (abs(cellCoord.x) <= 0.707f * float(gCellSize - 1) / 2.0f && cellCoord.y >= 0.0f);
+                //Fix for 1 pixel off. To make it work, x == 0 and y == 0 pixels shouldn't be considered part of beam (or else single pixel artifacts will appear)
+                bool insideCentralDiamond   = (absCellCoord.x + absCellCoord.y <= diamondRadius);
+                bool outsideCentralDiamond  = (absCellCoord.x + absCellCoord.y >= diamondRadius + 1.0f * float((gFlags & FLAG_NO_GRID) == 0));
+
+                bool insideHorizontalBeamLeft  = (absCellCoord.y <= 0.707f * float(cellSizeCorrected) / 2.0f && cellCoord.x <= 0.0f);
+                bool insideHorizontalBeamRight = (absCellCoord.y <= 0.707f * float(cellSizeCorrected) / 2.0f && cellCoord.x >= 0.0f);
+                bool insideVerticalBeamTop     = (absCellCoord.x <= 0.707f * float(cellSizeCorrected) / 2.0f && cellCoord.y <= 0.0f);
+                bool insideVerticalBeamBottom  = (absCellCoord.x <= 0.707f * float(cellSizeCorrected) / 2.0f && cellCoord.y >= 0.0f);
 
                 bvec4 insideSide = bvec4(cellCoord.x <= 0.0f, cellCoord.y <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y >= 0.0f);
                 bvec4 insideBeam = bvec4(insideHorizontalBeamLeft, insideVerticalBeamTop, insideHorizontalBeamRight, insideVerticalBeamBottom);
@@ -4069,8 +4091,6 @@ function main()
 
                 bvec4 insideB = b4nd(insideBeam.xzzx,     insideBeam.yyww ,                       bvec4(!insideCentralDiamond)); //B-A, B-B, B-C, B-D
                 bvec4 insideI = b4nd(insideBeam.xyzw, not(insideBeam.yxwz), not(insideBeam.wzyx), bvec4( insideCentralDiamond)); //I-A, I-B, I-C, I-D
-
-                bvec4 outsideB = b4nd(insideBeam.xzzx, insideBeam.yyww, bvec4(!outsideCentralDiamond)); //B-A, B-B, B-C, B-D
 
                 bvec4 insideYTopRight   = b4nd(insideBeam.yyzz, not(insideBeam.xzyw), bvec4(!insideCentralDiamond), insideSide.xzyw); //Y-A, Y-B, Y-C, Y-D
                 bvec4 insideYBottomLeft = b4nd(insideBeam.wwxx, not(insideBeam.zxwy), bvec4(!insideCentralDiamond), insideSide.zxwy); //Y-E, Y-F, Y-G, Y-H
@@ -4140,6 +4160,7 @@ function main()
                 uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
 
                 uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellValue, edgeValue, cornerValue)) * edgeValue;
+                emptyCornerCandidate      *= uint(outsideCentralDiamond); //Fix for 1 pixel offset beforehand 
 
                 uvec4 regionBCandidate = uvec4(regBRule(cellValue, edgeValue, cornerValue)) * cellValue;
                 uvec4 regionICandidate = uvec4(regIRule(cellValue, edgeValue, cornerValue)) * cellValue;
@@ -4336,8 +4357,10 @@ function main()
                 highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
 
-                mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize) / 2.0f);
-                mediump float circleRadius = float(gCellSize - 1) / 2.0f;
+                int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+
+                mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+                mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
                 
                 mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
@@ -4350,7 +4373,9 @@ function main()
                 ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
                 ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
         
-                bool insideCircle      = (dot(cellCoord, cellCoord) < circleRadius * circleRadius);
+                bool insideCircle  = (dot(cellCoord, cellCoord) < (circleRadius * circleRadius));
+                bool outsideCircle = (dot(cellCoord, cellCoord) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
+
                 bool insideTopLeft     = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
                 bool insideTopRight    = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
                 bool insideBottomRight = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
@@ -4413,6 +4438,8 @@ function main()
 
                 uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue))                    * edgeValue;
                 uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, edgeValue, cornerValue)) * cellValue;
+
+                emptyCornerCandidate = uint(outsideCircle) * emptyCornerCandidate;
 
                 uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
 
@@ -4584,21 +4611,24 @@ function main()
                 highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
 
-                mediump vec2  cellCoord       = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize) / 2.0f);
-                mediump float circleRadius    = float(gCellSize - 1) / 2.0f;
-                mediump float circleRadiusBig = float(gCellSize - 1);
+                int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+
+                mediump vec2  cellCoord       = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+                mediump float circleRadius    = float(cellSizeCorrected) / 2.0f;
+                mediump float circleRadiusBig = float(cellSizeCorrected - 1);
                 mediump float domainFactor    = 1.0f / float(gDomainSize - 1);
 
-                mediump vec2 cellCoordLeft        = cellCoord + vec2(float( gCellSize),              0.0f);
-                mediump vec2 cellCoordRight       = cellCoord + vec2(float(-gCellSize),              0.0f);
-                mediump vec2 cellCoordTop         = cellCoord + vec2(             0.0f, float( gCellSize));
-                mediump vec2 cellCoordBottom      = cellCoord + vec2(             0.0f, float(-gCellSize));
+                mediump vec2 cellCoordLeft        = cellCoord + vec2(float( cellSizeCorrected),              0.0f);
+                mediump vec2 cellCoordRight       = cellCoord + vec2(float(-cellSizeCorrected),              0.0f);
+                mediump vec2 cellCoordTop         = cellCoord + vec2(             0.0f, float( cellSizeCorrected));
+                mediump vec2 cellCoordBottom      = cellCoord + vec2(             0.0f, float(-cellSizeCorrected));
 
-                bool insideCircle     = (dot(      cellCoord,       cellCoord) < circleRadius    * circleRadius);
-                bool insideCircleBigL = (dot(  cellCoordLeft,   cellCoordLeft) < circleRadiusBig * circleRadiusBig);
-                bool insideCircleBigR = (dot( cellCoordRight,  cellCoordRight) < circleRadiusBig * circleRadiusBig);
-                bool insideCircleBigT = (dot(   cellCoordTop,    cellCoordTop) < circleRadiusBig * circleRadiusBig);
-                bool insideCircleBigB = (dot(cellCoordBottom, cellCoordBottom) < circleRadiusBig * circleRadiusBig);
+                bool insideCircle     = (dot(      cellCoord,       cellCoord) < circleRadius          * circleRadius);
+                bool outsideCircle    = (dot(      cellCoord,       cellCoord) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
+                bool insideCircleBigL = (dot(  cellCoordLeft,   cellCoordLeft) < (circleRadiusBig)     * (circleRadiusBig));
+                bool insideCircleBigR = (dot( cellCoordRight,  cellCoordRight) < (circleRadiusBig)     * (circleRadiusBig));
+                bool insideCircleBigT = (dot(   cellCoordTop,    cellCoordTop) < (circleRadiusBig)     * (circleRadiusBig));
+                bool insideCircleBigB = (dot(cellCoordBottom, cellCoordBottom) < (circleRadiusBig)     * (circleRadiusBig));
 
                 bool insideTopLeft     = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
                 bool insideTopRight    = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
@@ -4712,6 +4742,8 @@ function main()
 
                 uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)                   ) * edgeValue;
                 uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, edgeValue, cornerValue)) * cellValue;
+
+                emptyCornerCandidate = uint(outsideCircle) * emptyCornerCandidate;
 
                 uvec2 linkCandidate     = uvec2(linkRule(edgeValue)                ) *       edgeValue.xy;
                 uvec4 slimEdgeCandidate = uvec4(slimEdgeRule(cellValue, edge2Value)) * uvec4(cellValue);
