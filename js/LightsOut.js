@@ -1526,6 +1526,40 @@ function main()
         }
     }
 
+    let touchStartX = null;                                                        
+    let touchStartY = null;
+    document.ontouchstart = function(e)
+    {
+        const firstTouch = e.touches[0];                                      
+        touchStartX = firstTouch.clientX;                                      
+        touchStartY = firstTouch.clientY;                                      
+    };                                                
+
+    document.ontouchmove = function(e) 
+    {
+        if(!touchStartX || !touchStartY) 
+        {
+            return;
+        }
+
+        let diffX = touchStartX - e.touches[0].clientX;
+        let diffY = touchStartY - e.touches[0].clientY;
+        if(Math.abs(diffX) > Math.abs(diffY)) 
+        {
+            if(diffX > 0) 
+            {
+                /* Left swipe */ 
+            }
+            else 
+            {
+                /* right swipe */
+            }                       
+        }                                                                 
+
+        xDown = null;
+        yDown = null;                                             
+    };
+
     //Can change to do it on button click
     rulesSidebar.classList.toggle("active");   
     for (let i = 0; i < sidebarAccordion.length; i++) 
@@ -1544,6 +1578,8 @@ function main()
                 panel.style.maxHeight = panel.scrollHeight + "px";
             } 
         });
+
+        //TODO: Swipe exactly here
     }
 
     renderModeSelect.onchange = function()
@@ -1957,10 +1993,6 @@ function main()
     let currentDomainSize    = 2;
 
     let currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
-    if((!flagNoGrid && (currentCellSize % 2) !== 0) || (flagNoGrid && (currentCellSize % 2) === 0))
-    {
-        currentCellSize = currentCellSize - 1; //Ensure the cell size with respect to grid is odd
-    }
 
     let currentColorLit     = [0.0, 1.0, 0.0, 1.0];
     let currentColorUnlit   = [0.0, 0.0, 0.0, 1.0];
@@ -2098,10 +2130,6 @@ function main()
         }
 
         currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
-        if((!flagNoGrid && (currentCellSize % 2) !== 0) || (flagNoGrid && (currentCellSize % 2) === 0))
-        {
-            currentCellSize = currentCellSize - 1; //Ensure the cell size with respect to grid is odd
-        }
 
         let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, !flagNoGrid);
         currentViewportWidth  = newCanvasSize.width;
@@ -3133,13 +3161,9 @@ function main()
     {
         flagNoGrid = !visible;
 
-        currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
-        if((!flagNoGrid && (currentCellSize % 2) !== 0) || (flagNoGrid && (currentCellSize % 2) === 0))
-        {
-            currentCellSize = currentCellSize - 1; //Ensure the cell size with respect to grid is odd
-        }
-
         let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, visible);
+        currentCellSize   = Math.ceil(canvasSize / currentGameSize) - 1;
+
         currentViewportWidth  = newCanvasSize.width;
         currentViewportHeight = newCanvasSize.height;
 
@@ -4070,14 +4094,14 @@ function main()
 
                 mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
                 mediump float diamondRadius = float(cellSizeCorrected) / 2.0f;
-                
-                mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
+                mediump float domainFactor = 1.0f / float(gDomainSize - 1);
                 mediump vec2 absCellCoord = abs(cellCoord);
 
                 //Fix for 1 pixel off. To make it work, x == 0 and y == 0 pixels shouldn't be considered part of beam (or else single pixel artifacts will appear)
-                bool insideCentralDiamond   = (absCellCoord.x + absCellCoord.y <= diamondRadius);
-                bool outsideCentralDiamond  = (absCellCoord.x + absCellCoord.y >= diamondRadius + 1.0f * float((gFlags & FLAG_NO_GRID) == 0));
+                //For even cell sizes, region inside diamond should be a bit smaller to compensate
+                bool insideCentralDiamond   = (absCellCoord.x + absCellCoord.y <= diamondRadius - 1.0f * float((gCellSize % 2 == 0) && ((gFlags & FLAG_NO_GRID) != 0)));
+                bool outsideCentralDiamond  = (absCellCoord.x + absCellCoord.y >= diamondRadius + 1.0f * float(gCellSize % 2 == 0));
 
                 bool insideHorizontalBeamLeft  = (absCellCoord.y <= 0.707f * float(cellSizeCorrected) / 2.0f && cellCoord.x <= 0.0f);
                 bool insideHorizontalBeamRight = (absCellCoord.y <= 0.707f * float(cellSizeCorrected) / 2.0f && cellCoord.x >= 0.0f);
@@ -4190,6 +4214,8 @@ function main()
                 enablePower              += dot(vec4(insideV),           regVPower);
 
                 outColor = mix(gColorNone, gColorEnabled, enablePower);
+
+                //outColor += vec4(float(insideCentralDiamond), 0.0f, float(outsideCentralDiamond), 0.0f);
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
