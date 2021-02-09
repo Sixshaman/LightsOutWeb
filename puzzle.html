@@ -30,6 +30,8 @@
                 <div id="SolutionPeriodInfo">Solution period: </div>
             </div>
 
+            <button id="testbtn">TEST</button>
+
             <div class="selectrendermode">
                 <label class="mainLabel" for="RenderModeSel">Render mode: </label>
                 <select class="rendermode" id="RenderModeSel">
@@ -65,7 +67,7 @@
 
     <div class="rules" id="RulesSidebar">
         <button class="accordion">General</button>
-        <div class="panel">
+        <div class="panel active">
             <div class="hotkeywrapper">
                 <div class="hotkeydisabled" id="ConstructModeButton">
                     <span class="control">Construct mode</span><span class="controlhotkey">(Hold Ctrl)</span>
@@ -82,7 +84,6 @@
                 </div>
             </div>
         
-
             <div class="hotkeywrapper" id="IncreaseDomainHints">
                 <div class="hotkeydisabled" id="IncreaseDomainButton">
                     <span>Increase domain (Shift +)</span>
@@ -95,8 +96,6 @@
         <button class="accordion">Click rules</button>
         <div class="panel">
             <div class="hotkeywrapper" id="ClickRuleHints">
-                <div class="hotkeyspacing">&nbsp;</div>
-
                 <div class="hotkeydisabled" id="RegularClickRuleButton">
                     <span>Regular click rule (Shift R)</span>
                 </div>

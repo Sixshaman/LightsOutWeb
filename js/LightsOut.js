@@ -980,7 +980,8 @@ function main()
     const checkersBoardButton                  = document.getElementById("CheckersBoardButton");
     const chessboardBoardButton                = document.getElementById("ChessboardBoardButton");
 
-    const sidebarAccordion = document.getElementsByClassName("accordion"); 
+    const menuAccordion = document.getElementsByClassName("accordion"); 
+    const menuPanels    = document.getElementsByClassName("panel"); 
 
     const gl = canvas.getContext("webgl2");
     if (!gl)
@@ -1546,14 +1547,27 @@ function main()
         let diffY = touchStartY - e.touches[0].clientY;
         if(Math.abs(diffX) > Math.abs(diffY)) 
         {
+            let currentIndex = 0;
+            for(let i = 0; i < menuPanels.length; i++) 
+            {
+                if(menuPanels[i].classList.contains("active"))
+                {
+                    currentIndex = i;
+                    break;
+                }
+            }
+            
+            menuPanels[currentIndex].classList.toggle("active");
             if(diffX > 0) 
             {
-                /* Left swipe */ 
+                let prevIndex = (currentIndex + menuPanels.length - 1) % menuPanels.length; 
+                menuPanels[prevIndex].classList.toggle("active");
             }
             else 
             {
-                /* right swipe */
-            }                       
+                let nextIndex = (currentIndex + 1) % menuPanels.length; 
+                menuPanels[nextIndex].classList.toggle("active");
+            }
         }                                                                 
 
         xDown = null;
@@ -1562,9 +1576,9 @@ function main()
 
     //Can change to do it on button click
     rulesSidebar.classList.toggle("active");   
-    for (let i = 0; i < sidebarAccordion.length; i++) 
+    for (let i = 0; i < menuAccordion.length; i++) 
     {
-        sidebarAccordion[i].addEventListener("click", function() 
+        menuAccordion[i].addEventListener("click", function() 
         {
             this.classList.toggle("active");
 

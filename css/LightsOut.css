@@ -352,7 +352,17 @@ select
     {
         display: none;
     }
-    .panel 
+    .panel
+    {
+        max-height: 100%;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 0%;
+        width: 200vw;
+        margin: 0px calc(100vw/2);
+    }
+    .panel.active
     {
         max-height: 100%;
         display: flex;
