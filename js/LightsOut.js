@@ -1536,7 +1536,7 @@ function main()
         touchStartY = firstTouch.clientY;                                      
     };                                                
 
-    document.ontouchmove = function(e) 
+    document.ontouchend = function(e) 
     {
         if(!touchStartX || !touchStartY) 
         {
@@ -1568,14 +1568,24 @@ function main()
                 let nextIndex = (currentIndex + 1) % menuPanels.length; 
                 menuPanels[nextIndex].classList.toggle("active");
             }
-        }                                                                 
+        }
+        else
+        {
+            if(diffY > 0)
+            {
+                rulesSidebar.classList.remove("active");
+            }
+            else
+            {
+                rulesSidebar.classList.add("active");
+            }
+        }                                                         
 
         xDown = null;
         yDown = null;                                             
     };
 
-    //Can change to do it on button click
-    rulesSidebar.classList.toggle("active");   
+    //Can change to do it on button click 
     for (let i = 0; i < menuAccordion.length; i++) 
     {
         menuAccordion[i].addEventListener("click", function() 
