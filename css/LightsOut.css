@@ -346,7 +346,7 @@ select
     }
     .rules.active 
     {
-        height: 50% !important;
+        height: 25% !important;
     }
     .accordion 
     {
