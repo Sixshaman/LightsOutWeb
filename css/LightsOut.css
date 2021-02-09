@@ -334,7 +334,7 @@ select
 {
     .rules 
     {
-        height: 0% !important;
+        height: 5% !important;
         right: 0px !important;
         display: flex;
         width: auto !important;
@@ -344,7 +344,7 @@ select
         min-width: 100%;
         float: left;
     }
-    .rules.active 
+    .rules.active
     {
         height: 25% !important;
     }
