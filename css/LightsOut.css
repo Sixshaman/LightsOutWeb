@@ -356,13 +356,13 @@ select
         justify-content: space-around;
         align-items: baseline;
         flex-direction: column;
-        height: 0%;
-        width: 96%;
+        width: 0%;
         margin: 0px;
     }
     .panel.active
     {
         height: max-content;
         max-height: 100%;
+        width: 96%;
     }
 }
