@@ -983,6 +983,11 @@ function main()
     const menuAccordion = document.getElementsByClassName("accordion"); 
     const menuPanels    = document.getElementsByClassName("panel"); 
 
+    let touchStartX = null;                                                        
+    let touchStartY = null;
+    let touchEndX   = null;                                                        
+    let touchEndY   = null;
+
     const gl = canvas.getContext("webgl2");
     if (!gl)
     {
@@ -1527,24 +1532,40 @@ function main()
         }
     }
 
-    let touchStartX = null;                                                        
-    let touchStartY = null;
     document.ontouchstart = function(e)
     {
-        const firstTouch = e.touches[0];                                      
-        touchStartX = firstTouch.clientX;                                      
-        touchStartY = firstTouch.clientY;                                      
-    };                                                
+        if(e.touches.length == 1)
+        {
+            const touch = e.touches[0];                                
+            touchStartX = touch.clientX;                                      
+            touchStartY = touch.clientY;
+        }
+    };
+    
+    document.ontouchmove = function(e)
+    {
+        if(e.touches.length == 1)
+        {
+            if(!touchStartX || !touchStartY) 
+            {
+                return;
+            }
+
+            const touch = e.touches[0];
+            touchEndX = touch.clientX;
+            touchEndY = touch.clientY;
+        }
+    }
 
     document.ontouchend = function(e) 
     {
-        if(!touchStartX || !touchStartY) 
+        if(!touchStartX || !touchStartY || !touchEndX || !touchEndY) 
         {
             return;
         }
 
-        let diffX = touchStartX - e.touches[0].clientX;
-        let diffY = touchStartY - e.touches[0].clientY;
+        let diffX = touchEndX - touchStartX;
+        let diffY = touchEndY - touchStartY;
         if(Math.abs(diffX) > Math.abs(diffY)) 
         {
             let currentIndex = 0;
@@ -1581,8 +1602,10 @@ function main()
             }
         }                                                         
 
-        xDown = null;
-        yDown = null;                                             
+        touchStartX = null;
+        touchStartY = null;                                             
+        touchEndX   = null;
+        touchEndY   = null;
     };
 
     //Can change to do it on button click 

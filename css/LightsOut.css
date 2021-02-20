@@ -334,7 +334,7 @@ select
 {
     div.rules 
     {
-        height: 0% !important;
+        height: 5% !important;
         right: 0px !important;
         align-items: right;
         justify-content: center;
