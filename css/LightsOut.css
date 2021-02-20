@@ -46,7 +46,7 @@ div.rules
 {
     background-color: lavender;
     color: midnightblue;
-    overflow: hidden;
+    overflow: scroll;
     width: 0px;
     height: 100%;
     position: fixed;
@@ -332,21 +332,18 @@ select
 
 @media all and (max-width: 800px) 
 {
-    .rules 
+    div.rules 
     {
-        height: 5% !important;
+        height: 0% !important;
         right: 0px !important;
-        display: flex;
-        width: auto !important;
-        align-items: center;
+        align-items: right;
         justify-content: center;
-        transform: translateX(1270vw);
         min-width: 100%;
-        float: left;
     }
-    .rules.active
+    div.rules.active
     {
-        height: 25% !important;
+        height: 45% !important;
+        width:  100%;
     }
     .accordion 
     {
@@ -356,20 +353,16 @@ select
     {
         max-height: 100%;
         display: flex;
-        justify-content: center;
-        align-items: center;
+        justify-content: space-around;
+        align-items: baseline;
+        flex-direction: column;
         height: 0%;
-        width: 200vw;
-        margin: 0px calc(100vw/2);
+        width: 96%;
+        margin: 0px;
     }
     .panel.active
     {
+        height: max-content;
         max-height: 100%;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100%;
-        width: 200vw;
-        margin: 0px calc(100vw/2);
     }
 }

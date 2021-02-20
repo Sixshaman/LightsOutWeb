@@ -1585,42 +1585,6 @@ function main()
         yDown = null;                                             
     };
 
-    document.getElementById("swipeleft").onclick = function()
-    {
-        let currentIndex = 0;
-        for(let i = 0; i < menuPanels.length; i++) 
-        {
-            if(menuPanels[i].classList.contains("active"))
-            {
-                currentIndex = i;
-                break;
-            }
-        }
-        
-        menuPanels[currentIndex].classList.toggle("active");
-        
-        let prevIndex = (currentIndex + menuPanels.length - 1) % menuPanels.length; 
-        menuPanels[prevIndex].classList.toggle("active");
-    };
-
-    document.getElementById("swiperight").onclick = function()
-    {
-        let currentIndex = 0;
-        for(let i = 0; i < menuPanels.length; i++) 
-        {
-            if(menuPanels[i].classList.contains("active"))
-            {
-                currentIndex = i;
-                break;
-            }
-        }
-        
-        menuPanels[currentIndex].classList.toggle("active");
-
-        let nextIndex = (currentIndex + 1) % menuPanels.length; 
-        menuPanels[nextIndex].classList.toggle("active");
-    };
-
     //Can change to do it on button click 
     for (let i = 0; i < menuAccordion.length; i++) 
     {
