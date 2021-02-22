@@ -922,6 +922,7 @@ function main()
     const solutionMatrixCancelButton = document.getElementById("SolutionMatrixCancel");
 
     const renderModeSelect = document.getElementById("RenderModeSel");
+    const colorThemeSelect = document.getElementById("ColorThemeSel");
 
     const gridCheckBox = document.getElementById("GridCheckBox");
 
@@ -1005,7 +1006,7 @@ function main()
 
     document.onkeydown = function (e)
     {
-        if(document.activeElement === renderModeSelect)
+        if(document.activeElement === renderModeSelect || document.activeElement === colorThemeSelect)
         {
             return;
         }
@@ -1340,7 +1341,7 @@ function main()
 
     document.onkeyup = function(e)
     {
-        if(document.activeElement === renderModeSelect)
+        if(document.activeElement === renderModeSelect || document.activeElement === colorThemeSelect)
         {
             return;
         }
@@ -1635,6 +1636,13 @@ function main()
         renderModeSelect.blur(); //Blur - Beetlebum
         canvas.focus();
     };
+
+    colorThemeSelect.onchange = function()
+    {
+        setColorTheme(colorThemeSelect.value);
+        colorThemeSelect.blur(); //Blur - Charmless Man
+        canvas.focus();
+    }
 
     gridCheckBox.onclick = function()
     {
@@ -3114,51 +3122,49 @@ function main()
 
     function setRenderMode(renderMode)
     {
+        let valueSelect = renderMode;
         switch(renderMode)
         {
         case "Squares":
         {
-            renderModeSelect.value = renderMode;
-            currentShaderProgram   = squaresShaderProgram;
+            currentShaderProgram = squaresShaderProgram;
             break;
         }
         case "Circles":
         {
-            renderModeSelect.value = renderMode;
-            currentShaderProgram   = circlesShaderProgram;
+            currentShaderProgram = circlesShaderProgram;
             break;
         }
         case "Diamonds":
         {
-            renderModeSelect.value = renderMode;
-            currentShaderProgram   = diamondsShaderProgram;
+            currentShaderProgram = diamondsShaderProgram;
             break;
         }
         case "BEAMS":
         {
-            renderModeSelect.value = renderMode;
-            currentShaderProgram   = beamsShaderProgram;
+            currentShaderProgram = beamsShaderProgram;
             break;
         }
         case "Raindrops":
         {
-            renderModeSelect.value = renderMode;
-            currentShaderProgram   = raindropsShaderProgram;
+            currentShaderProgram = raindropsShaderProgram;
             break;
         }
         case "Chains":
         {
-            renderModeSelect.value = renderMode;
-            currentShaderProgram   = chainsShaderProgram;
+            currentShaderProgram = chainsShaderProgram;
             break;
         }
         default:
         {
             currentShaderProgram = squaresShaderProgram;
+            valueSelect          = "Squares";
             break;
         }
         }
 
+        renderModeSelect.value = valueSelect;
+        
         updateAddressBar(50);
 
         boardSizeUniformLocation  = gl.getUniformLocation(currentShaderProgram, "gBoardSize");
@@ -3179,7 +3185,7 @@ function main()
         boardTextureUniformLocation     = gl.getUniformLocation(currentShaderProgram, "gBoard");
         solutionTextureUniformLocation  = gl.getUniformLocation(currentShaderProgram, "gSolution");
         stabilityTextureUniformLocation = gl.getUniformLocation(currentShaderProgram, "gStability");
-               
+                
         drawVertexBufferAttribLocation = gl.getAttribLocation(currentShaderProgram, "vScreenPos");
 
         const posArray = new Float32Array([-1.0,  1.0, 0.0, 1.0, // eslint-disable-next-line indent
@@ -3200,6 +3206,69 @@ function main()
         gl.bindBuffer(gl.ARRAY_BUFFER, null);
 
         gl.bindVertexArray(null);
+
+        requestRedraw();
+    }
+
+    function setColorTheme(colorTheme)
+    {
+        let valueSelect = colorTheme;
+        switch(colorTheme)
+        {
+        case "Neon":
+        {
+            currentColorLit     = [0.0, 1.0, 0.0, 1.0];
+            currentColorUnlit   = [0.0, 0.0, 0.0, 1.0];
+            currentColorSolved  = [0.0, 0.0, 1.0, 1.0];
+            currentColorBetween = [0.0, 0.0, 0.0, 1.0];
+            break;
+        }
+        case "Autumn":
+        {
+            currentColorLit     = [1.0,   1.0,   0.0,   1.0];
+            currentColorUnlit   = [0.153, 0.086, 0.078, 1.0];
+            currentColorSolved  = [0.133, 0.545, 0.133, 1.0];
+            currentColorBetween = [0.153, 0.086, 0.078, 1.0];
+            break;
+        }
+        case "Strawberry":
+        {
+            currentColorLit     = [1.0,   0.412, 0.706, 1.0];
+            currentColorUnlit   = [1.0,   0.894, 0.769, 1.0];
+            currentColorSolved  = [0.824, 0.412, 0.118, 1.0];
+            currentColorBetween = [1.0,   0.894, 0.769, 1.0];
+            break;
+        }
+        case "HardToSee":
+        {
+            currentColorLit     = [0.0,   0.0,   0.502, 1.0];
+            currentColorUnlit   = [0.0,   0.0,   0.545, 1.0];
+            currentColorSolved  = [0.098, 0.098, 0.439, 1.0];
+            currentColorBetween = [0.0,   0.0,   0.545, 1.0];
+            break;
+        }
+        case "Pietia":
+        {
+            currentColorLit     = [0.980, 0.984, 0.988, 1.0];
+            currentColorUnlit   = [0.459, 0.733, 0.992, 1.0];
+            currentColorSolved  = [0.639, 0.694, 0.745, 1.0];
+            currentColorBetween = [0.459, 0.733, 0.992, 1.0];
+            break;
+        }
+        default:
+        {
+            currentColorLit     = [0.0, 1.0, 0.0, 1.0];
+            currentColorUnlit   = [0.0, 0.0, 0.0, 1.0];
+            currentColorSolved  = [0.0, 0.0, 1.0, 1.0];
+            currentColorBetween = [0.0, 0.0, 0.0, 1.0];
+            valueSelect          = "Neon";
+            break;
+        }
+        }
+
+        colorThemeSelect.value = valueSelect;
+
+        updateAddressBar(50);
 
         requestRedraw();
     }
@@ -3446,6 +3515,7 @@ function main()
         let gameSize         = 15;
         let domainSize       = 2;
         let renderMode       = "Squares";
+        let colorTheme       = "Neon";
         let encodedClickRule = "";
         let showGrid         = true;
 
@@ -3469,11 +3539,20 @@ function main()
             }
         }
 
-        const allRenderModes = ["Squares", "Circles", "Diamonds", "BEAMS", "Raindrops", "Chains"];
+        const renderModeOptions = [...renderModeSelect.options];
+        const allRenderModes = renderModeOptions.map(opt => opt.value);
         const renderModeStr  = queryString.get("renderMode");
         if(renderModeStr !== null && allRenderModes.includes(renderModeStr))
         {
             renderMode = renderModeStr;
+        }
+
+        const colorThemeOptions = [...colorThemeSelect.options];
+        const allColorThemes = colorThemeOptions.map(opt => opt.value);
+        const colorThemeStr  = queryString.get("colorTheme");
+        if(colorThemeStr !== null && allColorThemes.includes(colorThemeStr))
+        {
+            colorTheme = colorThemeStr;
         }
 
         const clickRuleStr = queryString.get("clickRule");
@@ -3508,6 +3587,7 @@ function main()
         changeDomainSize(domainSize);
 
         setRenderMode(renderMode);
+        setColorTheme(colorTheme);
 
         gridCheckBox.checked = showGrid;
         setGridVisible(showGrid);
@@ -3534,6 +3614,7 @@ function main()
             queryString.set("size",       gameSize);
             queryString.set("domain",     currentDomainSize);
             queryString.set("renderMode", renderModeSelect.value);
+            queryString.set("colorTheme", colorThemeSelect.value);
             queryString.set("showGrid",   gridCheckBox.checked);
             queryString.set("clickRule",  currentEncodedClickRule);
 

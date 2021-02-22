@@ -72,9 +72,11 @@ div.puzzleinfo
     margin-top: 2rem;
 }
 
-div.selectrendermode
+div.selectviewoptions
 {
     margin-top: 2rem;
+    display: flex;
+    flex-direction: column;
 }
 
 div.gridcheckbox
@@ -240,7 +242,7 @@ span.checkboxlabel
     transform: translateY(-50%);
 }
 
-select.rendermode
+select.viewselect
 {
     padding:     0.2rem;
     background:lavender;
@@ -263,6 +265,17 @@ select.rendermode
         0.5rem 0.5rem, 
         1.5rem 2.5rem;
     background-repeat: no-repeat;
+}
+
+div.selectwithlabel
+{
+    display: inline-grid;
+    grid-template-columns: 6.5em 12em;
+}
+
+div.selectwithlabel ~ div.selectwithlabel
+{
+    padding-top: 0.5rem;
 }
 
 progress
