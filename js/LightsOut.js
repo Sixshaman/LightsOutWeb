@@ -3217,51 +3217,67 @@ function main()
         {
         case "Neon":
         {
-            currentColorLit     = [0.0, 1.0, 0.0, 1.0];
-            currentColorUnlit   = [0.0, 0.0, 0.0, 1.0];
-            currentColorSolved  = [0.0, 0.0, 1.0, 1.0];
-            currentColorBetween = [0.0, 0.0, 0.0, 1.0];
+            currentColorLit     = [0.000, 1.000, 0.000, 1.000];
+            currentColorUnlit   = [0.000, 0.000, 0.000, 1.000];
+            currentColorSolved  = [0.000, 0.000, 1.000, 1.000];
+            currentColorBetween = [0.000, 0.000, 0.000, 1.000];
             break;
         }
         case "Autumn":
         {
-            currentColorLit     = [1.0,   1.0,   0.0,   1.0];
-            currentColorUnlit   = [0.153, 0.086, 0.078, 1.0];
-            currentColorSolved  = [0.133, 0.545, 0.133, 1.0];
-            currentColorBetween = [0.153, 0.086, 0.078, 1.0];
+            currentColorLit     = [1.000, 1.000, 0.000, 1.000];
+            currentColorUnlit   = [0.153, 0.086, 0.078, 1.000];
+            currentColorSolved  = [0.133, 0.545, 0.133, 1.000];
+            currentColorBetween = [0.153, 0.086, 0.078, 1.000];
             break;
         }
         case "Strawberry":
         {
-            currentColorLit     = [1.0,   0.412, 0.706, 1.0];
-            currentColorUnlit   = [1.0,   0.894, 0.769, 1.0];
-            currentColorSolved  = [0.824, 0.412, 0.118, 1.0];
-            currentColorBetween = [1.0,   0.894, 0.769, 1.0];
+            currentColorLit     = [1.000, 0.412, 0.706, 1.000];
+            currentColorUnlit   = [1.000, 0.894, 0.769, 1.000];
+            currentColorSolved  = [0.824, 0.412, 0.118, 1.000];
+            currentColorBetween = [1.000, 0.894, 0.769, 1.000];
             break;
         }
         case "HardToSee":
         {
-            currentColorLit     = [0.0,   0.0,   0.502, 1.0];
-            currentColorUnlit   = [0.0,   0.0,   0.545, 1.0];
-            currentColorSolved  = [0.098, 0.098, 0.439, 1.0];
-            currentColorBetween = [0.0,   0.0,   0.545, 1.0];
+            currentColorLit     = [0.000, 0.000, 0.502, 1.000];
+            currentColorUnlit   = [0.000, 0.000, 0.545, 1.000];
+            currentColorSolved  = [0.098, 0.098, 0.439, 1.000];
+            currentColorBetween = [0.000, 0.000, 0.545, 1.000];
             break;
         }
         case "Pietia":
         {
-            currentColorLit     = [0.980, 0.984, 0.988, 1.0];
-            currentColorUnlit   = [0.459, 0.733, 0.992, 1.0];
-            currentColorSolved  = [0.639, 0.694, 0.745, 1.0];
-            currentColorBetween = [0.459, 0.733, 0.992, 1.0];
+            currentColorLit     = [0.980, 0.984, 0.988, 1.000];
+            currentColorUnlit   = [0.459, 0.733, 0.992, 1.000];
+            currentColorSolved  = [0.639, 0.694, 0.745, 1.000];
+            currentColorBetween = [0.459, 0.733, 0.992, 1.000];
+            break;
+        }
+        case "Universe":
+        {
+            currentColorLit     = [1.000, 0.000, 0.000, 1.000];
+            currentColorUnlit   = [1.000, 1.000, 1.000, 1.000];
+            currentColorSolved  = [0.545, 0.090, 0.851, 1.000];
+            currentColorBetween = [0.000, 0.000, 0.000, 1.000];
+            break;
+        }
+        case "Continuous":
+        {
+            currentColorLit     = [1.000, 0.000, 0.000, 1.000];
+            currentColorUnlit   = [0.000, 0.000, 0.000, 1.000];
+            currentColorSolved  = [0.961, 0.871, 0.702, 1.000];
+            currentColorBetween = [0.000, 0.000, 0.000, 1.000];
             break;
         }
         default:
         {
-            currentColorLit     = [0.0, 1.0, 0.0, 1.0];
-            currentColorUnlit   = [0.0, 0.0, 0.0, 1.0];
-            currentColorSolved  = [0.0, 0.0, 1.0, 1.0];
-            currentColorBetween = [0.0, 0.0, 0.0, 1.0];
-            valueSelect          = "Neon";
+            currentColorLit     = [0.000, 1.000, 0.000, 1.000];
+            currentColorUnlit   = [0.000, 0.000, 0.000, 1.000];
+            currentColorSolved  = [0.000, 0.000, 1.000, 1.000];
+            currentColorBetween = [0.000, 0.000, 0.000, 1.000];
+            valueSelect         = "Neon";
             break;
         }
         }
