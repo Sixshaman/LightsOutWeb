@@ -3559,7 +3559,7 @@ function main()
         link.remove();
     }
 
-    function saveMatrixToImage(matrix, currentGameSize)
+    function saveMatrixToImage(matrix)
     {
         const canvasMatrix  = document.createElement("canvas");
         canvasMatrix.width  = currentGameSize * currentGameSize;
