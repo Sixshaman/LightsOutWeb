@@ -179,7 +179,7 @@ function solutionMatrixWorkerFunction()
     //Calculates the Lights Out matrix for the given click rule and game size. Lights Out matrix helps to calculate inverse solutions
     function calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid)
     {
-        //Generate a normal Lights Out matrix for the click rule
+        //Generate a regular Lights Out matrix for the click rule
         let lightsOutMatrix = [];
         for(let yL = 0; yL < gameSize; yL++)
         {

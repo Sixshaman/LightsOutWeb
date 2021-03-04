@@ -524,6 +524,32 @@ function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cell
     return populatedClickRule;
 }
 
+//Calculates the Lights Out matrix for the given click rule and game size
+function calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid)
+{
+    //Generate a regular Lights Out matrix for the click rule
+    let lightsOutMatrix = [];
+    for(let yL = 0; yL < gameSize; yL++)
+    {
+        for(let xL = 0; xL < gameSize; xL++)
+        {
+            let matrixRow = {};
+            if(isToroid)
+            {
+                matrixRow = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, xL, yL);
+            }
+            else
+            {
+                matrixRow = populateClickRulePlane(clickRule, clickRuleSize, gameSize, xL, yL);
+            }
+
+            lightsOutMatrix.push(matrixRow);
+        }
+    }
+
+    return lightsOutMatrix;
+}
+
 //Calculates the solution given the solution matrix
 function calculateSolution(board, gameSize, domainSize, solutionMatrix)
 {
@@ -980,6 +1006,7 @@ function main()
     const borderBoardButton                    = document.getElementById("BorderBoardButton");
     const checkersBoardButton                  = document.getElementById("CheckersBoardButton");
     const chessboardBoardButton                = document.getElementById("ChessboardBoardButton");
+    const saveRegularMatrixButton              = document.getElementById("SaveLOMatrix");
 
     const menuAccordion = document.getElementsByClassName("accordion"); 
     const menuPanels    = document.getElementsByClassName("panel"); 
@@ -1938,6 +1965,12 @@ function main()
         {
             changeCountingMode(countingModes.COUNT_INVERSE_SOLUTION_PERIOD, false);
         }
+    }
+
+    saveRegularMatrixButton.onclick = function()
+    {
+        let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
+        saveMatrixToImage(lightsOutMatrix, currentGameSize);
     }
 
     let boardGenModes =
@@ -3524,6 +3557,66 @@ function main()
 
         link.click();
         link.remove();
+    }
+
+    function saveMatrixToImage(matrix, currentGameSize)
+    {
+        const canvasMatrix  = document.createElement("canvas");
+        canvasMatrix.width  = currentGameSize * currentGameSize;
+        canvasMatrix.height = currentGameSize * currentGameSize;
+
+        let palette = [];
+        for(let i = 0; i < currentDomainSize; i++)
+        {
+            const lerpCoeff = i / (currentDomainSize - 1);
+
+            const r = Math.floor(255.0 * (currentColorUnlit[0] * (1 - lerpCoeff) + currentColorLit[0] * lerpCoeff));
+            const g = Math.floor(255.0 * (currentColorUnlit[1] * (1 - lerpCoeff) + currentColorLit[1] * lerpCoeff));
+            const b = Math.floor(255.0 * (currentColorUnlit[2] * (1 - lerpCoeff) + currentColorLit[2] * lerpCoeff));
+            const a = Math.floor(255.0 * (currentColorUnlit[3] * (1 - lerpCoeff) + currentColorLit[3] * lerpCoeff));
+
+            palette.push([r, g, b, a]);
+        }
+
+        let matrixImageArray = new Uint8ClampedArray(currentGameSize * currentGameSize * currentGameSize * currentGameSize * 4);
+        for(let yBig = 0; yBig < currentGameSize; yBig++)
+        {
+            for(let xBig = 0; xBig < currentGameSize; xBig++)
+            {
+                const matrixRowIndex = yBig * currentGameSize + xBig;
+                for(let ySm = 0; ySm < currentGameSize; ySm++)
+                {
+                    const imageRowIndex = yBig * currentGameSize + ySm;
+                    for(let xSm = 0; xSm < currentGameSize; xSm++)
+                    {
+                        const matrixColumnIndex = ySm * currentGameSize + xSm;
+                        const imageColumnIndex  = xBig * currentGameSize + xSm;
+
+                        const matrixVal = matrix[matrixRowIndex][matrixColumnIndex];
+                        
+                        const imageIndex = 4 * (imageRowIndex * currentGameSize * currentGameSize + imageColumnIndex);
+                        matrixImageArray[imageIndex + 0] = palette[matrixVal][0];
+                        matrixImageArray[imageIndex + 1] = palette[matrixVal][1];
+                        matrixImageArray[imageIndex + 2] = palette[matrixVal][2];
+                        matrixImageArray[imageIndex + 3] = palette[matrixVal][3];
+                    }
+                }
+            }
+        }
+
+        let matrixImageData = new ImageData(matrixImageArray, currentGameSize * currentGameSize)
+
+        const canvasContext = canvasMatrix.getContext('2d');
+        canvasContext.putImageData(matrixImageData, 0, 0);
+
+        let link      = document.createElement("a");
+        link.href     = canvasMatrix.toDataURL("image/png");
+        link.download = "LightsOutMatrix.png";
+
+        link.click();
+        link.remove();
+
+        canvasMatrix.remove();
     }
 
     function initPuzzleContents()
