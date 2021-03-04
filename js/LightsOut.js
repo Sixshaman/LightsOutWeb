@@ -1006,7 +1006,7 @@ function main()
     const borderBoardButton                    = document.getElementById("BorderBoardButton");
     const checkersBoardButton                  = document.getElementById("CheckersBoardButton");
     const chessboardBoardButton                = document.getElementById("ChessboardBoardButton");
-    const saveRegularMatrixButton              = document.getElementById("SaveLOMatrix");
+    const saveRegularMatrixButton              = document.getElementById("SaveLOMatrixNoEdges");
 
     const menuAccordion = document.getElementsByClassName("accordion"); 
     const menuPanels    = document.getElementsByClassName("panel"); 
