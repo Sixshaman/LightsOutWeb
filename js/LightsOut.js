@@ -3280,6 +3280,14 @@ function main()
             currentColorBetween = [0.000, 0.000, 0.545, 1.000];
             break;
         }
+        case "BlackAndWhite":
+        {
+            currentColorLit     = [1.000, 1.000, 1.000, 1.000];
+            currentColorUnlit   = [0.000, 0.000, 0.000, 1.000];
+            currentColorSolved  = [1.000, 1.000, 1.000, 1.000];
+            currentColorBetween = [0.000, 0.000, 0.000, 1.000];
+            break;
+        }
         case "Pietia":
         {
             currentColorLit     = [0.980, 0.984, 0.988, 1.000];
