@@ -964,6 +964,7 @@ function main()
     const boardSolveHints          = document.getElementById("BoardSolveHints"); 
     const metaBoardHints           = document.getElementById("MetaBoardHints");
     const miscellaneousHints       = document.getElementById("MiscellaneousHints");
+    const saveMatrixHints          = document.getElementById("SaveMatrixHints");
 
     const constructModeButton                  = document.getElementById("ConstructModeButton");
     const increaseSizeButton                   = document.getElementById("IncreaseSizeButton");
@@ -1007,6 +1008,7 @@ function main()
     const checkersBoardButton                  = document.getElementById("CheckersBoardButton");
     const chessboardBoardButton                = document.getElementById("ChessboardBoardButton");
     const saveRegularMatrixButton              = document.getElementById("SaveLOMatrixNoEdges");
+    const saveInverseMatrixButton              = document.getElementById("SaveInverseMatrixNoEdges");
 
     const menuAccordion = document.getElementsByClassName("accordion"); 
     const menuPanels    = document.getElementsByClassName("panel"); 
@@ -1969,8 +1971,19 @@ function main()
 
     saveRegularMatrixButton.onclick = function()
     {
-        let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
-        saveMatrixToImage(lightsOutMatrix, currentGameSize);
+        if(currentWorkingMode == workingModes.LIT_BOARD)
+        {
+            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
+            saveMatrixToImage(lightsOutMatrix, currentGameSize);
+        }
+    }
+
+    saveInverseMatrixButton.onclick = function()
+    {
+        if(currentWorkingMode == workingModes.LIT_BOARD)
+        {
+            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX);
+        }
     }
 
     let boardGenModes =
@@ -2028,7 +2041,8 @@ function main()
         CALC_SOULTION_PERIO4:           5,
         CALC_SOULTION_PERIO4_WITH_STOP: 6,
         CALC_SOLVE_RANDOM:              7,
-        CALC_SOLVE_SEQUENTIAL:          8
+        CALC_SOLVE_SEQUENTIAL:          8,
+        CALC_SAVE_INVERSE_MATRIX:       9
     }
 
     const minimumBoardSize = 1;
@@ -2506,6 +2520,15 @@ function main()
 
                 break;
             }
+            case afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX:
+            {
+                if(currentWorkingMode == workingModes.LIT_BOARD)
+                {
+                    saveMatrixToImage(currentSolutionMatrix);
+                }
+
+                break;
+            }
         }
     }
 
@@ -2965,6 +2988,7 @@ function main()
            boardSolveHints.hidden          = true;
            metaBoardHints.hidden           = true;
            miscellaneousHints.hidden       = true;
+           saveMatrixHints.hidden          = true;
         }
         else
         {
@@ -2976,6 +3000,7 @@ function main()
             boardSolveHints.hidden          = false;
             metaBoardHints.hidden           = false;
             miscellaneousHints.hidden       = false;
+            saveMatrixHints.hidden          = false;
         }
 
         requestRedraw();
