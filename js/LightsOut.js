@@ -1008,7 +1008,9 @@ function main()
     const checkersBoardButton                  = document.getElementById("CheckersBoardButton");
     const chessboardBoardButton                = document.getElementById("ChessboardBoardButton");
     const saveRegularMatrixButton              = document.getElementById("SaveLOMatrixNoEdges");
+    const saveRegularMatrixEdgesButton         = document.getElementById("SaveLOMatrix");
     const saveInverseMatrixButton              = document.getElementById("SaveInverseMatrixNoEdges");
+    const saveInverseMatrixEdgesButton         = document.getElementById("SaveInverseMatrix");
 
     const menuAccordion = document.getElementsByClassName("accordion"); 
     const menuPanels    = document.getElementsByClassName("panel"); 
@@ -1974,8 +1976,19 @@ function main()
         if(currentWorkingMode == workingModes.LIT_BOARD)
         {
             let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
-            saveMatrixToImage(lightsOutMatrix, currentGameSize);
+            saveMatrixToImage(lightsOutMatrix);
         }
+    }
+
+    saveRegularMatrixEdgesButton.onclick = function()
+    {
+        if(currentWorkingMode == workingModes.LIT_BOARD)
+        {
+            let matrixCellSize = 5;
+
+            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
+            saveMatrixWithEdgesToImage(lightsOutMatrix, matrixCellSize);
+        }       
     }
 
     saveInverseMatrixButton.onclick = function()
@@ -1983,6 +1996,14 @@ function main()
         if(currentWorkingMode == workingModes.LIT_BOARD)
         {
             updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX);
+        }
+    }
+
+    saveInverseMatrixEdgesButton.onclick = function()
+    {
+        if(currentWorkingMode == workingModes.LIT_BOARD)
+        {
+            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_EDGES);
         }
     }
 
@@ -2042,7 +2063,8 @@ function main()
         CALC_SOULTION_PERIO4_WITH_STOP: 6,
         CALC_SOLVE_RANDOM:              7,
         CALC_SOLVE_SEQUENTIAL:          8,
-        CALC_SAVE_INVERSE_MATRIX:       9
+        CALC_SAVE_INVERSE_MATRIX:       9,
+        CALC_SAVE_INVERSE_MATRIX_EDGES: 10
     }
 
     const minimumBoardSize = 1;
@@ -2525,6 +2547,17 @@ function main()
                 if(currentWorkingMode == workingModes.LIT_BOARD)
                 {
                     saveMatrixToImage(currentSolutionMatrix);
+                }
+
+                break;
+            }
+            case afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_EDGES:
+            {
+                if(currentWorkingMode == workingModes.LIT_BOARD)
+                {
+                    const matrixCellSize = 5;
+
+                    saveMatrixWithEdgesToImage(currentSolutionMatrix, matrixCellSize);
                 }
 
                 break;
@@ -3638,6 +3671,182 @@ function main()
         }
 
         let matrixImageData = new ImageData(matrixImageArray, currentGameSize * currentGameSize)
+
+        const canvasContext = canvasMatrix.getContext('2d');
+        canvasContext.putImageData(matrixImageData, 0, 0);
+
+        let link      = document.createElement("a");
+        link.href     = canvasMatrix.toDataURL("image/png");
+        link.download = "LightsOutMatrix.png";
+
+        link.click();
+        link.remove();
+
+        canvasMatrix.remove();
+    }
+
+    function saveMatrixWithEdgesToImage(matrix, matrixCellSize)
+    {
+        const canvasMatrix  = document.createElement("canvas");
+        canvasMatrix.width  = currentGameSize * (currentGameSize * matrixCellSize + currentGameSize + 1) + currentGameSize + 1;
+        canvasMatrix.height = currentGameSize * (currentGameSize * matrixCellSize + currentGameSize + 1) + currentGameSize + 1;
+
+        let palette = [];
+        for(let i = 0; i < currentDomainSize; i++)
+        {
+            const lerpCoeff = i / (currentDomainSize - 1);
+
+            const r = Math.floor(255.0 * (currentColorUnlit[0] * (1 - lerpCoeff) + currentColorLit[0] * lerpCoeff));
+            const g = Math.floor(255.0 * (currentColorUnlit[1] * (1 - lerpCoeff) + currentColorLit[1] * lerpCoeff));
+            const b = Math.floor(255.0 * (currentColorUnlit[2] * (1 - lerpCoeff) + currentColorLit[2] * lerpCoeff));
+            const a = Math.floor(255.0 * (currentColorUnlit[3] * (1 - lerpCoeff) + currentColorLit[3] * lerpCoeff));
+
+            palette.push([r, g, b, a]);
+        }
+
+        let colorBetweenBigCells   = [Math.floor(255.0 * currentColorUnlit[0]),   Math.floor(255.0 * currentColorUnlit[1]),   Math.floor(255.0 * currentColorUnlit[2]),   Math.floor(255.0 * currentColorUnlit[3])];
+        let colorBetweenSmallCells = [Math.floor(255.0 * currentColorBetween[0]), Math.floor(255.0 * currentColorBetween[1]), Math.floor(255.0 * currentColorBetween[2]), Math.floor(255.0 * currentColorBetween[3])];
+
+        let matrixImageArray = new Uint8ClampedArray(canvasMatrix.width * canvasMatrix.height * 4);
+
+        let imageIndex = 0;
+
+        //Edge above the big cell
+        for(let xImage = 0; xImage < (currentGameSize * (currentGameSize * matrixCellSize + currentGameSize + 1) + currentGameSize + 1); xImage++)
+        {
+            matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+            matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+            matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+            matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+            imageIndex += 4;
+        }
+
+        for(let yBig = 0; yBig < currentGameSize; yBig++)
+        {
+            //Edge above the cell
+
+            //Leftmost edge of the image
+            matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+            matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+            matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+            matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+            imageIndex += 4;
+
+            for(let xBig = 0; xBig < currentGameSize; xBig++)
+            {
+                for(let xBigCell = 0; xBigCell < (currentGameSize * matrixCellSize + currentGameSize + 1); xBigCell++)
+                {
+                    matrixImageArray[imageIndex + 0] = colorBetweenSmallCells[0];
+                    matrixImageArray[imageIndex + 1] = colorBetweenSmallCells[1];
+                    matrixImageArray[imageIndex + 2] = colorBetweenSmallCells[2];
+                    matrixImageArray[imageIndex + 3] = colorBetweenSmallCells[3];
+                    imageIndex += 4;
+                }
+
+                //Edge after the big cell
+                matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                imageIndex += 4;
+            }
+
+            for(let ySm = 0; ySm < currentGameSize; ySm++)
+            {
+                //The cell
+                for(let yCell = 0; yCell < matrixCellSize; yCell++)
+                {
+                    //Leftmost edge of the image
+                    matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                    matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                    matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                    matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                    imageIndex += 4;
+
+                    for(let xBig = 0; xBig < currentGameSize; xBig++)
+                    {
+                        const matrixRowIndex = yBig * currentGameSize + xBig;
+
+                        //Leftmost edge on the big cell
+                        matrixImageArray[imageIndex + 0] = colorBetweenSmallCells[0];
+                        matrixImageArray[imageIndex + 1] = colorBetweenSmallCells[1];
+                        matrixImageArray[imageIndex + 2] = colorBetweenSmallCells[2];
+                        matrixImageArray[imageIndex + 3] = colorBetweenSmallCells[3];
+                        imageIndex += 4;
+
+                        for(let xSm = 0; xSm < currentGameSize; xSm++)
+                        {
+                            const matrixColumnIndex = ySm * currentGameSize + xSm;
+                            const matrixVal         = matrix[matrixRowIndex][matrixColumnIndex];
+                            
+                            for(let xCell = 0; xCell < matrixCellSize; xCell++)
+                            {
+                                //The cell
+                                matrixImageArray[imageIndex + 0] = palette[matrixVal][0];
+                                matrixImageArray[imageIndex + 1] = palette[matrixVal][1];
+                                matrixImageArray[imageIndex + 2] = palette[matrixVal][2];
+                                matrixImageArray[imageIndex + 3] = palette[matrixVal][3];
+                                imageIndex += 4;
+                            }
+
+                            //Edge after the cell
+                            matrixImageArray[imageIndex + 0] = colorBetweenSmallCells[0];
+                            matrixImageArray[imageIndex + 1] = colorBetweenSmallCells[1];
+                            matrixImageArray[imageIndex + 2] = colorBetweenSmallCells[2];
+                            matrixImageArray[imageIndex + 3] = colorBetweenSmallCells[3];
+                            imageIndex += 4;
+                        }
+
+                        //Edge after the big cell
+                        matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                        matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                        matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                        matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                        imageIndex += 4;
+                    }
+                }
+
+                //Edge below the cell
+
+                //Leftmost edge of the image
+                matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                imageIndex += 4;
+
+                for(let xBig = 0; xBig < currentGameSize; xBig++)
+                {
+                    for(let xBigCell = 0; xBigCell < (currentGameSize * matrixCellSize + currentGameSize + 1); xBigCell++)
+                    {
+                        matrixImageArray[imageIndex + 0] = colorBetweenSmallCells[0];
+                        matrixImageArray[imageIndex + 1] = colorBetweenSmallCells[1];
+                        matrixImageArray[imageIndex + 2] = colorBetweenSmallCells[2];
+                        matrixImageArray[imageIndex + 3] = colorBetweenSmallCells[3];
+                        imageIndex += 4;
+                    }
+
+                    //Edge after the big cell
+                    matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                    matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                    matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                    matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                    imageIndex += 4;
+                }
+            }
+
+            //Edge below the big cell
+            for(let xImage = 0; xImage < (currentGameSize * (currentGameSize * matrixCellSize + currentGameSize + 1) + currentGameSize + 1); xImage++)
+            {
+                matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                imageIndex += 4;
+            }
+        }
+
+        let matrixImageData = new ImageData(matrixImageArray, canvasMatrix.width);
 
         const canvasContext = canvasMatrix.getContext('2d');
         canvasContext.putImageData(matrixImageData, 0, 0);
