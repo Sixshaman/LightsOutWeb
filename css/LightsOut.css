@@ -343,6 +343,11 @@ select
     transition: max-height 0.3s ease-out;
 }
 
+input[type="file"]
+{
+    display: none;
+}
+
 @media all and (max-width: 800px) 
 {
     div.rules 

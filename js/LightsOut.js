@@ -317,6 +317,13 @@ function makeTurn(board, clickRule, clickRuleSize, gameSize, domainSize, cellX, 
     }
 }
 
+//Makes a turn at (cellX, cellY) using explicit matrix
+function makeTurnMatrix(board, matrix, gameSize, domainSize, cellX, cellY)
+{
+    let cellIndex = flatCellIndex(gameSize, cellX, cellY);
+    return addBoard(board, matrix[cellIndex], domainSize);
+}
+
 //Flips the state of the (cellX, cellY) cell 
 function makeConstructTurn(board, gameSize, domainSize, cellX, cellY)
 {
@@ -454,6 +461,19 @@ function makeTurnsDefault(board, gameSize, domainSize, turnListBoard, isToroid)
     }
 
     return newBoard;
+}
+
+function makeTurnsMatrix(board, matrix, gameSize, turnlistBoard, domainSize)
+{
+    let boardToAdd   = board.slice();
+    const matrixSize = gameSize * gameSize;
+
+    for(let i = 0; i < matrixSize; i++)
+    {
+        boardToAdd[i] = dotProductBoard(turnlistBoard, matrix[i], domainSize);
+    }
+
+    return addBoard(board, boardToAdd, domainSize);
 }
 
 //Translates the click rule from click rule space to the board space (regular version)
@@ -1011,6 +1031,7 @@ function main()
     const saveRegularMatrixEdgesButton         = document.getElementById("SaveLOMatrix");
     const saveInverseMatrixButton              = document.getElementById("SaveInverseMatrixNoEdges");
     const saveInverseMatrixEdgesButton         = document.getElementById("SaveInverseMatrix");
+    const matrixFileUploadInput                = document.getElementById("MatrixFileInput");
 
     const menuAccordion = document.getElementsByClassName("accordion"); 
     const menuPanels    = document.getElementsByClassName("panel"); 
@@ -1657,8 +1678,6 @@ function main()
                 panel.style.maxHeight = panel.scrollHeight + "px";
             } 
         });
-
-        //TODO: Swipe exactly here
     }
 
     renderModeSelect.onchange = function()
@@ -1973,27 +1992,35 @@ function main()
 
     saveRegularMatrixButton.onclick = function()
     {
-        if(currentWorkingMode == workingModes.LIT_BOARD)
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
         {
             let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
             saveMatrixToImage(lightsOutMatrix);
+        }
+        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            saveMatrixToImage(currentGameMatrix);
         }
     }
 
     saveRegularMatrixEdgesButton.onclick = function()
     {
-        if(currentWorkingMode == workingModes.LIT_BOARD)
-        {
-            let matrixCellSize = 5;
+        let matrixCellSize = 5;
 
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+        {
             let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
             saveMatrixWithEdgesToImage(lightsOutMatrix, matrixCellSize);
-        }       
+        }   
+        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            saveMatrixWithEdgesToImage(currentGameMatrix, matrixCellSize);
+        }    
     }
 
     saveInverseMatrixButton.onclick = function()
     {
-        if(currentWorkingMode == workingModes.LIT_BOARD)
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
             updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX);
         }
@@ -2001,9 +2028,17 @@ function main()
 
     saveInverseMatrixEdgesButton.onclick = function()
     {
-        if(currentWorkingMode == workingModes.LIT_BOARD)
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
             updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_EDGES);
+        }
+    }
+
+    matrixFileUploadInput.onchange = function()
+    {
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            loadMatrix(matrixFileUploadInput.files[0]);
         }
     }
 
@@ -2039,9 +2074,10 @@ function main()
 
     let workingModes =
     {
-        LIT_BOARD:                  1,
-        CONSTRUCT_CLICKRULE:        2,
-        CONSTRUCT_CLICKRULE_TOROID: 3
+        LIT_BOARD_CLICKRULE:        1,
+        LIT_BOARD_MATRIX:           2,
+        CONSTRUCT_CLICKRULE:        3,
+        CONSTRUCT_CLICKRULE_TOROID: 4,
     };
 
     let countingModes =
@@ -2104,6 +2140,7 @@ function main()
     let flagNeedToSaveBoard         = false;
 
     let currentGameClickRule    = null;
+    let currentGameMatrix       = null;
     let currentGameBoard        = null;
     let currentGameSolution     = null;
     let currentGameStability    = null;
@@ -2123,7 +2160,7 @@ function main()
     let currentColorSolved  = [0.0, 0.0, 1.0, 1.0];
     let currentColorBetween = [0.0, 0.0, 0.0, 1.0];
 
-    let currentWorkingMode  = workingModes.LIT_BOARD;
+    let currentWorkingMode  = workingModes.LIT_BOARD_CLICKRULE;
 
     let currentSolutionMatrix = [];
 
@@ -2192,11 +2229,12 @@ function main()
 
     function incrementGameSize()
     {
-        if(currentWorkingMode === workingModes.LIT_BOARD)
+        //Can't change sizes with custom matrix, so no branch for LIT_BOARD_MATRIX
+        if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
         {
             changeGameSize(currentGameSize + 1);
         }
-        else
+        else if(currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
         {
             changeGameSize(currentGameSize + 2);
         }
@@ -2204,11 +2242,12 @@ function main()
 
     function decrementGameSize()
     {
-        if(currentWorkingMode === workingModes.LIT_BOARD)
+        //Can't change sizes with custom matrix, so no branch for LIT_BOARD_MATRIX
+        if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
         {
             changeGameSize(currentGameSize - 1);
         }
-        else
+        else if(currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
         {
             changeGameSize(currentGameSize - 2);
         }
@@ -2221,7 +2260,7 @@ function main()
         showSolution(false);
         showInverseSolution(false);
 
-        if(currentWorkingMode == workingModes.LIT_BOARD)
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
             recreateSolutionMatrixWorker();
             currentSolutionMatrixCalculated = false;
@@ -2235,7 +2274,7 @@ function main()
 
         qpText.textContent = "Quiet patterns: ";
 
-        if(currentWorkingMode === workingModes.LIT_BOARD)
+        if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
             resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
@@ -2272,7 +2311,7 @@ function main()
 
     function changeDomainSize(newSize)
     {
-        if(currentWorkingMode != workingModes.LIT_BOARD)
+        if(currentWorkingMode != workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
         {
             return;
         }
@@ -2309,20 +2348,24 @@ function main()
         let modX = boardPoint.xBoard;
         let modY = boardPoint.yBoard;
 
-        if(currentWorkingMode === workingModes.LIT_BOARD)
+        if(isConstruct)
         {
-            if(isConstruct)
-            {
-                makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
-            }
-            else
+            makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
+        }
+        else
+        {
+            if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
             {
                 currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, modX, modY, flagToroidBoard);
             }
-        }
-        else if(currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE_TOROID)
-        {
-            makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameBoard = makeTurnMatrix(currentGameBoard, currentGameMatrix, currentGameSize, currentDomainSize, modX, modY);
+            }
+            else if(currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE_TOROID)
+            {
+                makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
+            }
         }
 
         resetStability();
@@ -2334,7 +2377,15 @@ function main()
         }
         else if(flagShowInverseSolution)
         {
-            currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
+
             updateSolutionTexture();
         }
 
@@ -2354,6 +2405,11 @@ function main()
 
     function enableDefaultClickRule()
     {   
+        if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            currentWorkingMode = workingModes.LIT_BOARD_CLICKRULE;
+        }
+
         recreateSolutionMatrixWorker();
         currentSolutionMatrixCalculated = false;
 
@@ -2373,6 +2429,11 @@ function main()
 
     function enableDefaultToroidClickRule()
     {   
+        if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            currentWorkingMode = workingModes.LIT_BOARD_CLICKRULE;
+        }
+
         recreateSolutionMatrixWorker();
         currentSolutionMatrixCalculated = false;
 
@@ -2392,6 +2453,11 @@ function main()
 
     function enableCustomClickRule(clickRule, clickRuleSize, isToroid)
     {
+        if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            currentWorkingMode = workingModes.LIT_BOARD_CLICKRULE;
+        }
+
         recreateSolutionMatrixWorker();
         currentSolutionMatrixCalculated = false;
 
@@ -2403,6 +2469,24 @@ function main()
 
         currentEncodedClickRule = encodeBase64ClickRule(clickRule, isToroid);
         updateAddressBar(50);
+    }
+
+    function enableCustomMatrix(lightsOutMatrix, gameSize)
+    {
+        changeWorkingMode(workingModes.LIT_BOARD_MATRIX);
+
+        currentGameClickRule = null;
+        currentClickRuleSize = 0;
+
+        recreateSolutionMatrixWorker();
+        currentSolutionMatrixCalculated = false;
+
+        flagDefaultClickRule = false;
+        flagToroidBoard      = false;
+
+        currentGameMatrix = lightsOutMatrix;
+
+        changeGameSize(gameSize);
     }
 
     function resetStability()
@@ -2510,7 +2594,7 @@ function main()
             }
             case afterCalculationOperations.CALC_SOLVE_RANDOM:
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD)
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
                     updateSolutionTexture();
@@ -2527,7 +2611,7 @@ function main()
             }
             case afterCalculationOperations.CALC_SOLVE_SEQUENTIAL:
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD)
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
                     updateSolutionTexture();
@@ -2544,7 +2628,7 @@ function main()
             }
             case afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX:
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD)
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
                 {
                     saveMatrixToImage(currentSolutionMatrix);
                 }
@@ -2553,7 +2637,7 @@ function main()
             }
             case afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_EDGES:
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD)
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
                 {
                     const matrixCellSize = 5;
 
@@ -2623,13 +2707,21 @@ function main()
             }
             else if(flagShowInverseSolution)
             {
-                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+                {
+                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                }
+                else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                {
+                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+                }
+
                 updateSolutionTexture();
             }
         }
         else if(resetMode === resetModes.RESET_SOLUTION)
         {
-            if(currentWorkingMode !== workingModes.LIT_BOARD)
+            if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
             {
                 return;
             }
@@ -2704,13 +2796,21 @@ function main()
             }
             else if(flagShowInverseSolution)
             {
-                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+                {
+                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                }
+                else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                {
+                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+                }
+
                 updateSolutionTexture();
             }
         }
         else if(resetMode === resetModes.RESET_SOLVABLE_RANDOM)
         {
-            if(currentWorkingMode !== workingModes.LIT_BOARD)
+            if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
             {
                 return;
             }
@@ -2721,7 +2821,15 @@ function main()
             showInverseSolution(false);
 
             currentGameBoard = generateNewBoard(currentGameSize, currentDomainSize, boardGenModes.BOARDGEN_FULL_RANDOM);
-            currentGameBoard = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+ 
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameBoard = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameBoard = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
 
             resetStability();
             updateStabilityTexture();
@@ -2896,7 +3004,7 @@ function main()
 
     function changeCountingMode(newCountingMode, stopWhenReturned)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD)
+        if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
         {
             return;
         }
@@ -2969,7 +3077,15 @@ function main()
         {
             currentPeriodCount = 0;
             currentCountedBoard = currentGameBoard.slice();
-            currentGameBoard    = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameBoard = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameBoard = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
 
             currentGameBoard = domainInverseBoard(currentGameBoard, currentDomainSize);
 
@@ -3011,19 +3127,19 @@ function main()
             currentGameBoard = currentGameClickRule;
             updateBoardTexture();
 
-           infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
+            infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
 
-           acceptClickRuleHints.hidden     = false;
-           increaseDomainHints.hidden      = true;
-           changeClickRuleHints.hidden     = true;
-           solutionPeriodHints.hidden      = true;
-           solutionInterchangeHints.hidden = true;
-           boardSolveHints.hidden          = true;
-           metaBoardHints.hidden           = true;
-           miscellaneousHints.hidden       = true;
-           saveMatrixHints.hidden          = true;
+            acceptClickRuleHints.hidden     = false;
+            increaseDomainHints.hidden      = true;
+            changeClickRuleHints.hidden     = true;
+            solutionPeriodHints.hidden      = true;
+            solutionInterchangeHints.hidden = true;
+            boardSolveHints.hidden          = true;
+            metaBoardHints.hidden           = true;
+            miscellaneousHints.hidden       = true;
+            saveMatrixHints.hidden          = true;
         }
-        else
+        else if(workingMode == workingModes.LIT_BOARD_MATRIX || workingMode == workingModes.LIT_BOARD_CLICKRULE)
         {
             acceptClickRuleHints.hidden     = true;
             increaseDomainHints.hidden      = false;
@@ -3057,7 +3173,7 @@ function main()
             updateBoardTexture();
 
             requestRedraw();
-            changeWorkingMode(workingModes.LIT_BOARD);
+            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
 
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         }
@@ -3073,7 +3189,7 @@ function main()
             updateBoardTexture();
 
             requestRedraw();
-            changeWorkingMode(workingModes.LIT_BOARD);
+            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
 
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         }
@@ -3100,7 +3216,7 @@ function main()
 
     function showSolution(showFlag)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD)
+        if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
         {
             flagShowSolution        = false;
             flagShowInverseSolution = false;
@@ -3128,7 +3244,7 @@ function main()
 
     function showInverseSolution(showFlag)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD)
+        if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
         {
             flagShowSolution        = false;
             flagShowInverseSolution = false;
@@ -3143,7 +3259,15 @@ function main()
         {
             flagShowInverseSolution = true;
 
-            currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
+            
             updateSolutionTexture();
         }
         else
@@ -3156,7 +3280,7 @@ function main()
 
     function showStability(showFlag)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD || currentDomainSize > 2)
+        if((currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX) || currentDomainSize > 2)
         {
             flagShowStability    = false;
             flagShowLitStability = false;
@@ -3184,7 +3308,7 @@ function main()
 
     function showLitStability(showFlag)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD || currentDomainSize > 2)
+        if((currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX) || currentDomainSize > 2)
         {
             flagShowStability    = false;
             flagShowLitStability = false;
@@ -3452,8 +3576,15 @@ function main()
         {
             currentPeriodCount++;
 
-            currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
-            
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
+
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
 
@@ -3572,7 +3703,15 @@ function main()
 
             let citybuilderBoard = addBoard(currentGameBoard, currentCountedBoard, currentDomainSize);
 
-            currentGameSolution = calculateInverseSolution(citybuilderBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameSolution = calculateInverseSolution(citybuilderBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
+            
             if(flagStopCountingWhenFound && equalsMultipliedBoard(currentGameSolution, citybuilderBoard, currentDomainSize)) //Solution is the current board multiplied by a number => we found an eigenvector
             {
                 flagStopCountingWhenFound = false;
@@ -3861,6 +4000,188 @@ function main()
         canvasMatrix.remove();
     }
 
+    function loadMatrix(imageFile)
+    {
+        let fileReader = new FileReader();
+        fileReader.onload = function()
+        {
+            let image    = new Image();
+            image.onload = function()
+            {
+                const canvasMatrix  = document.createElement("canvas");
+                const canvasContext = canvasMatrix.getContext('2d'); 
+
+                canvasMatrix.width  = image.width;
+                canvasMatrix.height = image.height;
+
+                canvasContext.drawImage(image, 0, 0);
+                let matrixData = canvasContext.getImageData(0, 0, image.width, image.height).data;
+
+                let matrixSize = Math.min(image.width, image.height);
+
+                let newGameSize = Math.floor(Math.sqrt(matrixSize));
+                matrixSize      = newGameSize * newGameSize;
+
+                //Calculate matrix values based on CIEDE2000 color difference in Lab color space
+                function labF(t) 
+                {
+                    let delta = 6.0 / 29.0;
+                    if(t > delta * delta * delta)
+                    {
+                        return Math.pow(t, 1 / 3.0);
+                    }
+                    else
+                    {
+                        return t / (3 * delta * delta) + 4.0 / 29.0;
+                    }
+                }
+
+                function rgbToLab(R, G, B)
+                {
+                    let X = (0.49000 * R + 0.31000 * G + 0.20000 * B) / 0.17697;
+                    let Y = (0.19697 * R + 0.81240 * G + 0.01063 * B) / 0.17697;
+                    let Z = (0.00000 * R + 0.01000 * G + 0.99000 * B) / 0.17697;
+
+                    let L = 116 * labF(Y / 100.0)    - 16;
+                    let a = 500 * (labF(X / 95.0489) - labF(Y / 100.0));
+                    let b = 200 * (labF(Y / 100.0)   - labF(Z / 108.8840));
+
+                    return [L, a, b];
+                }
+
+                //CIEDE2000
+                function ciede2000(L1, a1, b1, L2, a2, b2)
+                {
+                    let C1 = Math.sqrt(a1 * a1 + b1 * b1);
+                    let C2 = Math.sqrt(a2 * a2 + b2 * b2);
+
+                    let L_ = (L1 + L2) / 2;
+                    let C_ = (C1 + C2) / 2;
+
+                    let C7        = C_ * C_ * C_ * C_ * C_ * C_ * C_;
+                    let twenty57_ = 25 * 25 * 25 * 25 * 25 * 25 * 25;
+
+                    let a1q = a1 + (a1 / 2) * (1 - Math.sqrt(C7 / (C7 + twenty57_)));
+                    let a2q = a2 + (a2 / 2) * (1 - Math.sqrt(C7 / (C7 + twenty57_)));
+
+                    let C1q = Math.sqrt(a1q * a1q + b1 * b1);
+                    let C2q = Math.sqrt(a2q * a2q + b2 * b2);
+
+                    let h1 = (Math.atan2(b1, a1q) + Math.PI) * 180.0 / Math.PI;
+                    let h2 = (Math.atan2(b2, a2q) + Math.PI) * 180.0 / Math.PI;
+
+                    let deltahq = 0.0;
+                    if(Math.abs(C1q) < 0.0000001 || Math.abs(C2q) < 0.0000001)
+                    {
+                        deltahq = 0.0;
+                    }
+                    else if(Math.abs(h1 - h2) <= 180)
+                    {
+                        deltahq = h1 - h2;
+                    }
+                    else if(Math.abs(h1 - h2) > 180 && h2 <= h1)
+                    {
+                        deltahq = h2 - h1 + 360;
+                    }
+                    else if(Math.abs(h1 - h2) > 180 && h2 > h1)
+                    {
+                        deltahq = h2 - h1 - 360;
+                    }
+
+                    let H_ = 0.0;
+                    if(Math.abs(C1q) < 0.0000001 || Math.abs(C2q) < 0.0000001)
+                    {
+                        H_ = h1 + h2;
+                    }
+                    else if(Math.abs(h1 - h2) <= 180)
+                    {
+                        H_ = (h1 + h2) / 2;
+                    }
+                    else if(Math.abs(h1 - h2) > 180 && (h1 + h2 < 360))
+                    {
+                        H_ = (h1 + h2 + 360) / 2;
+                    }
+                    else if(Math.abs(h1 - h2) > 180 && (h1 + h2 >= 360))
+                    {
+                        H_ = (h1 + h2 - 360) / 2;
+                    }
+
+                    let deltaL = L2  - L1;
+                    let deltaC = C2q - C1q;
+                    let deltaH = 2 * Math.sqrt(C1q * C2q) * Math.sin(deltahq * Math.PI / 360.0);
+                    
+                    let T = 1 - 0.17 * Math.cos((H_ - 30) * Math.PI / 180) + 0.24 * Math.cos((2 * H_) * Math.PI / 180) + 0.32 * Math.cos((3 * H_ + 6) * Math.PI / 180) - 0.20 * Math.cos((4 * H_ - 63) * Math.PI / 180);
+
+                    let SL = 1 + 0.015 * (L_ - 50) * (L_ - 50) / Math.sqrt(20 + (L_ - 50) * (L_ - 50));
+                    let SC = 1 + 0.045 * C_;
+                    let SH = 1 + 0.015 * C_ * T;
+
+                    let RT = -2 * Math.sqrt(C7 / (C7 + twenty57_)) * Math.sin(60 * Math.exp(-(H_ - 275) * (H_ - 275) / 625) * Math.PI / 180);
+
+                    let deltaLTerm = (deltaL / SL) * (deltaL / SL);
+                    let deltaCTerm = (deltaC / SC) * (deltaC / SC);
+                    let deltaHTerm = (deltaH / SH) * (deltaH / SH);
+                    let RTTerm     = RT * (deltaC / SC) * (deltaH / SH);
+
+                    return Math.sqrt(deltaLTerm + deltaCTerm + deltaHTerm + RTTerm);
+                }
+
+                let colorUnlitLab = rgbToLab(currentColorUnlit[0], currentColorUnlit[1], currentColorUnlit[2]);
+                let colorLitLab   = rgbToLab(currentColorLit[0],   currentColorLit[1],   currentColorLit[2]);
+
+                let distUnlitLit = ciede2000(colorUnlitLab[0], colorUnlitLab[1], colorUnlitLab[2], colorLitLab[0], colorLitLab[1], colorLitLab[2]);
+
+                let newMatrix = [];
+                for(let yMatrix = 0; yMatrix < matrixSize; yMatrix++)
+                {
+                    let matrixRow = new Uint8Array(matrixSize);
+                    newMatrix.push(matrixRow);
+                }
+
+                for(let yBig = 0; yBig < newGameSize; yBig++)
+                {
+                    for(let ySm = 0; ySm < newGameSize; ySm++)
+                    {
+                        let matrixRow = yBig * newGameSize + ySm;
+
+                        for(let xBig = 0; xBig < newGameSize; xBig++)
+                        {
+                            let imageRow = yBig * newGameSize + xBig;
+
+                            for(let xSm = 0; xSm < newGameSize; xSm++)
+                            {
+                                let matrixColumn = xBig * newGameSize + xSm; 
+                                let imageColumn  = ySm  * newGameSize + xSm;
+
+                                let pixelPos = 4 * (imageRow * image.width + imageColumn);
+
+                                let r = matrixData[pixelPos + 0] / 255.0;
+                                let g = matrixData[pixelPos + 1] / 255.0;
+                                let b = matrixData[pixelPos + 2] / 255.0;
+
+                                let pixelColorLab  = rgbToLab(r, g, b);
+                                let distPixelUnlit = ciede2000(pixelColorLab[0], pixelColorLab[1], pixelColorLab[2], colorUnlitLab[0], colorUnlitLab[1], colorUnlitLab[2]); 
+
+                                let matrixValNormalized = clamp(distPixelUnlit / distUnlitLit, 0.0, 1.0);
+                                let matrixVal           = Math.floor(matrixValNormalized * (currentDomainSize - 1));
+
+                                newMatrix[matrixRow][matrixColumn] = matrixVal;
+                            }
+                        }
+                    }
+                }
+
+                enableCustomMatrix(newMatrix, newGameSize);
+
+                canvasMatrix.remove();
+            }
+
+            image.src = fileReader.result;
+        }
+
+        fileReader.readAsDataURL(imageFile);
+    }
+
     function initPuzzleContents()
     {
         let gameSize         = 15;
@@ -3953,7 +4274,7 @@ function main()
         updateAddressBarTimeout = setTimeout(function()
         {
             let gameSize = 0;
-            if(currentWorkingMode == workingModes.LIT_BOARD)
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
             {
                 gameSize = currentGameSize;
             }
