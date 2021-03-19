@@ -4163,7 +4163,7 @@ function main()
                                 let distPixelUnlit = ciede2000(pixelColorLab[0], pixelColorLab[1], pixelColorLab[2], colorUnlitLab[0], colorUnlitLab[1], colorUnlitLab[2]); 
 
                                 let matrixValNormalized = clamp(distPixelUnlit / distUnlitLit, 0.0, 1.0);
-                                let matrixVal           = Math.floor(matrixValNormalized * (currentDomainSize - 1));
+                                let matrixVal           = Math.floor(matrixValNormalized * (currentDomainSize - 1) + 0.5);
 
                                 newMatrix[matrixRow][matrixColumn] = matrixVal;
                             }
