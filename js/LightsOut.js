@@ -857,6 +857,24 @@ function invalidateBoardDomainInPlace(board, domainSize)
     }
 }
 
+//Invalidates all elements of the board modulo domainSize, in-place
+function invalidateMatrixDomainInPlace(matrix, domainSize)
+{
+    if(domainSize === 0)
+    {
+        return;
+    }
+
+    for(let i = 0; i < matrix.length; i++)
+    {
+        let matrixRow = matrix[i];
+        for(let j = 0; j < matrixRow.length; j++)
+        {
+            matrixRow[j] = Math.min(matrixRow[j], domainSize - 1);
+        }
+    }
+}
+
 //Returns a dot product of boardLeft and boardRight
 function dotProductBoard(boardLeft, boardRight, domainSize)
 {
@@ -976,6 +994,7 @@ function main()
 
     const rulesSidebar = document.getElementById("RulesSidebar");
 
+    const increaseSizeHints        = document.getElementById("IncreaseSizeHints");
     const increaseDomainHints      = document.getElementById("IncreaseDomainHints");
     const changeClickRuleHints     = document.getElementById("ClickRuleHints");
     const acceptClickRuleHints     = document.getElementById("ClickRuleAcceptanceHints");
@@ -2147,6 +2166,8 @@ function main()
     let currentGameLitStability = null;
     let currentCountedBoard     = null;
     let currentSavedBoard       = null;
+    let currentSavedMatrix      = null;
+    let currentSavedWorkingMode = null;
 
     let currentClickRuleSize = 3;
     let currentGameSize      = 15;
@@ -2332,8 +2353,17 @@ function main()
 
         updateAddressBar(500); //Update the address bar with 1000ms delay
 
+        //Click rule/matrix invalidation
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+        {
+            invalidateBoardDomainInPlace(currentGameClickRule, currentDomainSize);
+        }
+        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            invalidateMatrixDomainInPlace(currentGameMatrix, currentDomainSize);
+        }
+
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
-        invalidateBoardDomainInPlace(currentGameClickRule, currentDomainSize); //Click rule invalidation
 
         infoText.textContent = "Lights Out  " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         updateBoardTexture();
@@ -2407,7 +2437,7 @@ function main()
     {   
         if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
-            currentWorkingMode = workingModes.LIT_BOARD_CLICKRULE;
+            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
         }
 
         recreateSolutionMatrixWorker();
@@ -2431,7 +2461,7 @@ function main()
     {   
         if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
-            currentWorkingMode = workingModes.LIT_BOARD_CLICKRULE;
+            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
         }
 
         recreateSolutionMatrixWorker();
@@ -2455,7 +2485,7 @@ function main()
     {
         if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
-            currentWorkingMode = workingModes.LIT_BOARD_CLICKRULE;
+            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
         }
 
         recreateSolutionMatrixWorker();
@@ -2503,7 +2533,14 @@ function main()
             currentSolutionMatrixCalculating = true;
             solutionMatrixBlock.hidden       = false;
 
-            solutionMatrixWorker.postMessage({command: "CalcSolutionMatrix", params: {clickRule: currentGameClickRule, gameSize: currentGameSize, domainSize: currentDomainSize, clickRuleSize: currentClickRuleSize, isToroid: flagToroidBoard, opAfter: operationAfter}});
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                solutionMatrixWorker.postMessage({command: "CalcSolutionMatrixFromClickRule", params: {clickRule: currentGameClickRule, gameSize: currentGameSize, domainSize: currentDomainSize, clickRuleSize: currentClickRuleSize, isToroid: flagToroidBoard, opAfter: operationAfter}});
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                solutionMatrixWorker.postMessage({command: "CalcSolutionMatrixFromMatrix", params: {matrix: currentGameMatrix, gameSize: currentGameSize, domainSize: currentDomainSize, opAfter: operationAfter}});
+            }
         }
         else if(currentSolutionMatrixCalculated) //Matrix already calculated, do the operation specified
         {
@@ -3116,12 +3153,28 @@ function main()
         flagStopCountingWhenFound   = false;
         flagTickLoop                = false;
 
-        currentWorkingMode = workingMode;
+        currentSavedWorkingMode = currentWorkingMode;
+        currentWorkingMode      = workingMode;
         
         if(workingMode == workingModes.CONSTRUCT_CLICKRULE || workingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
         {
+            if(currentSavedWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentSavedMatrix = null;
+            }
+            else if(currentSavedWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentSavedMatrix = currentGameMatrix;
+                currentGameMatrix  = null;
+            }
+
+            if(currentGameClickRule === null || currentClickRuleSize === 0)
+            {
+                enableDefaultClickRule();
+            }
+
             currentSavedBoard    = currentGameBoard.slice();
-            currentSavedGameSize = currentGameSize; 
+            currentSavedGameSize = currentGameSize;
 
             changeGameSize(currentClickRuleSize);
             currentGameBoard = currentGameClickRule;
@@ -3130,6 +3183,7 @@ function main()
             infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
 
             acceptClickRuleHints.hidden     = false;
+            increaseSizeHints.hidden        = false;
             increaseDomainHints.hidden      = true;
             changeClickRuleHints.hidden     = true;
             solutionPeriodHints.hidden      = true;
@@ -3139,9 +3193,26 @@ function main()
             miscellaneousHints.hidden       = true;
             saveMatrixHints.hidden          = true;
         }
-        else if(workingMode == workingModes.LIT_BOARD_MATRIX || workingMode == workingModes.LIT_BOARD_CLICKRULE)
+        else if(workingMode == workingModes.LIT_BOARD_MATRIX)
         {
             acceptClickRuleHints.hidden     = true;
+            increaseSizeHints.hidden        = true;
+            increaseDomainHints.hidden      = false;
+            changeClickRuleHints.hidden     = false;
+            solutionPeriodHints.hidden      = false;
+            solutionInterchangeHints.hidden = false;
+            boardSolveHints.hidden          = false;
+            metaBoardHints.hidden           = false;
+            miscellaneousHints.hidden       = false;
+            saveMatrixHints.hidden          = false;
+        }
+        else if(workingMode == workingModes.LIT_BOARD_CLICKRULE)
+        {
+            currentSavedMatrix = null;
+            currentGameMatrix  = null;
+
+            acceptClickRuleHints.hidden     = true;
+            increaseSizeHints.hidden        = false;
             increaseDomainHints.hidden      = false;
             changeClickRuleHints.hidden     = false;
             solutionPeriodHints.hidden      = false;
@@ -3189,7 +3260,14 @@ function main()
             updateBoardTexture();
 
             requestRedraw();
-            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
+            if(currentSavedWorkingMode === workingModes.LIT_BOARD_MATRIX)
+            {
+                enableCustomMatrix(currentSavedMatrix, currentSavedGameSize);
+            }
+            else
+            {
+                changeWorkingMode(currentSavedWorkingMode);
+            }
 
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         }
@@ -3557,7 +3635,15 @@ function main()
                 turn = currentTurnList.pop();
             }
 
-            currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, turn.cellX, turn.cellY, flagToroidBoard);
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, turn.cellX, turn.cellY, flagToroidBoard);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameBoard = makeTurnMatrix(currentGameBoard, currentGameMatrix, currentGameSize, currentDomainSize, turn.cellX, turn.cellY);   
+            }
+
             updateBoardTexture();
 
             resetStability();
