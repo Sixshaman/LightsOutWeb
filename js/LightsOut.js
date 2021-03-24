@@ -1048,8 +1048,10 @@ function main()
     const chessboardBoardButton                = document.getElementById("ChessboardBoardButton");
     const saveRegularMatrixButton              = document.getElementById("SaveLOMatrixNoEdges");
     const saveRegularMatrixEdgesButton         = document.getElementById("SaveLOMatrix");
+    const saveRegularMatrixRenderModeButton    = document.getElementById("SaveLOMatrixRenderMode");
     const saveInverseMatrixButton              = document.getElementById("SaveInverseMatrixNoEdges");
     const saveInverseMatrixEdgesButton         = document.getElementById("SaveInverseMatrix");
+    const saveInverseMatrixRenderModeButton    = document.getElementById("SaveInverseMatrixRenderMode");
     const matrixFileUploadInput                = document.getElementById("MatrixFileInput");
 
     const menuAccordion = document.getElementsByClassName("accordion"); 
@@ -2037,6 +2039,21 @@ function main()
         }    
     }
 
+    saveRegularMatrixRenderModeButton.onclick = function()
+    {
+        let matrixCellSize = 5;
+
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+        {
+            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
+            saveMatrixWithRenderModeToImage(lightsOutMatrix, matrixCellSize, currentShaderProgram, !flagNoGrid);
+        }   
+        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            saveMatrixWithRenderModeToImage(currentGameMatrix, matrixCellSize, currentShaderProgram, !flagNoGrid);
+        }    
+    }
+
     saveInverseMatrixButton.onclick = function()
     {
         if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
@@ -2050,6 +2067,14 @@ function main()
         if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
             updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_EDGES);
+        }
+    }
+
+    saveInverseMatrixRenderModeButton.onclick = function()
+    {
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_RENDER_MODE);
         }
     }
 
@@ -2110,16 +2135,17 @@ function main()
 
     let afterCalculationOperations =
     {
-        CALC_NO_OP:                     1,
-        CALC_SHOW_SOLUTION:             2,
-        CALC_SOULTION_PERIOD:           3,
-        CALC_SOULTION_PERIOD_WITH_STOP: 4,
-        CALC_SOULTION_PERIO4:           5,
-        CALC_SOULTION_PERIO4_WITH_STOP: 6,
-        CALC_SOLVE_RANDOM:              7,
-        CALC_SOLVE_SEQUENTIAL:          8,
-        CALC_SAVE_INVERSE_MATRIX:       9,
-        CALC_SAVE_INVERSE_MATRIX_EDGES: 10
+        CALC_NO_OP:                           1,
+        CALC_SHOW_SOLUTION:                   2,
+        CALC_SOULTION_PERIOD:                 3,
+        CALC_SOULTION_PERIOD_WITH_STOP:       4,
+        CALC_SOULTION_PERIO4:                 5,
+        CALC_SOULTION_PERIO4_WITH_STOP:       6,
+        CALC_SOLVE_RANDOM:                    7,
+        CALC_SOLVE_SEQUENTIAL:                8,
+        CALC_SAVE_INVERSE_MATRIX:             9,
+        CALC_SAVE_INVERSE_MATRIX_EDGES:       10,
+        CALC_SAVE_INVERSE_MATRIX_RENDER_MODE: 11
     }
 
     const minimumBoardSize = 1;
@@ -2679,6 +2705,17 @@ function main()
                     const matrixCellSize = 5;
 
                     saveMatrixWithEdgesToImage(currentSolutionMatrix, matrixCellSize);
+                }
+
+                break;
+            }
+            case afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_RENDER_MODE:
+            {
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                {
+                    const matrixCellSize = 5;
+
+                    saveMatrixWithRenderModeToImage(currentSolutionMatrix, matrixCellSize, currentShaderProgram, !flagNoGrid);
                 }
 
                 break;
@@ -4086,6 +4123,40 @@ function main()
         canvasMatrix.remove();
     }
 
+    function saveMatrixWithRenderModeToImage(matrix, matrixCellSize, shaderProgram, showGrid)
+    {
+        const canvasMatrix = document.createElement("canvas");
+        const canvasRow    = document.createElement("canvas");
+        if(showGrid)
+        {
+            canvasMatrix.width  = currentGameSize * currentGameSize * (matrixCellSize + 1) + 1;
+            canvasMatrix.height = currentGameSize * currentGameSize * (matrixCellSize + 1) + 1;
+
+            canvasRow.width  = currentGameSize * (matrixCellSize + 1) + 1;
+            canvasRow.height = currentGameSize * (matrixCellSize + 1) + 1;
+        }
+        else
+        {
+            canvasMatrix.width  = currentGameSize * currentGameSize * matrixCellSize;
+            canvasMatrix.height = currentGameSize * currentGameSize * matrixCellSize;
+
+            canvasRow.width  = currentGameSize * matrixCellSize;
+            canvasRow.height = currentGameSize * matrixCellSize;
+        }
+
+        const webglRow = canvasRow.getContext("webgl2");
+        if(!webglRow)
+        {
+            alert("Unable to initialize WebGL. Your browser or machine may not support it.");
+            return;
+        }
+
+        //BUT HOW DO I PASS SHADER PROGRAMS? canvasRow has a different context....................
+
+        canvasRow.remove();
+        canvasMatrix.remove();
+    }
+
     function loadMatrix(imageFile)
     {
         let fileReader = new FileReader();
@@ -4387,41 +4458,44 @@ function main()
 
     function createTextures()
     {
+        boardTexture     = createBoardLikeTexture(gl);
+        solutionTexture  = createBoardLikeTexture(gl);
+        stabilityTexture = createBoardLikeTexture(gl);
+    }
+
+    function createBoardLikeTexture(context)
+    {
         let emptyTexData = new Uint8Array(maximumBoardSize * maximumBoardSize);
         emptyTexData.fill(0);
 
-        boardTexture     = gl.createTexture();
-        solutionTexture  = gl.createTexture();
-        stabilityTexture = gl.createTexture();
+        let texture = context.createTexture();
 
-        gl.bindTexture(gl.TEXTURE_2D, boardTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, maximumBoardSize, maximumBoardSize, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, emptyTexData);
+        context.bindTexture(context.TEXTURE_2D, texture);
+        context.texImage2D(context.TEXTURE_2D, 0, context.R8UI, maximumBoardSize, maximumBoardSize, 0, context.RED_INTEGER, context.UNSIGNED_BYTE, emptyTexData);
 
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S,     gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T,     gl.CLAMP_TO_EDGE);
+        context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, context.NEAREST);
+        context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MAG_FILTER, context.NEAREST);
+        context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_S,     context.CLAMP_TO_EDGE);
+        context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T,     context.CLAMP_TO_EDGE);
 
-        gl.bindTexture(gl.TEXTURE_2D, solutionTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, maximumBoardSize, maximumBoardSize, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, emptyTexData);
-
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S,     gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T,     gl.CLAMP_TO_EDGE);
-
-        gl.bindTexture(gl.TEXTURE_2D, stabilityTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, maximumBoardSize, maximumBoardSize, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, emptyTexData);
-
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S,     gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T,     gl.CLAMP_TO_EDGE);
+        return texture;
     }
 
     function createShaders()
+    {       
+        let defaultVS = createDefaultVertexShader(gl);
+
+        squaresShaderProgram   = createSquaresShaderProgram(gl, defaultVS);
+        circlesShaderProgram   = createCirclesShaderProgam(gl, defaultVS);
+        diamondsShaderProgram  = createDiamondsShaderProgram(gl, defaultVS);
+        beamsShaderProgram     = createBeamsShaderProgram(gl, defaultVS);
+        raindropsShaderProgram = createRaindropsShaderProgram(gl, defaultVS);
+        chainsShaderProgram    = createChainsShaderProgram(gl, defaultVS);
+    }
+
+    function createDefaultVertexShader(context)
     {
-        const vsSource = 
+        let defaultVSSource = 
         `#version 300 es
 
         layout(location = 0) in mediump vec4 vScreenPos;
@@ -4431,7 +4505,21 @@ function main()
         }
         `;
 
-        const squaresFsSource = 
+        let defaultVS = context.createShader(context.VERTEX_SHADER);
+        context.shaderSource(defaultVS, defaultVSSource);
+        context.compileShader(defaultVS);
+
+        if(!context.getShaderParameter(defaultVS, context.COMPILE_STATUS))
+        {
+            alert(context.getShaderInfoLog(defaultVS));
+        }
+
+        return defaultVS;
+    }
+
+    function createSquaresShaderProgram(context, vertexShader)
+    {
+        const squaresFSSource = 
         `#version 300 es
 
         #define FLAG_SHOW_SOLUTION  0x01
@@ -4448,7 +4536,7 @@ function main()
         uniform int gImageHeight;
         uniform int gViewportOffsetX;
         uniform int gViewportOffsetY;
- 
+
         uniform lowp vec4 gColorNone;
         uniform lowp vec4 gColorEnabled;
         uniform lowp vec4 gColorSolved;
@@ -4468,24 +4556,24 @@ function main()
             {
                 highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize, gCellSize);
 
-		        uint          cellValue = texelFetch(gBoard, cellNumber, 0).x;
-		        mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
+                uint          cellValue = texelFetch(gBoard, cellNumber, 0).x;
+                mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
 
                 outColor = mix(gColorNone, gColorEnabled, cellPower);
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
-		            uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
-		            mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
+                    uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                    mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
 
                     outColor = mix(outColor, gColorSolved, solutionPower);
                 }
                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
                 {
-        			uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
-			        mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
+                    uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
+                    mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
 
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                     colorStable.a = 1.0f;
 
                     outColor = mix(outColor, colorStable, stablePower);
@@ -4497,8 +4585,13 @@ function main()
             }
         }`;
 
+        return createShaderProgram(context, squaresFSSource, vertexShader);
+    }
+
+    function createCirclesShaderProgam(context, vertexShader)
+    {
         //https://lightstrout.com/blog/2019/05/21/circles-render-mode/
-        const circlesFsSource = 
+        const circlesFSSource = 
         `#version 300 es
 
         #define FLAG_SHOW_SOLUTION  0x01
@@ -4515,7 +4608,7 @@ function main()
         uniform int gImageHeight;
         uniform int gViewportOffsetX;
         uniform int gViewportOffsetY;
- 
+
         uniform lowp vec4 gColorNone;
         uniform lowp vec4 gColorEnabled;
         uniform lowp vec4 gColorSolved;
@@ -4547,9 +4640,9 @@ function main()
                 ivec2 rightCell  = cellNumber + ivec2( 1,  0);
                 ivec2 topCell    = cellNumber + ivec2( 0, -1);
                 ivec2 bottomCell = cellNumber + ivec2( 0,  1);
-        
+
                 bool insideCircle = (dot(cellCoord, cellCoord) <= circleRadius * circleRadius);
-        
+
                 bool nonLeftEdge   = cellNumber.x > 0;
                 bool nonRightEdge  = cellNumber.x < gBoardSize - 1;
                 bool nonTopEdge    = cellNumber.y > 0;
@@ -4561,14 +4654,14 @@ function main()
                     nonRightEdge  = true;
                     nonTopEdge    = true;
                     nonBottomEdge = true;
-        
+
                     const uint maxCheckDistance = 1u; //Different for different render modes
-        
+
                     uvec2 leftCellU   = uvec2(leftCell)   + uvec2(gBoardSize) * maxCheckDistance;
                     uvec2 rightCellU  = uvec2(rightCell)  + uvec2(gBoardSize) * maxCheckDistance;
                     uvec2 topCellU    = uvec2(topCell)    + uvec2(gBoardSize) * maxCheckDistance;
                     uvec2 bottomCellU = uvec2(bottomCell) + uvec2(gBoardSize) * maxCheckDistance;
-        
+
                     leftCell   = ivec2(leftCellU   % uvec2(gBoardSize));
                     rightCell  = ivec2(rightCellU  % uvec2(gBoardSize));
                     topCell    = ivec2(topCellU    % uvec2(gBoardSize));
@@ -4581,49 +4674,49 @@ function main()
                 uint bottomPartValue = uint(nonBottomEdge) * texelFetch(gBoard, bottomCell, 0).x;
 
                 bool circleRuleColored = insideCircle || ((leftPartValue   == cellValue && cellCoord.x <= 0.0f) 
-                                                      ||  (topPartValue    == cellValue && cellCoord.y <= 0.0f) 
-                                                      ||  (rightPartValue  == cellValue && cellCoord.x >= 0.0f) 
-                                                      ||  (bottomPartValue == cellValue && cellCoord.y >= 0.0f));
+                                                        ||  (topPartValue    == cellValue && cellCoord.y <= 0.0f) 
+                                                        ||  (rightPartValue  == cellValue && cellCoord.x >= 0.0f) 
+                                                        ||  (bottomPartValue == cellValue && cellCoord.y >= 0.0f));
 
                 cellPower = cellPower * float(circleRuleColored);
                 outColor  = mix(gColorNone, gColorEnabled, cellPower);
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
-		            uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
-		            mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
+                    uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                    mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
 
                     uint leftPartSolvedValue   = uint(nonLeftEdge)   * texelFetch(gSolution, leftCell,   0).x;
                     uint rightPartSolvedValue  = uint(nonRightEdge)  * texelFetch(gSolution, rightCell,  0).x;
                     uint topPartSolvedValue    = uint(nonTopEdge)    * texelFetch(gSolution, topCell,    0).x;
                     uint bottomPartSolvedValue = uint(nonBottomEdge) * texelFetch(gSolution, bottomCell, 0).x;
-        
+
                     bool circleRuleSolved = insideCircle || ((leftPartSolvedValue   == solutionValue && cellCoord.x <= 0.0f) 
-                                                         ||  (topPartSolvedValue    == solutionValue && cellCoord.y <= 0.0f) 
-                                                         ||  (rightPartSolvedValue  == solutionValue && cellCoord.x >= 0.0f) 
-                                                         ||  (bottomPartSolvedValue == solutionValue && cellCoord.y >= 0.0f));
-        
+                                                            ||  (topPartSolvedValue    == solutionValue && cellCoord.y <= 0.0f) 
+                                                            ||  (rightPartSolvedValue  == solutionValue && cellCoord.x >= 0.0f) 
+                                                            ||  (bottomPartSolvedValue == solutionValue && cellCoord.y >= 0.0f));
+
                     solutionPower = solutionPower * float(circleRuleSolved);
                     outColor      = mix(outColor, gColorSolved, solutionPower);
                 }
                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
                 {
-        			uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
-			        mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
+                    uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
+                    mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
 
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                     colorStable.a = 1.0f;
 
                     uint leftPartStableValue   = uint(nonLeftEdge)   * texelFetch(gStability, leftCell,   0).x;
                     uint rightPartStableValue  = uint(nonRightEdge)  * texelFetch(gStability, rightCell,  0).x;
                     uint topPartStableValue    = uint(nonTopEdge)    * texelFetch(gStability, topCell,    0).x;
                     uint bottomPartStableValue = uint(nonBottomEdge) * texelFetch(gStability, bottomCell, 0).x;
-        
+
                     bool circleRuleStable = insideCircle || ((leftPartStableValue  == stableValue && cellCoord.x <= 0.0f) 
-                                                         || (topPartStableValue    == stableValue && cellCoord.y <= 0.0f) 
-                                                         || (rightPartStableValue  == stableValue && cellCoord.x >= 0.0f) 
-                                                         || (bottomPartStableValue == stableValue && cellCoord.y >= 0.0f));
-        
+                                                            || (topPartStableValue    == stableValue && cellCoord.y <= 0.0f) 
+                                                            || (rightPartStableValue  == stableValue && cellCoord.x >= 0.0f) 
+                                                            || (bottomPartStableValue == stableValue && cellCoord.y >= 0.0f));
+
                     stablePower = stablePower * float(circleRuleStable);
                     outColor    = mix(outColor, colorStable, stablePower);
                 }
@@ -4634,209 +4727,219 @@ function main()
             }
         }`;
 
-        //http://lightstrout.com/blog/2019/12/09/diamonds-render-mode/
-        const diamondsFsSource = 
-        `#version 300 es
+        return createShaderProgram(context, circlesFSSource, vertexShader);
+    }
 
-        #define FLAG_SHOW_SOLUTION  0x01
-        #define FLAG_SHOW_STABILITY 0x02
-        #define FLAG_TOROID_RENDER  0x04
-        #define FLAG_NO_GRID        0x08
-
-        uniform int gBoardSize;
-        uniform int gCellSize;
-        uniform int gDomainSize;
-        uniform int gFlags;
-
-        uniform int gImageWidth;
-        uniform int gImageHeight;
-        uniform int gViewportOffsetX;
-        uniform int gViewportOffsetY;
+    function createDiamondsShaderProgram(context, vertexShader)
+    {
+         //http://lightstrout.com/blog/2019/12/09/diamonds-render-mode/
+         const diamondsFSSource = 
+         `#version 300 es
  
-        uniform lowp vec4 gColorNone;
-        uniform lowp vec4 gColorEnabled;
-        uniform lowp vec4 gColorSolved;
-        uniform lowp vec4 gColorBetween;
+         #define FLAG_SHOW_SOLUTION  0x01
+         #define FLAG_SHOW_STABILITY 0x02
+         #define FLAG_TOROID_RENDER  0x04
+         #define FLAG_NO_GRID        0x08
+ 
+         uniform int gBoardSize;
+         uniform int gCellSize;
+         uniform int gDomainSize;
+         uniform int gFlags;
+ 
+         uniform int gImageWidth;
+         uniform int gImageHeight;
+         uniform int gViewportOffsetX;
+         uniform int gViewportOffsetY;
+ 
+         uniform lowp vec4 gColorNone;
+         uniform lowp vec4 gColorEnabled;
+         uniform lowp vec4 gColorSolved;
+         uniform lowp vec4 gColorBetween;
+ 
+         uniform highp usampler2D gBoard;
+         uniform highp usampler2D gSolution;
+         uniform highp usampler2D gStability;
+ 
+         layout(location = 0) out lowp vec4 outColor;
+ 
+         bvec4 emptyCornerRule(uvec4 edgeValue)
+         {
+             return equal(edgeValue.xyzw, edgeValue.yzwx);
+         }
+ 
+         bvec4 cornerRule(uint cellValue, uvec4 cornerValue)
+         {
+             return equal(uvec4(cellValue), cornerValue.xyzw);
+         }
+ 
+         void main(void)
+         {
+             ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
+ 
+             if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
+             {
+                 highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
+                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
+ 
+                 int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+ 
+                 mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+                 mediump float diamondRadius = float(cellSizeCorrected - 1) / 2.0f;
+                 
+                 mediump float domainFactor = 1.0f / float(gDomainSize - 1);
+ 
+                 bool insideDiamond     = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
+                 bool insideTopLeft     = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
+                 bool insideTopRight    = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
+                 bool insideBottomRight = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
+                 bool insideBottomLeft  = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
+ 
+                 bvec4 insideCorner = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
+ 
+                 ivec2 leftCell        = cellNumber + ivec2(-1,  0);
+                 ivec2 rightCell       = cellNumber + ivec2( 1,  0);
+                 ivec2 topCell         = cellNumber + ivec2( 0, -1);
+                 ivec2 bottomCell      = cellNumber + ivec2( 0,  1);
+                 ivec2 leftTopCell     = cellNumber + ivec2(-1, -1);
+                 ivec2 rightTopCell    = cellNumber + ivec2( 1, -1);
+                 ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
+                 ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
+         
+                 bool nonLeftEdge        = cellNumber.x > 0;
+                 bool nonRightEdge       = cellNumber.x < gBoardSize - 1;
+                 bool nonTopEdge         =                                  cellNumber.y > 0;
+                 bool nonBottomEdge      =                                  cellNumber.y < gBoardSize - 1;
+                 bool nonLeftTopEdge     = cellNumber.x > 0              && cellNumber.y > 0;
+                 bool nonRightTopEdge    = cellNumber.x < gBoardSize - 1 && cellNumber.y > 0;
+                 bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
+                 bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
+ 
+                 if((gFlags & FLAG_TOROID_RENDER) != 0)
+                 {
+                     nonLeftEdge        = true;
+                     nonRightEdge       = true;
+                     nonTopEdge         = true;
+                     nonBottomEdge      = true;
+                     nonLeftTopEdge     = true;
+                     nonRightTopEdge    = true;
+                     nonLeftBottomEdge  = true;
+                     nonRightBottomEdge = true;
+         
+                     const uint maxCheckDistance = 1u; //Different for different render modes
+ 
+                     uvec2 leftCellU        = uvec2(leftCell)        + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 rightCellU       = uvec2(rightCell)       + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 topCellU         = uvec2(topCell)         + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(gBoardSize) * maxCheckDistance;
+ 
+                     leftCell        = ivec2(leftCellU        % uvec2(gBoardSize));
+                     rightCell       = ivec2(rightCellU       % uvec2(gBoardSize));
+                     topCell         = ivec2(topCellU         % uvec2(gBoardSize));
+                     bottomCell      = ivec2(bottomCellU      % uvec2(gBoardSize));
+                     leftTopCell     = ivec2(leftTopCellU     % uvec2(gBoardSize));
+                     rightTopCell    = ivec2(rightTopCellU    % uvec2(gBoardSize));
+                     leftBottomCell  = ivec2(leftBottomCellU  % uvec2(gBoardSize));
+                     rightBottomCell = ivec2(rightBottomCellU % uvec2(gBoardSize));
+                 }
+ 
+                 uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
+                 uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCell,       0).x;
+                 uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCell,         0).x;
+                 uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCell,      0).x;
+                 uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCell,     0).x;
+                 uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCell,    0).x;
+                 uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCell,  0).x;
+                 uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCell, 0).x;
+ 
+                 uvec4 edgeValue   = uvec4(leftPartValue,    topPartValue,      rightPartValue,       bottomPartValue);
+                 uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
+ 
+                 uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)        ) * edgeValue;
+                 uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, cornerValue)) * cellValue;
+ 
+                 uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
+ 
+                 mediump float  cellPower = float(cellValue) * domainFactor;		
+                 mediump vec4 cornerPower =  vec4(resCorner) * domainFactor;
+ 
+                 mediump float enablePower = cellPower * float(insideDiamond) + dot(cornerPower, vec4(insideCorner));
+                 outColor                  = mix(gColorNone, gColorEnabled, enablePower);
+ 
+                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
+                 {
+                     uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+         
+                     uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
+                     uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
+                     uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCell,         0).x;
+                     uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCell,      0).x;
+                     uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCell,     0).x;
+                     uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCell,    0).x;
+                     uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCell,  0).x;
+                     uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCell, 0).x;
+ 
+                     uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
+                     uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
+ 
+                     uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(edgeSolved)            ) * edgeSolved;
+                     uvec4 cornerSolutionCandidate      = uvec4(cornerRule(solutionValue, cornerSolved)) * solutionValue;
+ 
+                     uvec4 resCornerSolved = max(emptyCornerSolutionCandidate, cornerSolutionCandidate);
+         
+                     mediump float      solutionPower =  float(solutionValue) * domainFactor;		
+                     mediump vec4 cornerSolutionPower = vec4(resCornerSolved) * domainFactor;
+ 
+                     mediump float solvedPower = solutionPower * float(insideDiamond) + dot(cornerSolutionPower, vec4(insideCorner));
+                     outColor                  = mix(outColor, gColorSolved, solvedPower);
+                 }
+                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
+                 {
+                     uint stableValue = texelFetch(gStability, cellNumber, 0).x;
+ 
+                     lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                     colorStable.a = 1.0f;
+ 
+                     uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
+                     uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCell,       0).x;
+                     uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCell,         0).x;
+                     uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCell,      0).x;
+                     uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCell,     0).x;
+                     uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCell,    0).x;
+                     uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCell,  0).x;
+                     uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCell, 0).x;
+ 
+                     uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
+                     uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
+         
+                     uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(edgeStable)          ) * edgeStable;
+                     uvec4 cornerStabilityCandidate      = uvec4(cornerRule(stableValue, cornerStable)) * stableValue;
+         
+                     uvec4 resCornerStable = max(emptyCornerStabilityCandidate, cornerStabilityCandidate);
+         
+                     mediump float      stabilityPower =    float(stableValue) * domainFactor;		
+                     mediump vec4 cornerStabilityPower = vec4(resCornerStable) * domainFactor;
+         
+                     mediump float stablePower = stabilityPower * float(insideDiamond) + dot(cornerStabilityPower, vec4(insideCorner));
+                     outColor                  = mix(outColor, colorStable, stablePower);
+                 }
+             }
+             else
+             {
+                 outColor = gColorBetween;
+             }
+         }`;
+ 
+         return createShaderProgram(context, diamondsFSSource, vertexShader);
+    }
 
-        uniform highp usampler2D gBoard;
-        uniform highp usampler2D gSolution;
-        uniform highp usampler2D gStability;
-
-        layout(location = 0) out lowp vec4 outColor;
-
-        bvec4 emptyCornerRule(uvec4 edgeValue)
-        {
-            return equal(edgeValue.xyzw, edgeValue.yzwx);
-        }
-
-        bvec4 cornerRule(uint cellValue, uvec4 cornerValue)
-        {
-            return equal(uvec4(cellValue), cornerValue.xyzw);
-        }
-
-        void main(void)
-        {
-            ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
-
-            if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
-            {
-                highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
-                uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
-
-                int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
-
-                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-                mediump float diamondRadius = float(cellSizeCorrected - 1) / 2.0f;
-                
-                mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-
-                bool insideDiamond     = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
-                bool insideTopLeft     = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
-                bool insideTopRight    = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-                bool insideBottomRight = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
-                bool insideBottomLeft  = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
-
-                bvec4 insideCorner = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
-
-                ivec2 leftCell        = cellNumber + ivec2(-1,  0);
-                ivec2 rightCell       = cellNumber + ivec2( 1,  0);
-                ivec2 topCell         = cellNumber + ivec2( 0, -1);
-                ivec2 bottomCell      = cellNumber + ivec2( 0,  1);
-                ivec2 leftTopCell     = cellNumber + ivec2(-1, -1);
-                ivec2 rightTopCell    = cellNumber + ivec2( 1, -1);
-                ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
-                ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
-        
-                bool nonLeftEdge        = cellNumber.x > 0;
-                bool nonRightEdge       = cellNumber.x < gBoardSize - 1;
-                bool nonTopEdge         =                                  cellNumber.y > 0;
-                bool nonBottomEdge      =                                  cellNumber.y < gBoardSize - 1;
-                bool nonLeftTopEdge     = cellNumber.x > 0              && cellNumber.y > 0;
-                bool nonRightTopEdge    = cellNumber.x < gBoardSize - 1 && cellNumber.y > 0;
-                bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
-                bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
-
-                if((gFlags & FLAG_TOROID_RENDER) != 0)
-                {
-                    nonLeftEdge        = true;
-                    nonRightEdge       = true;
-                    nonTopEdge         = true;
-                    nonBottomEdge      = true;
-                    nonLeftTopEdge     = true;
-                    nonRightTopEdge    = true;
-                    nonLeftBottomEdge  = true;
-                    nonRightBottomEdge = true;
-        
-                    const uint maxCheckDistance = 1u; //Different for different render modes
-
-                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 topCellU         = uvec2(topCell)         + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(gBoardSize) * maxCheckDistance;
-
-                    leftCell        = ivec2(leftCellU        % uvec2(gBoardSize));
-                    rightCell       = ivec2(rightCellU       % uvec2(gBoardSize));
-                    topCell         = ivec2(topCellU         % uvec2(gBoardSize));
-                    bottomCell      = ivec2(bottomCellU      % uvec2(gBoardSize));
-                    leftTopCell     = ivec2(leftTopCellU     % uvec2(gBoardSize));
-                    rightTopCell    = ivec2(rightTopCellU    % uvec2(gBoardSize));
-                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(gBoardSize));
-                    rightBottomCell = ivec2(rightBottomCellU % uvec2(gBoardSize));
-                }
-
-                uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
-                uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCell,       0).x;
-                uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCell,         0).x;
-                uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCell,      0).x;
-                uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCell,     0).x;
-                uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCell,    0).x;
-                uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCell,  0).x;
-                uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCell, 0).x;
-
-                uvec4 edgeValue   = uvec4(leftPartValue,    topPartValue,      rightPartValue,       bottomPartValue);
-                uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
-
-                uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)        ) * edgeValue;
-                uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, cornerValue)) * cellValue;
-
-                uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
-
-                mediump float  cellPower = float(cellValue) * domainFactor;		
-                mediump vec4 cornerPower =  vec4(resCorner) * domainFactor;
-
-                mediump float enablePower = cellPower * float(insideDiamond) + dot(cornerPower, vec4(insideCorner));
-                outColor                  = mix(gColorNone, gColorEnabled, enablePower);
-
-                if((gFlags & FLAG_SHOW_SOLUTION) != 0)
-                {
-		            uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
-        
-                    uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
-                    uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
-                    uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCell,         0).x;
-                    uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCell,      0).x;
-                    uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCell,     0).x;
-                    uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCell,    0).x;
-                    uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCell,  0).x;
-                    uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCell, 0).x;
-
-                    uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
-                    uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
-
-                    uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(edgeSolved)            ) * edgeSolved;
-                    uvec4 cornerSolutionCandidate      = uvec4(cornerRule(solutionValue, cornerSolved)) * solutionValue;
-
-                    uvec4 resCornerSolved = max(emptyCornerSolutionCandidate, cornerSolutionCandidate);
-        
-                    mediump float      solutionPower =  float(solutionValue) * domainFactor;		
-                    mediump vec4 cornerSolutionPower = vec4(resCornerSolved) * domainFactor;
-
-                    mediump float solvedPower = solutionPower * float(insideDiamond) + dot(cornerSolutionPower, vec4(insideCorner));
-                    outColor                  = mix(outColor, gColorSolved, solvedPower);
-                }
-                else if((gFlags & FLAG_SHOW_STABILITY) != 0)
-                {
-        			uint stableValue = texelFetch(gStability, cellNumber, 0).x;
-
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
-                    colorStable.a = 1.0f;
-
-                    uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
-                    uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCell,       0).x;
-                    uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCell,         0).x;
-                    uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCell,      0).x;
-                    uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCell,     0).x;
-                    uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCell,    0).x;
-                    uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCell,  0).x;
-                    uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCell, 0).x;
-
-                    uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
-                    uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
-        
-                    uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(edgeStable)          ) * edgeStable;
-                    uvec4 cornerStabilityCandidate      = uvec4(cornerRule(stableValue, cornerStable)) * stableValue;
-        
-                    uvec4 resCornerStable = max(emptyCornerStabilityCandidate, cornerStabilityCandidate);
-        
-                    mediump float      stabilityPower =    float(stableValue) * domainFactor;		
-                    mediump vec4 cornerStabilityPower = vec4(resCornerStable) * domainFactor;
-        
-                    mediump float stablePower = stabilityPower * float(insideDiamond) + dot(cornerStabilityPower, vec4(insideCorner));
-                    outColor                  = mix(outColor, colorStable, stablePower);
-                }
-            }
-            else
-            {
-                outColor = gColorBetween;
-            }
-        }`;
-
+    function createBeamsShaderProgram(context, vertexShader)
+    {
         //https://lightstrout.com/blog/2019/12/18/beams-render-mode/
-        const beamsFsSource = 
+        const beamsFSSource = 
         `#version 300 es
 
         #define FLAG_SHOW_SOLUTION  0x01
@@ -4853,7 +4956,7 @@ function main()
         uniform int gImageHeight;
         uniform int gViewportOffsetX;
         uniform int gViewportOffsetY;
- 
+
         uniform lowp vec4 gColorNone;
         uniform lowp vec4 gColorEnabled;
         uniform lowp vec4 gColorSolved;
@@ -5105,7 +5208,7 @@ function main()
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
-		            uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                    uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
         
                     uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
                     uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
@@ -5118,29 +5221,29 @@ function main()
 
                     uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
                     uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
-    
+
                     uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(solutionValue, edgeSolved, cornerSolved)) * edgeSolved;
-    
+
                     uvec4 regionBSolutionCandidate = uvec4(regBRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
                     uvec4 regionISolutionCandidate = uvec4(regIRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-    
+
                     uvec4 regionYTopRightSolutionCandidate   = uvec4(regYTopRightRule(solutionValue, edgeSolved, cornerSolved))   * solutionValue;
                     uvec4 regionYBottomLeftSolutionCandidate = uvec4(regYBottomLeftRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-    
+
                     uvec4 regionVSolutionCandidate = uvec4(regVRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-    
+
                     uvec4 resBSolution           = max(regionBSolutionCandidate,           emptyCornerSolutionCandidate.xyzw);
                     uvec4 resYTopRightSolution   = max(regionYTopRightSolutionCandidate,   emptyCornerSolutionCandidate.xyyz);
                     uvec4 resYBottomLeftSolution = max(regionYBottomLeftSolutionCandidate, emptyCornerSolutionCandidate.zwwx);
                     uvec4 resVSolution           = max(regionVSolutionCandidate,           emptyCornerSolutionCandidate.xyzw);
-    
+
                     mediump float regGSolutionPower           = float(solutionValue           ) *      domainFactor;
                     mediump vec4  regISolutionPower           = vec4( regionISolutionCandidate) * vec4(domainFactor);
                     mediump vec4  regBSolutionPower           = vec4( resBSolution            ) * vec4(domainFactor);
                     mediump vec4  regYTopRightSolutionPower   = vec4( resYTopRightSolution    ) * vec4(domainFactor);
                     mediump vec4  regYBottomLeftSolutionPower = vec4( resYBottomLeftSolution  ) * vec4(domainFactor);
                     mediump vec4  regVSolutionPower           = vec4( resVSolution            ) * vec4(domainFactor);
-    
+
                     mediump float solvedPower =    float(insideG)      *     regGSolutionPower;
                     solvedPower              += dot(vec4(insideB),           regBSolutionPower);
                     solvedPower              += dot(vec4(insideI),           regISolutionPower); 
@@ -5152,9 +5255,9 @@ function main()
                 }
                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
                 {
-        			uint stabilityValue = texelFetch(gStability, cellNumber, 0).x;
+                    uint stabilityValue = texelFetch(gStability, cellNumber, 0).x;
 
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                     colorStable.a = 1.0f;
 
                     uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
@@ -5168,29 +5271,29 @@ function main()
 
                     uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
                     uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
-    
+
                     uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(stabilityValue, edgeStable, cornerStable)) * edgeStable;
-    
+
                     uvec4 regionBStabilityCandidate = uvec4(regBRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
                     uvec4 regionIStabilityCandidate = uvec4(regIRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
-    
+
                     uvec4 regionYTopRightStabilityCandidate   = uvec4(regYTopRightRule(stabilityValue, edgeStable, cornerStable))   * stabilityValue;
                     uvec4 regionYBottomLeftStabilityCandidate = uvec4(regYBottomLeftRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
-    
+
                     uvec4 regionVStabilityCandidate = uvec4(regVRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
-    
+
                     uvec4 resBStability           = max(regionBStabilityCandidate,           emptyCornerStabilityCandidate.xyzw);
                     uvec4 resYTopRightStability   = max(regionYTopRightStabilityCandidate,   emptyCornerStabilityCandidate.xyyz);
                     uvec4 resYBottomLeftStability = max(regionYBottomLeftStabilityCandidate, emptyCornerStabilityCandidate.zwwx);
                     uvec4 resVStability           = max(regionVStabilityCandidate,           emptyCornerStabilityCandidate.xyzw);
-    
+
                     mediump float regGStabilityPower           = float(stabilityValue           ) *      domainFactor;
                     mediump vec4  regIStabilityPower           = vec4( regionIStabilityCandidate) * vec4(domainFactor);
                     mediump vec4  regBStabilityPower           = vec4( resBStability            ) * vec4(domainFactor);
                     mediump vec4  regYTopRightStabilityPower   = vec4( resYTopRightStability    ) * vec4(domainFactor);
                     mediump vec4  regYBottomLeftStabilityPower = vec4( resYBottomLeftStability  ) * vec4(domainFactor);
                     mediump vec4  regVStabilityPower           = vec4( resVStability            ) * vec4(domainFactor);
-    
+
                     mediump float stablePower =    float(insideG)      *     regGStabilityPower;
                     stablePower              += dot(vec4(insideB),           regBStabilityPower);
                     stablePower              += dot(vec4(insideI),           regIStabilityPower); 
@@ -5207,8 +5310,13 @@ function main()
             }
         }`;
 
+        return createShaderProgram(context, beamsFSSource, vertexShader);
+    }
+
+    function createRaindropsShaderProgram(context, vertexShader)
+    {
         //https://lightstrout.com/blog/2019/05/21/raindrops-render-mode/
-        const raindropsFsSource = 
+        const raindropsFSSource = 
         `#version 300 es
 
         #define FLAG_SHOW_SOLUTION  0x01
@@ -5225,7 +5333,7 @@ function main()
         uniform int gImageHeight;
         uniform int gViewportOffsetX;
         uniform int gViewportOffsetY;
- 
+
         uniform lowp vec4 gColorNone;
         uniform lowp vec4 gColorEnabled;
         uniform lowp vec4 gColorSolved;
@@ -5363,7 +5471,7 @@ function main()
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
-		            uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                    uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
         
                     uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
                     uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
@@ -5390,9 +5498,9 @@ function main()
                 }
                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
                 {
-        			uint stableValue = texelFetch(gStability, cellNumber, 0).x;
+                    uint stableValue = texelFetch(gStability, cellNumber, 0).x;
 
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                     colorStable.a = 1.0f;
 
                     uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
@@ -5425,8 +5533,13 @@ function main()
             }
         }`;
 
+        return createShaderProgram(context, raindropsFSSource, vertexShader);
+    }
+
+    function createChainsShaderProgram(context, vertexShader)
+    {
         //https://lightstrout.com/blog/2019/05/21/chains-render-mode/
-        const chainsFsSource = 
+        const chainsFSSource = 
         `#version 300 es
 
         #define FLAG_SHOW_SOLUTION  0x01
@@ -5443,7 +5556,7 @@ function main()
         uniform int gImageHeight;
         uniform int gViewportOffsetX;
         uniform int gViewportOffsetY;
- 
+
         uniform lowp vec4 gColorNone;
         uniform lowp vec4 gColorEnabled;
         uniform lowp vec4 gColorSolved;
@@ -5685,7 +5798,7 @@ function main()
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
-		            uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                    uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
         
                     uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
                     uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
@@ -5737,9 +5850,9 @@ function main()
                 }
                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
                 {
-        			uint stabilityValue = texelFetch(gStability, cellNumber, 0).x;
+                    uint stabilityValue = texelFetch(gStability, cellNumber, 0).x;
 
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                     colorStable.a = 1.0f;
 
                     uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
@@ -5796,129 +5909,32 @@ function main()
                 outColor = gColorBetween;
             }
         }`;
-        
-        let defaultVS = gl.createShader(gl.VERTEX_SHADER);
-        gl.shaderSource(defaultVS, vsSource);
-        gl.compileShader(defaultVS);
 
-        if(!gl.getShaderParameter(defaultVS, gl.COMPILE_STATUS))
+        return createShaderProgram(context, chainsFSSource, vertexShader);
+    }
+
+    function createShaderProgram(context, fragmentShaderSource, vertexShader)
+    {
+        let fragmentShader = context.createShader(context.FRAGMENT_SHADER);
+        context.shaderSource(fragmentShader, fragmentShaderSource);
+        context.compileShader(fragmentShader);
+
+        if(!context.getShaderParameter(fragmentShader, context.COMPILE_STATUS))
         {
-            alert(gl.getShaderInfoLog(defaultVS));
+            alert(context.getShaderInfoLog(fragmentShader));
         }
 
-        let squaresFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(squaresFS, squaresFsSource);
-        gl.compileShader(squaresFS);
+        let shaderProgram = context.createProgram();
+        context.attachShader(shaderProgram, vertexShader);
+        context.attachShader(shaderProgram, fragmentShader);
+        context.linkProgram(shaderProgram);
 
-        if(!gl.getShaderParameter(squaresFS, gl.COMPILE_STATUS))
+        if(!context.getProgramParameter(shaderProgram, context.LINK_STATUS))
         {
-            alert(gl.getShaderInfoLog(squaresFS));
+            alert(context.getProgramInfoLog(shaderProgram));
         }
 
-        let circlesFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(circlesFS, circlesFsSource);
-        gl.compileShader(circlesFS);
-
-        if(!gl.getShaderParameter(circlesFS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(circlesFS));
-        }
-
-        let diamondsFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(diamondsFS, diamondsFsSource);
-        gl.compileShader(diamondsFS);
-
-        if(!gl.getShaderParameter(diamondsFS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(diamondsFS));
-        }
-
-        let beamsFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(beamsFS, beamsFsSource);
-        gl.compileShader(beamsFS);
-
-        if(!gl.getShaderParameter(beamsFS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(beamsFS));
-        }
-
-        let raindropsFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(raindropsFS, raindropsFsSource);
-        gl.compileShader(raindropsFS);
-
-        if(!gl.getShaderParameter(raindropsFS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(raindropsFS));
-        }
-
-        let chainsFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(chainsFS, chainsFsSource);
-        gl.compileShader(chainsFS);
-
-        if(!gl.getShaderParameter(chainsFS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(chainsFS));
-        }
-
-        squaresShaderProgram = gl.createProgram();
-        gl.attachShader(squaresShaderProgram, defaultVS);
-        gl.attachShader(squaresShaderProgram, squaresFS);
-        gl.linkProgram(squaresShaderProgram);
-
-        if(!gl.getProgramParameter(squaresShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(squaresShaderProgram));
-        }
-
-        circlesShaderProgram = gl.createProgram();
-        gl.attachShader(circlesShaderProgram, defaultVS);
-        gl.attachShader(circlesShaderProgram, circlesFS);
-        gl.linkProgram(circlesShaderProgram);
-
-        if(!gl.getProgramParameter(circlesShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(circlesShaderProgram));
-        }
-
-        diamondsShaderProgram = gl.createProgram();
-        gl.attachShader(diamondsShaderProgram, defaultVS);
-        gl.attachShader(diamondsShaderProgram, diamondsFS);
-        gl.linkProgram(diamondsShaderProgram);
-
-        if(!gl.getProgramParameter(diamondsShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(diamondsShaderProgram));
-        }
-
-        beamsShaderProgram = gl.createProgram();
-        gl.attachShader(beamsShaderProgram, defaultVS);
-        gl.attachShader(beamsShaderProgram, beamsFS);
-        gl.linkProgram(beamsShaderProgram);
-
-        if(!gl.getProgramParameter(beamsShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(beamsShaderProgram));
-        }
-
-        raindropsShaderProgram = gl.createProgram();
-        gl.attachShader(raindropsShaderProgram, defaultVS);
-        gl.attachShader(raindropsShaderProgram, raindropsFS);
-        gl.linkProgram(raindropsShaderProgram);
-
-        if(!gl.getProgramParameter(raindropsShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(raindropsShaderProgram));
-        }
-
-        chainsShaderProgram = gl.createProgram();
-        gl.attachShader(chainsShaderProgram, defaultVS);
-        gl.attachShader(chainsShaderProgram, chainsFS);
-        gl.linkProgram(chainsShaderProgram);
-
-        if(!gl.getProgramParameter(chainsShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(chainsShaderProgram));
-        }
+        return shaderProgram;
     }
 
     function updateBoardTexture()
