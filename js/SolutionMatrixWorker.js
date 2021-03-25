@@ -179,7 +179,7 @@ function solutionMatrixWorkerFunction()
     //Calculates the Lights Out matrix for the given click rule and game size. Lights Out matrix helps to calculate inverse solutions
     function calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid)
     {
-        //Generate a normal Lights Out matrix for the click rule
+        //Generate a regular Lights Out matrix for the click rule
         let lightsOutMatrix = [];
         for(let yL = 0; yL < gameSize; yL++)
         {
@@ -204,14 +204,17 @@ function solutionMatrixWorkerFunction()
     
     //Calculates the inverse Lights Out matrix for the given click rule and game size. Lights Out matrix helps to calculate solutions
     //Single-execute version
-    function calculateSolutionMatrix(clickRule, gameSize, domainSize, clickRuleSize, isToroid)
+    function calculateSolutionMatrixFromClickRule(clickRule, gameSize, domainSize, clickRuleSize, isToroid)
     {
-        let currProgress = 0.0;
-        postProgressMessage(currProgress);
+        postProgressMessage(0.0);
 
         let lightsOutMatrix = calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid);
+        return calculateSolutionMatrixFromMatrix(lightsOutMatrix, gameSize, domainSize);
+    }
 
-        currProgress = 0.01;
+    function calculateSolutionMatrixFromMatrix(lightsOutMatrix, gameSize, domainSize)
+    {
+        let currProgress = 0.01;
         postProgressMessage(currProgress);
 
         //Generate a unit matrix. This will eventually become an inverse matrix
@@ -344,11 +347,20 @@ function solutionMatrixWorkerFunction()
     {
         switch(e.data.command)
         {
-            case "CalcSolutionMatrix":
+            case "CalcSolutionMatrixFromClickRule":
             {
                 let operationAfter = e.data.params.opAfter;
                 
-                let calcResult = calculateSolutionMatrix(e.data.params.clickRule, e.data.params.gameSize, e.data.params.domainSize, e.data.params.clickRuleSize, e.data.params.isToroid);
+                let calcResult = calculateSolutionMatrixFromClickRule(e.data.params.clickRule, e.data.params.gameSize, e.data.params.domainSize, e.data.params.clickRuleSize, e.data.params.isToroid);
+                postMessage({command: "Finish", params: {matrix: calcResult.invM, qp: calcResult.quietP, opAfter: operationAfter}});
+
+                break;
+            }
+            case "CalcSolutionMatrixFromMatrix":
+            {
+                let operationAfter = e.data.params.opAfter;
+                
+                let calcResult = calculateSolutionMatrixFromMatrix(e.data.params.matrix, e.data.params.gameSize, e.data.params.domainSize);
                 postMessage({command: "Finish", params: {matrix: calcResult.invM, qp: calcResult.quietP, opAfter: operationAfter}});
 
                 break;

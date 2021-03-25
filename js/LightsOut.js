@@ -292,10 +292,10 @@ function decodeBase64ClickRule(base64Str, domainSize, minSize, maxSize)
     return {clickrule: clickRule, clickrulesize: clickRuleSize, istoroid: isToroid};
 }
 
-//Returns (num % domainSize) with regard to the sign of num
-function wholeMod(num, domainSize)
+//Returns (num % modulo) with regard to the sign of num
+function wholeMod(num, modulo)
 {
-    return ((num % domainSize) + domainSize) % domainSize;
+    return ((num % modulo) + modulo) % modulo;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -315,6 +315,13 @@ function makeTurn(board, clickRule, clickRuleSize, gameSize, domainSize, cellX, 
         let populatedClickRuleP = populateClickRulePlane(clickRule, clickRuleSize, gameSize, cellX, cellY);
         return addBoard(board, populatedClickRuleP, domainSize);
     }
+}
+
+//Makes a turn at (cellX, cellY) using explicit matrix
+function makeTurnMatrix(board, matrix, gameSize, domainSize, cellX, cellY)
+{
+    let cellIndex = flatCellIndex(gameSize, cellX, cellY);
+    return addBoard(board, matrix[cellIndex], domainSize);
 }
 
 //Flips the state of the (cellX, cellY) cell 
@@ -456,6 +463,19 @@ function makeTurnsDefault(board, gameSize, domainSize, turnListBoard, isToroid)
     return newBoard;
 }
 
+function makeTurnsMatrix(board, matrix, gameSize, turnlistBoard, domainSize)
+{
+    let boardToAdd   = board.slice();
+    const matrixSize = gameSize * gameSize;
+
+    for(let i = 0; i < matrixSize; i++)
+    {
+        boardToAdd[i] = dotProductBoard(turnlistBoard, matrix[i], domainSize);
+    }
+
+    return addBoard(board, boardToAdd, domainSize);
+}
+
 //Translates the click rule from click rule space to the board space (regular version)
 function populateClickRulePlane(clickRule, clickRuleSize, gameSize, cellX, cellY)
 {
@@ -522,6 +542,32 @@ function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cell
     }
 
     return populatedClickRule;
+}
+
+//Calculates the Lights Out matrix for the given click rule and game size
+function calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid)
+{
+    //Generate a regular Lights Out matrix for the click rule
+    let lightsOutMatrix = [];
+    for(let yL = 0; yL < gameSize; yL++)
+    {
+        for(let xL = 0; xL < gameSize; xL++)
+        {
+            let matrixRow = {};
+            if(isToroid)
+            {
+                matrixRow = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, xL, yL);
+            }
+            else
+            {
+                matrixRow = populateClickRulePlane(clickRule, clickRuleSize, gameSize, xL, yL);
+            }
+
+            lightsOutMatrix.push(matrixRow);
+        }
+    }
+
+    return lightsOutMatrix;
 }
 
 //Calculates the solution given the solution matrix
@@ -811,6 +857,24 @@ function invalidateBoardDomainInPlace(board, domainSize)
     }
 }
 
+//Invalidates all elements of the board modulo domainSize, in-place
+function invalidateMatrixDomainInPlace(matrix, domainSize)
+{
+    if(domainSize === 0)
+    {
+        return;
+    }
+
+    for(let i = 0; i < matrix.length; i++)
+    {
+        let matrixRow = matrix[i];
+        for(let j = 0; j < matrixRow.length; j++)
+        {
+            matrixRow[j] = Math.min(matrixRow[j], domainSize - 1);
+        }
+    }
+}
+
 //Returns a dot product of boardLeft and boardRight
 function dotProductBoard(boardLeft, boardRight, domainSize)
 {
@@ -930,6 +994,7 @@ function main()
 
     const rulesSidebar = document.getElementById("RulesSidebar");
 
+    const increaseSizeHints        = document.getElementById("IncreaseSizeHints");
     const increaseDomainHints      = document.getElementById("IncreaseDomainHints");
     const changeClickRuleHints     = document.getElementById("ClickRuleHints");
     const acceptClickRuleHints     = document.getElementById("ClickRuleAcceptanceHints");
@@ -938,6 +1003,7 @@ function main()
     const boardSolveHints          = document.getElementById("BoardSolveHints"); 
     const metaBoardHints           = document.getElementById("MetaBoardHints");
     const miscellaneousHints       = document.getElementById("MiscellaneousHints");
+    const saveMatrixHints          = document.getElementById("SaveMatrixHints");
 
     const constructModeButton                  = document.getElementById("ConstructModeButton");
     const increaseSizeButton                   = document.getElementById("IncreaseSizeButton");
@@ -980,6 +1046,13 @@ function main()
     const borderBoardButton                    = document.getElementById("BorderBoardButton");
     const checkersBoardButton                  = document.getElementById("CheckersBoardButton");
     const chessboardBoardButton                = document.getElementById("ChessboardBoardButton");
+    const saveRegularMatrixButton              = document.getElementById("SaveLOMatrixNoEdges");
+    const saveRegularMatrixEdgesButton         = document.getElementById("SaveLOMatrix");
+    const saveRegularMatrixRenderModeButton    = document.getElementById("SaveLOMatrixRenderMode");
+    const saveInverseMatrixButton              = document.getElementById("SaveInverseMatrixNoEdges");
+    const saveInverseMatrixEdgesButton         = document.getElementById("SaveInverseMatrix");
+    const saveInverseMatrixRenderModeButton    = document.getElementById("SaveInverseMatrixRenderMode");
+    const matrixFileUploadInput                = document.getElementById("MatrixFileInput");
 
     const menuAccordion = document.getElementsByClassName("accordion"); 
     const menuPanels    = document.getElementsByClassName("panel"); 
@@ -1626,8 +1699,6 @@ function main()
                 panel.style.maxHeight = panel.scrollHeight + "px";
             } 
         });
-
-        //TODO: Swipe exactly here
     }
 
     renderModeSelect.onchange = function()
@@ -1635,6 +1706,8 @@ function main()
         setRenderMode(renderModeSelect.value);
         renderModeSelect.blur(); //Blur - Beetlebum
         canvas.focus();
+
+        requestRedraw();
     };
 
     colorThemeSelect.onchange = function()
@@ -1940,6 +2013,81 @@ function main()
         }
     }
 
+    saveRegularMatrixButton.onclick = function()
+    {
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+        {
+            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
+            saveMatrixToImage(lightsOutMatrix);
+        }
+        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            saveMatrixToImage(currentGameMatrix);
+        }
+    }
+
+    saveRegularMatrixEdgesButton.onclick = function()
+    {
+        let matrixCellSize = 5;
+
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+        {
+            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
+            saveMatrixWithEdgesToImage(lightsOutMatrix, matrixCellSize);
+        }   
+        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            saveMatrixWithEdgesToImage(currentGameMatrix, matrixCellSize);
+        }    
+    }
+
+    saveRegularMatrixRenderModeButton.onclick = function()
+    {
+        let matrixCellSize = 15;
+
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+        {
+            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
+            saveMatrixWithRenderModeToImage(lightsOutMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, flagToroidBoard);
+        }   
+        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            saveMatrixWithRenderModeToImage(currentGameMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, flagToroidBoard);
+        }    
+    }
+
+    saveInverseMatrixButton.onclick = function()
+    {
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX);
+        }
+    }
+
+    saveInverseMatrixEdgesButton.onclick = function()
+    {
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_EDGES);
+        }
+    }
+
+    saveInverseMatrixRenderModeButton.onclick = function()
+    {
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_RENDER_MODE);
+        }
+    }
+
+    matrixFileUploadInput.onchange = function()
+    {
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            loadMatrix(matrixFileUploadInput.files[0]);
+        }
+    }
+
     let boardGenModes =
     {
         BOARDGEN_FULL_RANDOM:  1, //Generate a random board
@@ -1972,9 +2120,10 @@ function main()
 
     let workingModes =
     {
-        LIT_BOARD:                  1,
-        CONSTRUCT_CLICKRULE:        2,
-        CONSTRUCT_CLICKRULE_TOROID: 3
+        LIT_BOARD_CLICKRULE:        1,
+        LIT_BOARD_MATRIX:           2,
+        CONSTRUCT_CLICKRULE:        3,
+        CONSTRUCT_CLICKRULE_TOROID: 4,
     };
 
     let countingModes =
@@ -1988,14 +2137,17 @@ function main()
 
     let afterCalculationOperations =
     {
-        CALC_NO_OP:                     1,
-        CALC_SHOW_SOLUTION:             2,
-        CALC_SOULTION_PERIOD:           3,
-        CALC_SOULTION_PERIOD_WITH_STOP: 4,
-        CALC_SOULTION_PERIO4:           5,
-        CALC_SOULTION_PERIO4_WITH_STOP: 6,
-        CALC_SOLVE_RANDOM:              7,
-        CALC_SOLVE_SEQUENTIAL:          8
+        CALC_NO_OP:                           1,
+        CALC_SHOW_SOLUTION:                   2,
+        CALC_SOULTION_PERIOD:                 3,
+        CALC_SOULTION_PERIOD_WITH_STOP:       4,
+        CALC_SOULTION_PERIO4:                 5,
+        CALC_SOULTION_PERIO4_WITH_STOP:       6,
+        CALC_SOLVE_RANDOM:                    7,
+        CALC_SOLVE_SEQUENTIAL:                8,
+        CALC_SAVE_INVERSE_MATRIX:             9,
+        CALC_SAVE_INVERSE_MATRIX_EDGES:       10,
+        CALC_SAVE_INVERSE_MATRIX_RENDER_MODE: 11
     }
 
     const minimumBoardSize = 1;
@@ -2022,7 +2174,6 @@ function main()
     let flagShowInverseSolution     = false;
     let flagShowStability           = false;
     let flagShowLitStability        = false;
-    let flagNoGrid                  = false;
     let flagPeriodCounting          = false;
     let flagEigvecCounting          = false;
     let flagPerio4Counting          = false;
@@ -2035,12 +2186,15 @@ function main()
     let flagNeedToSaveBoard         = false;
 
     let currentGameClickRule    = null;
+    let currentGameMatrix       = null;
     let currentGameBoard        = null;
     let currentGameSolution     = null;
     let currentGameStability    = null;
     let currentGameLitStability = null;
     let currentCountedBoard     = null;
     let currentSavedBoard       = null;
+    let currentSavedMatrix      = null;
+    let currentSavedWorkingMode = null;
 
     let currentClickRuleSize = 3;
     let currentGameSize      = 15;
@@ -2054,7 +2208,7 @@ function main()
     let currentColorSolved  = [0.0, 0.0, 1.0, 1.0];
     let currentColorBetween = [0.0, 0.0, 0.0, 1.0];
 
-    let currentWorkingMode  = workingModes.LIT_BOARD;
+    let currentWorkingMode  = workingModes.LIT_BOARD_CLICKRULE;
 
     let currentSolutionMatrix = [];
 
@@ -2080,28 +2234,8 @@ function main()
     let solutionTexture  = null;
     let stabilityTexture = null;
 
-    let boardTextureUniformLocation     = null;
-    let solutionTextureUniformLocation  = null;
-    let stabilityTextureUniformLocation = null;
-
-    let boardSizeUniformLocation  = null;
-    let cellSizeUniformLocation   = null;
-    let domainSizeUniformLocation = null;
-    let flagsUniformLocation      = null;
-
-    let canvasWidthUniformLocation     = null;
-    let canvasHeightUniformLocation    = null;
-    let viewportXOffsetUniformLocation = null;
-    let viewportYOffsetUniformLocation = null;
-
-    let colorNoneUniformLocation    = null;
-    let colorEnabledUniformLocation = null;
-    let colorSolvedUniformLocation  = null;
-    let colorBetweenUniformLocation = null;
-
-    let drawVertexBuffer = null; //Still don't know about WebGL gl_VertexID support :/
-
-    let drawVertexBufferAttribLocation = null;
+    let drawShaderVariables = null;
+    let drawVertexArray     = null;
 
     let solutionMatrixWorker = null;
 
@@ -2123,11 +2257,12 @@ function main()
 
     function incrementGameSize()
     {
-        if(currentWorkingMode === workingModes.LIT_BOARD)
+        //Can't change sizes with custom matrix, so no branch for LIT_BOARD_MATRIX
+        if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
         {
             changeGameSize(currentGameSize + 1);
         }
-        else
+        else if(currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
         {
             changeGameSize(currentGameSize + 2);
         }
@@ -2135,11 +2270,12 @@ function main()
 
     function decrementGameSize()
     {
-        if(currentWorkingMode === workingModes.LIT_BOARD)
+        //Can't change sizes with custom matrix, so no branch for LIT_BOARD_MATRIX
+        if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
         {
             changeGameSize(currentGameSize - 1);
         }
-        else
+        else if(currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
         {
             changeGameSize(currentGameSize - 2);
         }
@@ -2152,7 +2288,7 @@ function main()
         showSolution(false);
         showInverseSolution(false);
 
-        if(currentWorkingMode == workingModes.LIT_BOARD)
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
             recreateSolutionMatrixWorker();
             currentSolutionMatrixCalculated = false;
@@ -2166,7 +2302,7 @@ function main()
 
         qpText.textContent = "Quiet patterns: ";
 
-        if(currentWorkingMode === workingModes.LIT_BOARD)
+        if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
             resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
@@ -2178,7 +2314,14 @@ function main()
             currentGameBoard = generateNewBoard(currentGameSize, currentDomainSize, boardGenModes.BOARDGEN_ZERO_ELEMENT);
 
             resetStability();
-            updateStabilityTexture();
+            if(flagShowLitStability)
+            {
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
+            }
 
             currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, Math.floor(currentGameSize / 2), Math.floor(currentGameSize / 2), false);
             infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
@@ -2186,7 +2329,7 @@ function main()
 
         currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
 
-        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, !flagNoGrid);
+        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, gridCheckBox.checked);
         currentViewportWidth  = newCanvasSize.width;
         currentViewportHeight = newCanvasSize.height;
 
@@ -2195,7 +2338,7 @@ function main()
         canvas.clientWidth  = currentViewportWidth;
         canvas.clientHeight = currentViewportHeight;
 
-        updateBoardTexture();
+        updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
         updateViewport();
         requestRedraw();
@@ -2203,7 +2346,7 @@ function main()
 
     function changeDomainSize(newSize)
     {
-        if(currentWorkingMode != workingModes.LIT_BOARD)
+        if(currentWorkingMode != workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
         {
             return;
         }
@@ -2224,36 +2367,49 @@ function main()
 
         updateAddressBar(500); //Update the address bar with 1000ms delay
 
+        //Click rule/matrix invalidation
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+        {
+            invalidateBoardDomainInPlace(currentGameClickRule, currentDomainSize);
+        }
+        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            invalidateMatrixDomainInPlace(currentGameMatrix, currentDomainSize);
+        }
+
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
-        invalidateBoardDomainInPlace(currentGameClickRule, currentDomainSize); //Click rule invalidation
 
         infoText.textContent = "Lights Out  " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
-        updateBoardTexture();
+        updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
         requestRedraw();
     }
 
     function clickAtPoint(x, y, isConstruct)
     {
-        let boardPoint = boardPointFromCanvasPoint(x, y, currentGameSize, currentViewportOffsetX, currentViewportOffsetY, currentViewportWidth, currentViewportHeight, !flagNoGrid);
+        let boardPoint = boardPointFromCanvasPoint(x, y, currentGameSize, currentViewportOffsetX, currentViewportOffsetY, currentViewportWidth, currentViewportHeight, gridCheckBox.checked);
 
         let modX = boardPoint.xBoard;
         let modY = boardPoint.yBoard;
 
-        if(currentWorkingMode === workingModes.LIT_BOARD)
+        if(isConstruct)
         {
-            if(isConstruct)
-            {
-                makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
-            }
-            else
+            makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
+        }
+        else
+        {
+            if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
             {
                 currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, modX, modY, flagToroidBoard);
             }
-        }
-        else if(currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE_TOROID)
-        {
-            makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameBoard = makeTurnMatrix(currentGameBoard, currentGameMatrix, currentGameSize, currentDomainSize, modX, modY);
+            }
+            else if(currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE_TOROID)
+            {
+                makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
+            }
         }
 
         resetStability();
@@ -2261,30 +2417,43 @@ function main()
         if(flagShowSolution)
         {
             currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-            updateSolutionTexture();
+            updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
         }
         else if(flagShowInverseSolution)
         {
-            currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
-            updateSolutionTexture();
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
+
+            updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
         }
 
         if(flagShowStability)
         {
-            updateStabilityTexture();
+            updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
         }
         else if(flagShowLitStability)
         {
             calculateLitStability();
-            updateStabilityTexture();
+            updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
         }
 
-        updateBoardTexture();
+        updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
         requestRedraw();
     }
 
     function enableDefaultClickRule()
     {   
+        if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
+        }
+
         recreateSolutionMatrixWorker();
         currentSolutionMatrixCalculated = false;
 
@@ -2304,6 +2473,11 @@ function main()
 
     function enableDefaultToroidClickRule()
     {   
+        if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
+        }
+
         recreateSolutionMatrixWorker();
         currentSolutionMatrixCalculated = false;
 
@@ -2323,6 +2497,11 @@ function main()
 
     function enableCustomClickRule(clickRule, clickRuleSize, isToroid)
     {
+        if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
+        }
+
         recreateSolutionMatrixWorker();
         currentSolutionMatrixCalculated = false;
 
@@ -2334,6 +2513,24 @@ function main()
 
         currentEncodedClickRule = encodeBase64ClickRule(clickRule, isToroid);
         updateAddressBar(50);
+    }
+
+    function enableCustomMatrix(lightsOutMatrix, gameSize)
+    {
+        changeWorkingMode(workingModes.LIT_BOARD_MATRIX);
+
+        currentGameClickRule = null;
+        currentClickRuleSize = 0;
+
+        recreateSolutionMatrixWorker();
+        currentSolutionMatrixCalculated = false;
+
+        flagDefaultClickRule = false;
+        flagToroidBoard      = false;
+
+        currentGameMatrix = lightsOutMatrix;
+
+        changeGameSize(gameSize);
     }
 
     function resetStability()
@@ -2350,7 +2547,14 @@ function main()
             currentSolutionMatrixCalculating = true;
             solutionMatrixBlock.hidden       = false;
 
-            solutionMatrixWorker.postMessage({command: "CalcSolutionMatrix", params: {clickRule: currentGameClickRule, gameSize: currentGameSize, domainSize: currentDomainSize, clickRuleSize: currentClickRuleSize, isToroid: flagToroidBoard, opAfter: operationAfter}});
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                solutionMatrixWorker.postMessage({command: "CalcSolutionMatrixFromClickRule", params: {clickRule: currentGameClickRule, gameSize: currentGameSize, domainSize: currentDomainSize, clickRuleSize: currentClickRuleSize, isToroid: flagToroidBoard, opAfter: operationAfter}});
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                solutionMatrixWorker.postMessage({command: "CalcSolutionMatrixFromMatrix", params: {matrix: currentGameMatrix, gameSize: currentGameSize, domainSize: currentDomainSize, opAfter: operationAfter}});
+            }
         }
         else if(currentSolutionMatrixCalculated) //Matrix already calculated, do the operation specified
         {
@@ -2441,10 +2645,10 @@ function main()
             }
             case afterCalculationOperations.CALC_SOLVE_RANDOM:
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD)
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                    updateSolutionTexture();
+                    updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
     
                     currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
     
@@ -2458,10 +2662,10 @@ function main()
             }
             case afterCalculationOperations.CALC_SOLVE_SEQUENTIAL:
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD)
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                    updateSolutionTexture();
+                    updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
     
                     currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
     
@@ -2469,6 +2673,37 @@ function main()
     
                     flagTickLoop = true;
                     currentAnimationFrame = window.requestAnimationFrame(nextTick);
+                }
+
+                break;
+            }
+            case afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX:
+            {
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                {
+                    saveMatrixToImage(currentSolutionMatrix);
+                }
+
+                break;
+            }
+            case afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_EDGES:
+            {
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                {
+                    const matrixCellSize = 5;
+
+                    saveMatrixWithEdgesToImage(currentSolutionMatrix, matrixCellSize);
+                }
+
+                break;
+            }
+            case afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_RENDER_MODE:
+            {
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                {
+                    const matrixCellSize = 15;
+
+                    saveMatrixWithRenderModeToImage(currentSolutionMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, flagToroidBoard);
                 }
 
                 break;
@@ -2525,22 +2760,37 @@ function main()
             }
 
             resetStability();
-            updateStabilityTexture();
+            if(flagShowLitStability)
+            {
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
+            }
 
             if(flagShowSolution)
             {
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                updateSolutionTexture();
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
             else if(flagShowInverseSolution)
             {
-                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
-                updateSolutionTexture();
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+                {
+                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                }
+                else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                {
+                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+                }
+
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
         }
         else if(resetMode === resetModes.RESET_SOLUTION)
         {
-            if(currentWorkingMode !== workingModes.LIT_BOARD)
+            if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
             {
                 return;
             }
@@ -2553,11 +2803,11 @@ function main()
                 if(flagShowLitStability)
                 {
                     currentGameLitStability = calculateLitStability();
-                    updateStabilityTexture();
+                    updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
                 }
                 else if(flagShowStability)
                 {
-                    updateStabilityTexture();
+                    updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
                 }
 
                 showSolution(false);
@@ -2570,7 +2820,7 @@ function main()
                 showStability(false);
                 resetStability();
 
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowLitStability)
             {
@@ -2579,7 +2829,7 @@ function main()
                 showLitStability(false);
                 resetStability();
 
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
         }
         else if(resetMode === resetModes.RESET_INVERTO || resetMode === resetModes.RESET_DOMAIN_ROTATE_NONZERO)
@@ -2606,22 +2856,37 @@ function main()
             }
 
             resetStability();
-            updateStabilityTexture();
+            if(flagShowLitStability)
+            {
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
+            }
 
             if(flagShowSolution)
             {
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                updateSolutionTexture();
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
             else if(flagShowInverseSolution)
             {
-                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
-                updateSolutionTexture();
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+                {
+                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                }
+                else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                {
+                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+                }
+
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
         }
         else if(resetMode === resetModes.RESET_SOLVABLE_RANDOM)
         {
-            if(currentWorkingMode !== workingModes.LIT_BOARD)
+            if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
             {
                 return;
             }
@@ -2632,10 +2897,25 @@ function main()
             showInverseSolution(false);
 
             currentGameBoard = generateNewBoard(currentGameSize, currentDomainSize, boardGenModes.BOARDGEN_FULL_RANDOM);
-            currentGameBoard = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+ 
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameBoard = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameBoard = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
 
             resetStability();
-            updateStabilityTexture();
+            if(flagShowLitStability)
+            {
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
+            }
         }
         else
         {
@@ -2691,10 +2971,17 @@ function main()
             currentGameBoard = generateNewBoard(currentGameSize, currentDomainSize, modeBgen);
 
             resetStability();
-            updateStabilityTexture();
+            if(flagShowLitStability)
+            {
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
+            }
         }
 
-        updateBoardTexture();
+        updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
         requestRedraw();
     }
 
@@ -2807,7 +3094,7 @@ function main()
 
     function changeCountingMode(newCountingMode, stopWhenReturned)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD)
+        if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
         {
             return;
         }
@@ -2880,7 +3167,15 @@ function main()
         {
             currentPeriodCount = 0;
             currentCountedBoard = currentGameBoard.slice();
-            currentGameBoard    = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameBoard = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameBoard = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
 
             currentGameBoard = domainInverseBoard(currentGameBoard, currentDomainSize);
 
@@ -2911,31 +3206,50 @@ function main()
         flagStopCountingWhenFound   = false;
         flagTickLoop                = false;
 
-        currentWorkingMode = workingMode;
+        currentSavedWorkingMode = currentWorkingMode;
+        currentWorkingMode      = workingMode;
         
         if(workingMode == workingModes.CONSTRUCT_CLICKRULE || workingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
         {
+            if(currentSavedWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentSavedMatrix = null;
+            }
+            else if(currentSavedWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentSavedMatrix = currentGameMatrix;
+                currentGameMatrix  = null;
+            }
+
+            if(currentGameClickRule === null || currentClickRuleSize === 0)
+            {
+                enableDefaultClickRule();
+            }
+
             currentSavedBoard    = currentGameBoard.slice();
-            currentSavedGameSize = currentGameSize; 
+            currentSavedGameSize = currentGameSize;
 
             changeGameSize(currentClickRuleSize);
             currentGameBoard = currentGameClickRule;
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
-           infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
+            infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
 
-           acceptClickRuleHints.hidden     = false;
-           increaseDomainHints.hidden      = true;
-           changeClickRuleHints.hidden     = true;
-           solutionPeriodHints.hidden      = true;
-           solutionInterchangeHints.hidden = true;
-           boardSolveHints.hidden          = true;
-           metaBoardHints.hidden           = true;
-           miscellaneousHints.hidden       = true;
+            acceptClickRuleHints.hidden     = false;
+            increaseSizeHints.hidden        = false;
+            increaseDomainHints.hidden      = true;
+            changeClickRuleHints.hidden     = true;
+            solutionPeriodHints.hidden      = true;
+            solutionInterchangeHints.hidden = true;
+            boardSolveHints.hidden          = true;
+            metaBoardHints.hidden           = true;
+            miscellaneousHints.hidden       = true;
+            saveMatrixHints.hidden          = true;
         }
-        else
+        else if(workingMode == workingModes.LIT_BOARD_MATRIX)
         {
             acceptClickRuleHints.hidden     = true;
+            increaseSizeHints.hidden        = true;
             increaseDomainHints.hidden      = false;
             changeClickRuleHints.hidden     = false;
             solutionPeriodHints.hidden      = false;
@@ -2943,6 +3257,23 @@ function main()
             boardSolveHints.hidden          = false;
             metaBoardHints.hidden           = false;
             miscellaneousHints.hidden       = false;
+            saveMatrixHints.hidden          = false;
+        }
+        else if(workingMode == workingModes.LIT_BOARD_CLICKRULE)
+        {
+            currentSavedMatrix = null;
+            currentGameMatrix  = null;
+
+            acceptClickRuleHints.hidden     = true;
+            increaseSizeHints.hidden        = false;
+            increaseDomainHints.hidden      = false;
+            changeClickRuleHints.hidden     = false;
+            solutionPeriodHints.hidden      = false;
+            solutionInterchangeHints.hidden = false;
+            boardSolveHints.hidden          = false;
+            metaBoardHints.hidden           = false;
+            miscellaneousHints.hidden       = false;
+            saveMatrixHints.hidden          = false;
         }
 
         requestRedraw();
@@ -2963,10 +3294,10 @@ function main()
             changeGameSize(currentSavedGameSize);
             currentGameBoard = currentSavedBoard.slice();
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             requestRedraw();
-            changeWorkingMode(workingModes.LIT_BOARD);
+            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
 
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         }
@@ -2979,10 +3310,17 @@ function main()
             changeGameSize(currentSavedGameSize);
             currentGameBoard = currentSavedBoard.slice();
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             requestRedraw();
-            changeWorkingMode(workingModes.LIT_BOARD);
+            if(currentSavedWorkingMode === workingModes.LIT_BOARD_MATRIX)
+            {
+                enableCustomMatrix(currentSavedMatrix, currentSavedGameSize);
+            }
+            else
+            {
+                changeWorkingMode(currentSavedWorkingMode);
+            }
 
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         }
@@ -3009,7 +3347,7 @@ function main()
 
     function showSolution(showFlag)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD)
+        if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
         {
             flagShowSolution        = false;
             flagShowInverseSolution = false;
@@ -3025,7 +3363,7 @@ function main()
             flagShowSolution = true;
 
             currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-            updateSolutionTexture();
+            updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
         }
         else
         {
@@ -3037,7 +3375,7 @@ function main()
 
     function showInverseSolution(showFlag)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD)
+        if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
         {
             flagShowSolution        = false;
             flagShowInverseSolution = false;
@@ -3052,8 +3390,16 @@ function main()
         {
             flagShowInverseSolution = true;
 
-            currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
-            updateSolutionTexture();
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
+            
+            updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
         }
         else
         {
@@ -3065,7 +3411,7 @@ function main()
 
     function showStability(showFlag)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD || currentDomainSize > 2)
+        if((currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX) || currentDomainSize > 2)
         {
             flagShowStability    = false;
             flagShowLitStability = false;
@@ -3081,7 +3427,7 @@ function main()
             flagShowStability = true;
             showSolution(false);
 
-            updateStabilityTexture();
+            updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
         }
         else
         {
@@ -3093,7 +3439,7 @@ function main()
 
     function showLitStability(showFlag)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD || currentDomainSize > 2)
+        if((currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX) || currentDomainSize > 2)
         {
             flagShowStability    = false;
             flagShowLitStability = false;
@@ -3110,7 +3456,7 @@ function main()
             showSolution(false);
 
             currentGameLitStability = calculateLitStability();
-            updateStabilityTexture();
+            updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
         }
         else
         {
@@ -3165,49 +3511,10 @@ function main()
 
         renderModeSelect.value = valueSelect;
         
+        drawVertexArray     = createVertexArray(gl, currentShaderProgram);
+        drawShaderVariables = obtainShaderVariables(gl, currentShaderProgram);
+
         updateAddressBar(50);
-
-        boardSizeUniformLocation  = gl.getUniformLocation(currentShaderProgram, "gBoardSize");
-        cellSizeUniformLocation   = gl.getUniformLocation(currentShaderProgram, "gCellSize");
-        domainSizeUniformLocation = gl.getUniformLocation(currentShaderProgram, "gDomainSize");
-        flagsUniformLocation      = gl.getUniformLocation(currentShaderProgram, "gFlags");
-
-        canvasWidthUniformLocation     = gl.getUniformLocation(currentShaderProgram, "gImageWidth");
-        canvasHeightUniformLocation    = gl.getUniformLocation(currentShaderProgram, "gImageHeight");
-        viewportXOffsetUniformLocation = gl.getUniformLocation(currentShaderProgram, "gViewportOffsetX");
-        viewportYOffsetUniformLocation = gl.getUniformLocation(currentShaderProgram, "gViewportOffsetY");
-
-        colorNoneUniformLocation    = gl.getUniformLocation(currentShaderProgram, "gColorNone");
-        colorEnabledUniformLocation = gl.getUniformLocation(currentShaderProgram, "gColorEnabled");
-        colorSolvedUniformLocation  = gl.getUniformLocation(currentShaderProgram, "gColorSolved");
-        colorBetweenUniformLocation = gl.getUniformLocation(currentShaderProgram, "gColorBetween");
-
-        boardTextureUniformLocation     = gl.getUniformLocation(currentShaderProgram, "gBoard");
-        solutionTextureUniformLocation  = gl.getUniformLocation(currentShaderProgram, "gSolution");
-        stabilityTextureUniformLocation = gl.getUniformLocation(currentShaderProgram, "gStability");
-                
-        drawVertexBufferAttribLocation = gl.getAttribLocation(currentShaderProgram, "vScreenPos");
-
-        const posArray = new Float32Array([-1.0,  1.0, 0.0, 1.0, // eslint-disable-next-line indent
-                                            1.0,  1.0, 0.0, 1.0, // eslint-disable-next-line indent
-                                           -1.0, -1.0, 0.0, 1.0, // eslint-disable-next-line indent
-                                            1.0, -1.0, 0.0, 1.0]);
-
-        let posBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, posArray, gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-        drawVertexBuffer = gl.createVertexArray();
-        gl.bindVertexArray(drawVertexBuffer);
-        gl.enableVertexAttribArray(drawVertexBufferAttribLocation);
-        gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-        gl.vertexAttribPointer(drawVertexBufferAttribLocation, 4, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-        gl.bindVertexArray(null);
-
-        requestRedraw();
     }
 
     function setColorTheme(colorTheme)
@@ -3245,6 +3552,14 @@ function main()
             currentColorUnlit   = [0.000, 0.000, 0.545, 1.000];
             currentColorSolved  = [0.098, 0.098, 0.439, 1.000];
             currentColorBetween = [0.000, 0.000, 0.545, 1.000];
+            break;
+        }
+        case "BlackAndWhite":
+        {
+            currentColorLit     = [1.000, 1.000, 1.000, 1.000];
+            currentColorUnlit   = [0.000, 0.000, 0.000, 1.000];
+            currentColorSolved  = [1.000, 1.000, 1.000, 1.000];
+            currentColorBetween = [0.000, 0.000, 0.000, 1.000];
             break;
         }
         case "Pietia":
@@ -3291,8 +3606,6 @@ function main()
 
     function setGridVisible(visible)
     {
-        flagNoGrid = !visible;
-
         let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, visible);
         currentCellSize   = Math.ceil(canvasSize / currentGameSize) - 1;
 
@@ -3334,13 +3647,44 @@ function main()
                 turn = currentTurnList.pop();
             }
 
-            currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, turn.cellX, turn.cellY, flagToroidBoard);
-            updateBoardTexture();
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, turn.cellX, turn.cellY, flagToroidBoard);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameBoard = makeTurnMatrix(currentGameBoard, currentGameMatrix, currentGameSize, currentDomainSize, turn.cellX, turn.cellY);   
+            }
+
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             resetStability();
-            if(flagShowStability || flagShowLitStability)
+            if(flagShowLitStability)
             {
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
+            }
+
+            if(flagShowSolution && currentSolutionMatrixCalculated)
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
+            }
+            else if(flagShowInverseSolution)
+            {
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+                {
+                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                }
+                else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                {
+                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+                }
+        
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
 
             if(currentTurnList.length === 0)
@@ -3353,21 +3697,28 @@ function main()
         {
             currentPeriodCount++;
 
-            currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
-            
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
+
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             if(flagStopCountingWhenFound && equalsBoard(currentGameBoard, currentCountedBoard))
@@ -3396,16 +3747,16 @@ function main()
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             if(flagStopCountingWhenFound && equalsBoard(currentGameBoard, currentCountedBoard))
@@ -3445,16 +3796,16 @@ function main()
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             if(!flagTickLoop) //Just stopped, period is found
@@ -3473,7 +3824,15 @@ function main()
 
             let citybuilderBoard = addBoard(currentGameBoard, currentCountedBoard, currentDomainSize);
 
-            currentGameSolution = calculateInverseSolution(citybuilderBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            {
+                currentGameSolution = calculateInverseSolution(citybuilderBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+            }
+            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+            }
+            
             if(flagStopCountingWhenFound && equalsMultipliedBoard(currentGameSolution, citybuilderBoard, currentDomainSize)) //Solution is the current board multiplied by a number => we found an eigenvector
             {
                 flagStopCountingWhenFound = false;
@@ -3486,16 +3845,16 @@ function main()
 
             currentGameBoard = domainInverseBoard(currentGameBoard, currentDomainSize);
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             if(!flagTickLoop) //Just stopped, period is found
@@ -3524,6 +3883,760 @@ function main()
 
         link.click();
         link.remove();
+    }
+
+    function saveMatrixToImage(matrix)
+    {
+        const canvasMatrix  = document.createElement("canvas");
+        canvasMatrix.width  = currentGameSize * currentGameSize;
+        canvasMatrix.height = currentGameSize * currentGameSize;
+
+        let palette = [];
+        for(let i = 0; i < currentDomainSize; i++)
+        {
+            const lerpCoeff = i / (currentDomainSize - 1);
+
+            const r = Math.floor(255.0 * (currentColorUnlit[0] * (1 - lerpCoeff) + currentColorLit[0] * lerpCoeff));
+            const g = Math.floor(255.0 * (currentColorUnlit[1] * (1 - lerpCoeff) + currentColorLit[1] * lerpCoeff));
+            const b = Math.floor(255.0 * (currentColorUnlit[2] * (1 - lerpCoeff) + currentColorLit[2] * lerpCoeff));
+            const a = Math.floor(255.0 * (currentColorUnlit[3] * (1 - lerpCoeff) + currentColorLit[3] * lerpCoeff));
+
+            palette.push([r, g, b, a]);
+        }
+
+        let matrixImageArray = new Uint8ClampedArray(currentGameSize * currentGameSize * currentGameSize * currentGameSize * 4);
+        for(let yBig = 0; yBig < currentGameSize; yBig++)
+        {
+            for(let xBig = 0; xBig < currentGameSize; xBig++)
+            {
+                const matrixRowIndex = yBig * currentGameSize + xBig;
+                for(let ySm = 0; ySm < currentGameSize; ySm++)
+                {
+                    const imageRowIndex = yBig * currentGameSize + ySm;
+                    for(let xSm = 0; xSm < currentGameSize; xSm++)
+                    {
+                        const matrixColumnIndex = ySm * currentGameSize + xSm;
+                        const imageColumnIndex  = xBig * currentGameSize + xSm;
+
+                        const matrixVal = matrix[matrixRowIndex][matrixColumnIndex];
+                        
+                        const imageIndex = 4 * (imageRowIndex * currentGameSize * currentGameSize + imageColumnIndex);
+                        matrixImageArray[imageIndex + 0] = palette[matrixVal][0];
+                        matrixImageArray[imageIndex + 1] = palette[matrixVal][1];
+                        matrixImageArray[imageIndex + 2] = palette[matrixVal][2];
+                        matrixImageArray[imageIndex + 3] = palette[matrixVal][3];
+                    }
+                }
+            }
+        }
+
+        let matrixImageData = new ImageData(matrixImageArray, currentGameSize * currentGameSize)
+
+        const canvasContext = canvasMatrix.getContext('2d');
+        canvasContext.putImageData(matrixImageData, 0, 0);
+
+        let link      = document.createElement("a");
+        link.href     = canvasMatrix.toDataURL("image/png");
+        link.download = "LightsOutMatrix.png";
+
+        link.click();
+        link.remove();
+
+        canvasMatrix.remove();
+    }
+
+    function saveMatrixWithEdgesToImage(matrix, matrixCellSize)
+    {
+        const canvasMatrix  = document.createElement("canvas");
+        canvasMatrix.width  = currentGameSize * (currentGameSize * matrixCellSize + currentGameSize + 1) + currentGameSize + 1;
+        canvasMatrix.height = currentGameSize * (currentGameSize * matrixCellSize + currentGameSize + 1) + currentGameSize + 1;
+
+        let palette = [];
+        for(let i = 0; i < currentDomainSize; i++)
+        {
+            const lerpCoeff = i / (currentDomainSize - 1);
+
+            const r = Math.floor(255.0 * (currentColorUnlit[0] * (1 - lerpCoeff) + currentColorLit[0] * lerpCoeff));
+            const g = Math.floor(255.0 * (currentColorUnlit[1] * (1 - lerpCoeff) + currentColorLit[1] * lerpCoeff));
+            const b = Math.floor(255.0 * (currentColorUnlit[2] * (1 - lerpCoeff) + currentColorLit[2] * lerpCoeff));
+            const a = Math.floor(255.0 * (currentColorUnlit[3] * (1 - lerpCoeff) + currentColorLit[3] * lerpCoeff));
+
+            palette.push([r, g, b, a]);
+        }
+
+        let colorBetweenBigCells   = [Math.floor(255.0 * currentColorUnlit[0]),   Math.floor(255.0 * currentColorUnlit[1]),   Math.floor(255.0 * currentColorUnlit[2]),   Math.floor(255.0 * currentColorUnlit[3])];
+        let colorBetweenSmallCells = [Math.floor(255.0 * currentColorBetween[0]), Math.floor(255.0 * currentColorBetween[1]), Math.floor(255.0 * currentColorBetween[2]), Math.floor(255.0 * currentColorBetween[3])];
+
+        let matrixImageArray = new Uint8ClampedArray(canvasMatrix.width * canvasMatrix.height * 4);
+
+        let imageIndex = 0;
+
+        //Edge above the big cell
+        for(let xImage = 0; xImage < (currentGameSize * (currentGameSize * matrixCellSize + currentGameSize + 1) + currentGameSize + 1); xImage++)
+        {
+            matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+            matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+            matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+            matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+            imageIndex += 4;
+        }
+
+        for(let yBig = 0; yBig < currentGameSize; yBig++)
+        {
+            //Edge above the cell
+
+            //Leftmost edge of the image
+            matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+            matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+            matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+            matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+            imageIndex += 4;
+
+            for(let xBig = 0; xBig < currentGameSize; xBig++)
+            {
+                for(let xBigCell = 0; xBigCell < (currentGameSize * matrixCellSize + currentGameSize + 1); xBigCell++)
+                {
+                    matrixImageArray[imageIndex + 0] = colorBetweenSmallCells[0];
+                    matrixImageArray[imageIndex + 1] = colorBetweenSmallCells[1];
+                    matrixImageArray[imageIndex + 2] = colorBetweenSmallCells[2];
+                    matrixImageArray[imageIndex + 3] = colorBetweenSmallCells[3];
+                    imageIndex += 4;
+                }
+
+                //Edge after the big cell
+                matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                imageIndex += 4;
+            }
+
+            for(let ySm = 0; ySm < currentGameSize; ySm++)
+            {
+                //The cell
+                for(let yCell = 0; yCell < matrixCellSize; yCell++)
+                {
+                    //Leftmost edge of the image
+                    matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                    matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                    matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                    matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                    imageIndex += 4;
+
+                    for(let xBig = 0; xBig < currentGameSize; xBig++)
+                    {
+                        const matrixRowIndex = yBig * currentGameSize + xBig;
+
+                        //Leftmost edge on the big cell
+                        matrixImageArray[imageIndex + 0] = colorBetweenSmallCells[0];
+                        matrixImageArray[imageIndex + 1] = colorBetweenSmallCells[1];
+                        matrixImageArray[imageIndex + 2] = colorBetweenSmallCells[2];
+                        matrixImageArray[imageIndex + 3] = colorBetweenSmallCells[3];
+                        imageIndex += 4;
+
+                        for(let xSm = 0; xSm < currentGameSize; xSm++)
+                        {
+                            const matrixColumnIndex = ySm * currentGameSize + xSm;
+                            const matrixVal         = matrix[matrixRowIndex][matrixColumnIndex];
+                            
+                            for(let xCell = 0; xCell < matrixCellSize; xCell++)
+                            {
+                                //The cell
+                                matrixImageArray[imageIndex + 0] = palette[matrixVal][0];
+                                matrixImageArray[imageIndex + 1] = palette[matrixVal][1];
+                                matrixImageArray[imageIndex + 2] = palette[matrixVal][2];
+                                matrixImageArray[imageIndex + 3] = palette[matrixVal][3];
+                                imageIndex += 4;
+                            }
+
+                            //Edge after the cell
+                            matrixImageArray[imageIndex + 0] = colorBetweenSmallCells[0];
+                            matrixImageArray[imageIndex + 1] = colorBetweenSmallCells[1];
+                            matrixImageArray[imageIndex + 2] = colorBetweenSmallCells[2];
+                            matrixImageArray[imageIndex + 3] = colorBetweenSmallCells[3];
+                            imageIndex += 4;
+                        }
+
+                        //Edge after the big cell
+                        matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                        matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                        matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                        matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                        imageIndex += 4;
+                    }
+                }
+
+                //Edge below the cell
+
+                //Leftmost edge of the image
+                matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                imageIndex += 4;
+
+                for(let xBig = 0; xBig < currentGameSize; xBig++)
+                {
+                    for(let xBigCell = 0; xBigCell < (currentGameSize * matrixCellSize + currentGameSize + 1); xBigCell++)
+                    {
+                        matrixImageArray[imageIndex + 0] = colorBetweenSmallCells[0];
+                        matrixImageArray[imageIndex + 1] = colorBetweenSmallCells[1];
+                        matrixImageArray[imageIndex + 2] = colorBetweenSmallCells[2];
+                        matrixImageArray[imageIndex + 3] = colorBetweenSmallCells[3];
+                        imageIndex += 4;
+                    }
+
+                    //Edge after the big cell
+                    matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                    matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                    matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                    matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                    imageIndex += 4;
+                }
+            }
+
+            //Edge below the big cell
+            for(let xImage = 0; xImage < (currentGameSize * (currentGameSize * matrixCellSize + currentGameSize + 1) + currentGameSize + 1); xImage++)
+            {
+                matrixImageArray[imageIndex + 0] = colorBetweenBigCells[0];
+                matrixImageArray[imageIndex + 1] = colorBetweenBigCells[1];
+                matrixImageArray[imageIndex + 2] = colorBetweenBigCells[2];
+                matrixImageArray[imageIndex + 3] = colorBetweenBigCells[3];
+                imageIndex += 4;
+            }
+        }
+
+        let matrixImageData = new ImageData(matrixImageArray, canvasMatrix.width);
+
+        const canvasContext = canvasMatrix.getContext('2d');
+        canvasContext.putImageData(matrixImageData, 0, 0);
+
+        let link      = document.createElement("a");
+        link.href     = canvasMatrix.toDataURL("image/png");
+        link.download = "LightsOutMatrix.png";
+
+        link.click();
+        link.remove();
+
+        canvasMatrix.remove();
+    }
+
+    function saveMatrixWithRenderModeToImage(matrix, matrixCellSize, renderMode, showGrid, isToroid)
+    {
+        const canvasMatrix = document.createElement("canvas");
+        const canvasRow    = document.createElement("canvas");
+
+        const matrixContext = canvasMatrix.getContext("2d");
+
+        const glRow = canvasRow.getContext("webgl2", {preserveDrawingBuffer: true});
+        if(!glRow)
+        {
+            alert("Unable to initialize WebGL. Your browser or machine may not support it.");
+            return;
+        }
+
+        let matrixShaderProgram = null;
+        let paddingCanvasCells  = 0;
+        switch(renderMode)
+        {
+        case "Squares":
+        {
+            matrixShaderProgram = createSquaresShaderProgram(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 0;
+            break;
+        }
+        case "Circles":
+        {
+            matrixShaderProgram = createCirclesShaderProgam(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 1;
+            break;
+        }
+        case "Diamonds":
+        {
+            matrixShaderProgram = createDiamondsShaderProgram(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 1;
+            break;
+        }
+        case "BEAMS":
+        {
+            matrixShaderProgram = createBeamsShaderProgram(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 1;
+            break;
+        }
+        case "Raindrops":
+        {
+            matrixShaderProgram = createRaindropsShaderProgram(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 1;
+            break;
+        }
+        case "Chains":
+        {
+            matrixShaderProgram = createChainsShaderProgram(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 2;
+            break;
+        }
+        default:
+        {
+            console.error("Unknown render mode");
+            return;
+        }
+        }
+
+        let rowShaderVariables = obtainShaderVariables(glRow, matrixShaderProgram);
+        let rowVertexArray     = createVertexArray(glRow, matrixShaderProgram);
+
+        let rowBoardTex = createBoardLikeTexture(glRow);
+
+        let drawCellSize = 0;
+        let copySizeX    = 0;
+        let copySizeY    = 0;
+        if(showGrid)
+        {
+            drawCellSize = matrixCellSize + 1;
+
+            copySizeX = currentGameSize * drawCellSize + 1;
+            copySizeY = currentGameSize * drawCellSize + 1;
+
+            canvasMatrix.width  = currentGameSize * currentGameSize * drawCellSize + 1;
+            canvasMatrix.height = currentGameSize * currentGameSize * drawCellSize + 1;
+
+            canvasRow.width  = (currentGameSize + 2 * paddingCanvasCells) * drawCellSize + 1;
+            canvasRow.height = (currentGameSize + 2 * paddingCanvasCells) * drawCellSize + 1;
+        }
+        else
+        {
+            drawCellSize = matrixCellSize;
+
+            copySizeX = currentGameSize * matrixCellSize;
+            copySizeY = currentGameSize * matrixCellSize;
+
+            canvasMatrix.width  = currentGameSize * currentGameSize * matrixCellSize;
+            canvasMatrix.height = currentGameSize * currentGameSize * matrixCellSize;
+
+            canvasRow.width  = (currentGameSize + 2 * paddingCanvasCells) * matrixCellSize;
+            canvasRow.height = (currentGameSize + 2 * paddingCanvasCells) * matrixCellSize;
+        }
+
+        let copyOffsetX = drawCellSize * paddingCanvasCells;
+        let copyOffsetY = drawCellSize * paddingCanvasCells;
+
+        canvasRow.clientWidth  = canvasRow.width;
+        canvasRow.clientHeight = canvasRow.height;
+
+        glRow.viewport(0, 0, canvasRow.width, canvasRow.height);
+
+        for(let yBig = 0; yBig < currentGameSize; yBig++)
+        {
+            for(let xBig = 0; xBig < currentGameSize; xBig++)
+            {
+                let row = flatCellIndex(currentGameSize, xBig, yBig);
+
+                let boardSize = currentGameSize + 2 * paddingCanvasCells;
+                let rowBoard  = new Uint8Array(boardSize * boardSize);
+
+                //Main row board data
+                for(let y = 0; y < currentGameSize; y++)
+                {
+                    for(let x = 0; x < currentGameSize; x++)
+                    {
+                        let indexPadded = flatCellIndex(boardSize, x + paddingCanvasCells, y + paddingCanvasCells);
+                        let indexPlain  = flatCellIndex(currentGameSize, x, y);
+
+                        rowBoard[indexPadded] = matrix[row][indexPlain];
+                    }
+                }
+
+                //Top padded rows
+                for(let padY = 0; padY < paddingCanvasCells; padY++)
+                {
+                    let y = padY;
+
+                    let bigY   = yBig - Math.ceil((paddingCanvasCells - padY) / currentGameSize);
+                    let smallY = wholeMod((currentGameSize - (paddingCanvasCells - padY)), currentGameSize);
+
+                    if(isToroid && bigY < 0)
+                    {
+                        bigY = wholeMod(bigY, currentGameSize);
+                    }
+                    else if(bigY < 0)
+                    {
+                        continue;
+                    }
+
+                    for(let x = 0; x < boardSize; x++)
+                    {
+                        let bigX   = -1;
+                        let smallX = -1;
+                        if(x < paddingCanvasCells)
+                        {
+                            let padX = x;
+                            bigX     = xBig - Math.ceil((paddingCanvasCells - padX) / currentGameSize);
+                            smallX   = wholeMod((currentGameSize - (paddingCanvasCells - padX)), currentGameSize);
+                        }
+                        else if(x >= paddingCanvasCells + currentGameSize)
+                        {
+                            let padX = x - paddingCanvasCells - currentGameSize;
+                            bigX     = xBig + Math.ceil((padX + 1) / currentGameSize);
+                            smallX   = wholeMod(padX, currentGameSize);
+                        }
+                        else
+                        {
+                            bigX   = xBig;
+                            smallX = x - paddingCanvasCells;
+                        }
+
+                        if(isToroid && (bigX < 0 || bigX >= currentGameSize))
+                        {
+                            bigX = wholeMod(bigX, currentGameSize);
+                        }
+                        else if(bigX < 0 || bigX >= currentGameSize)
+                        {
+                            continue;
+                        }
+
+                        let matrixRowIndex    = flatCellIndex(currentGameSize, bigX,   bigY);
+                        let matrixColumnIndex = flatCellIndex(currentGameSize, smallX, smallY); 
+                        let boardIndex        = flatCellIndex(boardSize,       x,      y);
+
+                        rowBoard[boardIndex] = matrix[matrixRowIndex][matrixColumnIndex];
+                    }
+                }
+
+                //Left and right padded columns
+                for(let smallY = 0; smallY < currentGameSize; smallY++)
+                {
+                    let bigY = yBig;
+                    let y    = smallY + paddingCanvasCells;
+
+                    for(let padX = 0; padX < paddingCanvasCells; padX++)
+                    {
+                        let bigXLeft   = xBig - Math.ceil((paddingCanvasCells - padX) / currentGameSize);
+                        let smallXLeft = wholeMod((currentGameSize - (paddingCanvasCells - padX)), currentGameSize);
+                        let xLeft      = padX;
+
+                        let bigXRight   = xBig + Math.ceil((padX + 1) / currentGameSize);
+                        let smallXRight = wholeMod(padX, currentGameSize);
+                        let xRight      = padX + currentGameSize + paddingCanvasCells;
+
+                        if(isToroid && (bigXLeft < 0 || bigXRight >= currentGameSize))
+                        {
+                            bigXLeft  = wholeMod(bigXLeft, currentGameSize);
+                            bigXRight = wholeMod(bigXRight, currentGameSize);
+                        }
+
+                        if(bigXLeft >= 0) //Can be if !isToroid 
+                        {
+                            let matrixRowIndexLeft    = flatCellIndex(currentGameSize, bigXLeft,   bigY);
+                            let matrixColumnIndexLeft = flatCellIndex(currentGameSize, smallXLeft, smallY); 
+                            let boardIndexLeft        = flatCellIndex(boardSize,       xLeft,      y);
+
+                            rowBoard[boardIndexLeft] = matrix[matrixRowIndexLeft][matrixColumnIndexLeft];
+                        }
+
+                        if(bigXRight < currentGameSize) //Can be if !isToroid 
+                        {
+                            let matrixRowIndexRight    = flatCellIndex(currentGameSize, bigXRight,   bigY);
+                            let matrixColumnIndexRight = flatCellIndex(currentGameSize, smallXRight, smallY); 
+                            let boardIndexRight        = flatCellIndex(boardSize,       xRight,      y);
+
+                            rowBoard[boardIndexRight] = matrix[matrixRowIndexRight][matrixColumnIndexRight];
+                        }
+                    }
+                }
+
+                //Bottom padded rows
+                for(let padY = 0; padY < paddingCanvasCells; padY++)
+                {
+                    let y = padY + currentGameSize + paddingCanvasCells;
+
+                    let bigY   = yBig + Math.ceil((padY + 1) / currentGameSize);
+                    let smallY = wholeMod(padY, currentGameSize);
+
+                    if(isToroid && bigY >= currentGameSize)
+                    {
+                        bigY = wholeMod(bigY, currentGameSize);
+                    }
+                    else if(bigY >= currentGameSize)
+                    {
+                        continue;
+                    }
+
+                    for(let x = 0; x < boardSize; x++)
+                    {
+                        let bigX   = -1;
+                        let smallX = -1;
+                        if(x < paddingCanvasCells)
+                        {
+                            let padX = x;
+                            bigX     = xBig - Math.ceil((paddingCanvasCells - padX) / currentGameSize);
+                            smallX   = wholeMod((currentGameSize - (paddingCanvasCells - padX)), currentGameSize);
+                        }
+                        else if(x >= paddingCanvasCells + currentGameSize)
+                        {
+                            let padX = x - paddingCanvasCells - currentGameSize;
+                            bigX     = xBig + Math.ceil((padX + 1) / currentGameSize);
+                            smallX   = wholeMod(padX, currentGameSize);
+                        }
+                        else
+                        {
+                            bigX   = xBig;
+                            smallX = x - paddingCanvasCells;
+                        }
+
+                        if(isToroid && (bigX < 0 || bigX >= currentGameSize))
+                        {
+                            bigX = wholeMod(bigX, currentGameSize);
+                        }
+                        else if(bigX < 0 || bigX >= currentGameSize)
+                        {
+                            continue;
+                        }
+
+                        let matrixRowIndex    = flatCellIndex(currentGameSize, bigX,   bigY);
+                        let matrixColumnIndex = flatCellIndex(currentGameSize, smallX, smallY); 
+                        let boardIndex        = flatCellIndex(boardSize,       x,      y);
+
+                        rowBoard[boardIndex] = matrix[matrixRowIndex][matrixColumnIndex];
+                    }
+                }
+
+                updateBoardLikeTexture(glRow, rowBoard, boardSize, rowBoardTex);
+
+                glRow.clearColor(0.0, 0.0, 0.0, 0.0);
+                glRow.clear(glRow.COLOR_BUFFER_BIT);
+
+                let drawFlags = 0;
+                if(!gridCheckBox.checked)
+                {
+                    drawFlags = drawFlags | 8;
+                }
+
+                glRow.bindVertexArray(rowVertexArray);
+
+                glRow.bindFramebuffer(glRow.FRAMEBUFFER, null);
+                glRow.useProgram(matrixShaderProgram);
+
+                glRow.uniform1i(rowShaderVariables.BoardSizeUniformLocation,  boardSize);
+                glRow.uniform1i(rowShaderVariables.CellSizeUniformLocation,   drawCellSize);
+                glRow.uniform1i(rowShaderVariables.DomainSizeUniformLocation, currentDomainSize);
+                glRow.uniform1i(rowShaderVariables.FlagsUniformLocation,      drawFlags);
+
+                glRow.uniform1i(rowShaderVariables.CanvasWidthUniformLocation,     canvasRow.width);
+                glRow.uniform1i(rowShaderVariables.CanvasHeightUniformLocation,    canvasRow.height);
+                glRow.uniform1i(rowShaderVariables.ViewportXOffsetUniformLocation, 0);
+                glRow.uniform1i(rowShaderVariables.ViewportYOffsetUniformLocation, 0);
+
+                glRow.uniform4f(rowShaderVariables.ColorNoneUniformLocation,    currentColorUnlit[0],   currentColorUnlit[1],   currentColorUnlit[2],   currentColorUnlit[3]);
+                glRow.uniform4f(rowShaderVariables.ColorEnabledUniformLocation, currentColorLit[0],     currentColorLit[1],     currentColorLit[2],     currentColorLit[3]);
+                glRow.uniform4f(rowShaderVariables.ColorSolvedUniformLocation,  currentColorSolved[0],  currentColorSolved[1],  currentColorSolved[2],  currentColorSolved[3]);
+                glRow.uniform4f(rowShaderVariables.ColorBetweenUniformLocation, currentColorBetween[0], currentColorBetween[1], currentColorBetween[2], currentColorBetween[3]);
+
+                glRow.uniform1i(rowShaderVariables.BoardTextureUniformLocation, 0);
+
+                glRow.activeTexture(glRow.TEXTURE0);
+                glRow.bindTexture(glRow.TEXTURE_2D, rowBoardTex);
+
+                glRow.drawArrays(glRow.TRIANGLE_STRIP, 0, 4);
+
+                let copyDestOffsetX = xBig * drawCellSize * currentGameSize;
+                let copyDestOffsetY = yBig * drawCellSize * currentGameSize;
+                matrixContext.drawImage(canvasRow, copyOffsetX, copyOffsetY, copySizeX, copySizeY, copyDestOffsetX, copyDestOffsetY, copySizeX, copySizeY);
+            }
+        }
+
+        //glRow.getExtension('WEBGL_lose_context').loseContext();
+
+        let link      = document.createElement("a");
+        link.href     = canvasMatrix.toDataURL("image/png");
+        link.download = "LightsOutMatrix.png";
+
+        link.click();
+        link.remove();
+
+        canvasRow.remove();
+        canvasMatrix.remove();
+    }
+
+    function loadMatrix(imageFile)
+    {
+        let fileReader = new FileReader();
+        fileReader.onload = function()
+        {
+            let image    = new Image();
+            image.onload = function()
+            {
+                const canvasMatrix  = document.createElement("canvas");
+                const canvasContext = canvasMatrix.getContext('2d'); 
+
+                canvasMatrix.width  = image.width;
+                canvasMatrix.height = image.height;
+
+                canvasContext.drawImage(image, 0, 0);
+                let matrixData = canvasContext.getImageData(0, 0, image.width, image.height).data;
+
+                let matrixSize = Math.min(image.width, image.height);
+
+                let newGameSize = Math.floor(Math.sqrt(matrixSize));
+                matrixSize      = newGameSize * newGameSize;
+
+                //Calculate matrix values based on CIEDE2000 color difference in Lab color space
+                function labF(t) 
+                {
+                    let delta = 6.0 / 29.0;
+                    if(t > delta * delta * delta)
+                    {
+                        return Math.pow(t, 1 / 3.0);
+                    }
+                    else
+                    {
+                        return t / (3 * delta * delta) + 4.0 / 29.0;
+                    }
+                }
+
+                function rgbToLab(R, G, B)
+                {
+                    let X = (0.49000 * R + 0.31000 * G + 0.20000 * B) / 0.17697;
+                    let Y = (0.19697 * R + 0.81240 * G + 0.01063 * B) / 0.17697;
+                    let Z = (0.00000 * R + 0.01000 * G + 0.99000 * B) / 0.17697;
+
+                    let L = 116 * labF(Y / 100.0)    - 16;
+                    let a = 500 * (labF(X / 95.0489) - labF(Y / 100.0));
+                    let b = 200 * (labF(Y / 100.0)   - labF(Z / 108.8840));
+
+                    return [L, a, b];
+                }
+
+                //CIEDE2000
+                function ciede2000(L1, a1, b1, L2, a2, b2)
+                {
+                    let C1 = Math.sqrt(a1 * a1 + b1 * b1);
+                    let C2 = Math.sqrt(a2 * a2 + b2 * b2);
+
+                    let L_ = (L1 + L2) / 2;
+                    let C_ = (C1 + C2) / 2;
+
+                    let C7        = C_ * C_ * C_ * C_ * C_ * C_ * C_;
+                    let twenty57_ = 25 * 25 * 25 * 25 * 25 * 25 * 25;
+
+                    let a1q = a1 + (a1 / 2) * (1 - Math.sqrt(C7 / (C7 + twenty57_)));
+                    let a2q = a2 + (a2 / 2) * (1 - Math.sqrt(C7 / (C7 + twenty57_)));
+
+                    let C1q = Math.sqrt(a1q * a1q + b1 * b1);
+                    let C2q = Math.sqrt(a2q * a2q + b2 * b2);
+
+                    let h1 = (Math.atan2(b1, a1q) + Math.PI) * 180.0 / Math.PI;
+                    let h2 = (Math.atan2(b2, a2q) + Math.PI) * 180.0 / Math.PI;
+
+                    let deltahq = 0.0;
+                    if(Math.abs(C1q) < 0.0000001 || Math.abs(C2q) < 0.0000001)
+                    {
+                        deltahq = 0.0;
+                    }
+                    else if(Math.abs(h1 - h2) <= 180)
+                    {
+                        deltahq = h1 - h2;
+                    }
+                    else if(Math.abs(h1 - h2) > 180 && h2 <= h1)
+                    {
+                        deltahq = h2 - h1 + 360;
+                    }
+                    else if(Math.abs(h1 - h2) > 180 && h2 > h1)
+                    {
+                        deltahq = h2 - h1 - 360;
+                    }
+
+                    let H_ = 0.0;
+                    if(Math.abs(C1q) < 0.0000001 || Math.abs(C2q) < 0.0000001)
+                    {
+                        H_ = h1 + h2;
+                    }
+                    else if(Math.abs(h1 - h2) <= 180)
+                    {
+                        H_ = (h1 + h2) / 2;
+                    }
+                    else if(Math.abs(h1 - h2) > 180 && (h1 + h2 < 360))
+                    {
+                        H_ = (h1 + h2 + 360) / 2;
+                    }
+                    else if(Math.abs(h1 - h2) > 180 && (h1 + h2 >= 360))
+                    {
+                        H_ = (h1 + h2 - 360) / 2;
+                    }
+
+                    let deltaL = L2  - L1;
+                    let deltaC = C2q - C1q;
+                    let deltaH = 2 * Math.sqrt(C1q * C2q) * Math.sin(deltahq * Math.PI / 360.0);
+                    
+                    let T = 1 - 0.17 * Math.cos((H_ - 30) * Math.PI / 180) + 0.24 * Math.cos((2 * H_) * Math.PI / 180) + 0.32 * Math.cos((3 * H_ + 6) * Math.PI / 180) - 0.20 * Math.cos((4 * H_ - 63) * Math.PI / 180);
+
+                    let SL = 1 + 0.015 * (L_ - 50) * (L_ - 50) / Math.sqrt(20 + (L_ - 50) * (L_ - 50));
+                    let SC = 1 + 0.045 * C_;
+                    let SH = 1 + 0.015 * C_ * T;
+
+                    let RT = -2 * Math.sqrt(C7 / (C7 + twenty57_)) * Math.sin(60 * Math.exp(-(H_ - 275) * (H_ - 275) / 625) * Math.PI / 180);
+
+                    let deltaLTerm = (deltaL / SL) * (deltaL / SL);
+                    let deltaCTerm = (deltaC / SC) * (deltaC / SC);
+                    let deltaHTerm = (deltaH / SH) * (deltaH / SH);
+                    let RTTerm     = RT * (deltaC / SC) * (deltaH / SH);
+
+                    return Math.sqrt(deltaLTerm + deltaCTerm + deltaHTerm + RTTerm);
+                }
+
+                let colorUnlitLab = rgbToLab(currentColorUnlit[0], currentColorUnlit[1], currentColorUnlit[2]);
+                let colorLitLab   = rgbToLab(currentColorLit[0],   currentColorLit[1],   currentColorLit[2]);
+
+                let distUnlitLit = ciede2000(colorUnlitLab[0], colorUnlitLab[1], colorUnlitLab[2], colorLitLab[0], colorLitLab[1], colorLitLab[2]);
+
+                let newMatrix = [];
+                for(let yMatrix = 0; yMatrix < matrixSize; yMatrix++)
+                {
+                    let matrixRow = new Uint8Array(matrixSize);
+                    newMatrix.push(matrixRow);
+                }
+
+                for(let yBig = 0; yBig < newGameSize; yBig++)
+                {
+                    for(let ySm = 0; ySm < newGameSize; ySm++)
+                    {
+                        let matrixRow = yBig * newGameSize + ySm;
+
+                        for(let xBig = 0; xBig < newGameSize; xBig++)
+                        {
+                            let imageRow = yBig * newGameSize + xBig;
+
+                            for(let xSm = 0; xSm < newGameSize; xSm++)
+                            {
+                                let matrixColumn = xBig * newGameSize + xSm; 
+                                let imageColumn  = ySm  * newGameSize + xSm;
+
+                                let pixelPos = 4 * (imageRow * image.width + imageColumn);
+
+                                let r = matrixData[pixelPos + 0] / 255.0;
+                                let g = matrixData[pixelPos + 1] / 255.0;
+                                let b = matrixData[pixelPos + 2] / 255.0;
+
+                                let pixelColorLab  = rgbToLab(r, g, b);
+                                let distPixelUnlit = ciede2000(pixelColorLab[0], pixelColorLab[1], pixelColorLab[2], colorUnlitLab[0], colorUnlitLab[1], colorUnlitLab[2]); 
+
+                                let matrixValNormalized = clamp(distPixelUnlit / distUnlitLit, 0.0, 1.0);
+                                let matrixVal           = Math.floor(matrixValNormalized * (currentDomainSize - 1) + 0.5);
+
+                                newMatrix[matrixRow][matrixColumn] = matrixVal;
+                            }
+                        }
+                    }
+                }
+
+                enableCustomMatrix(newMatrix, newGameSize);
+
+                canvasMatrix.remove();
+            }
+
+            image.src = fileReader.result;
+        }
+
+        fileReader.readAsDataURL(imageFile);
     }
 
     function initPuzzleContents()
@@ -3599,11 +4712,11 @@ function main()
             enableCustomClickRule(decodedClickRuleData.clickrule, decodedClickRuleData.clickrulesize, decodedClickRuleData.istoroid);
         }
 
-        changeGameSize(gameSize);
-        changeDomainSize(domainSize);
-
         setRenderMode(renderMode);
         setColorTheme(colorTheme);
+
+        changeGameSize(gameSize);
+        changeDomainSize(domainSize);
 
         gridCheckBox.checked = showGrid;
         setGridVisible(showGrid);
@@ -3618,7 +4731,7 @@ function main()
         updateAddressBarTimeout = setTimeout(function()
         {
             let gameSize = 0;
-            if(currentWorkingMode == workingModes.LIT_BOARD)
+            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
             {
                 gameSize = currentGameSize;
             }
@@ -3643,43 +4756,100 @@ function main()
         mainDraw();
     }
 
+    function obtainShaderVariables(context, shaderProgram)
+    {
+        let variables = 
+        {
+            BoardSizeUniformLocation:  context.getUniformLocation(shaderProgram, "gBoardSize"),
+            CellSizeUniformLocation:   context.getUniformLocation(shaderProgram, "gCellSize"),
+            DomainSizeUniformLocation: context.getUniformLocation(shaderProgram, "gDomainSize"),
+            FlagsUniformLocation:      context.getUniformLocation(shaderProgram, "gFlags"),
+    
+            CanvasWidthUniformLocation:     context.getUniformLocation(shaderProgram, "gImageWidth"),
+            CanvasHeightUniformLocation:    context.getUniformLocation(shaderProgram, "gImageHeight"),
+            ViewportXOffsetUniformLocation: context.getUniformLocation(shaderProgram, "gViewportOffsetX"),
+            ViewportYOffsetUniformLocation: context.getUniformLocation(shaderProgram, "gViewportOffsetY"),
+    
+            ColorNoneUniformLocation:    context.getUniformLocation(shaderProgram, "gColorNone"),
+            ColorEnabledUniformLocation: context.getUniformLocation(shaderProgram, "gColorEnabled"),
+            ColorSolvedUniformLocation:  context.getUniformLocation(shaderProgram, "gColorSolved"),
+            ColorBetweenUniformLocation: context.getUniformLocation(shaderProgram, "gColorBetween"),
+    
+            BoardTextureUniformLocation:     context.getUniformLocation(shaderProgram, "gBoard"),
+            SolutionTextureUniformLocation:  context.getUniformLocation(shaderProgram, "gSolution"),
+            StabilityTextureUniformLocation: context.getUniformLocation(shaderProgram, "gStability")
+        };
+
+        return variables;
+    }
+
+    function createVertexArray(context, shaderProgram)
+    {
+        let bufferAttribLocation = context.getAttribLocation(shaderProgram, "vScreenPos");
+
+        const posArray = new Float32Array([-1.0,  1.0, 0.0, 1.0, // eslint-disable-next-line indent
+                                            1.0,  1.0, 0.0, 1.0, // eslint-disable-next-line indent
+                                           -1.0, -1.0, 0.0, 1.0, // eslint-disable-next-line indent
+                                            1.0, -1.0, 0.0, 1.0]);
+
+        let posBuffer = context.createBuffer();
+        context.bindBuffer(context.ARRAY_BUFFER, posBuffer);
+        context.bufferData(context.ARRAY_BUFFER, posArray, context.STATIC_DRAW);
+        context.bindBuffer(context.ARRAY_BUFFER, null);
+
+        let vertexArray = context.createVertexArray();
+        context.bindVertexArray(vertexArray);
+
+        context.enableVertexAttribArray(bufferAttribLocation);
+        context.bindBuffer(context.ARRAY_BUFFER, posBuffer);
+        context.vertexAttribPointer(bufferAttribLocation, 4, context.FLOAT, false, 0, 0);
+        context.bindBuffer(context.ARRAY_BUFFER, null);
+
+        context.bindVertexArray(null);
+
+        return vertexArray;
+    }
+
     function createTextures()
+    {
+        boardTexture     = createBoardLikeTexture(gl);
+        solutionTexture  = createBoardLikeTexture(gl);
+        stabilityTexture = createBoardLikeTexture(gl);
+    }
+
+    function createBoardLikeTexture(context)
     {
         let emptyTexData = new Uint8Array(maximumBoardSize * maximumBoardSize);
         emptyTexData.fill(0);
 
-        boardTexture     = gl.createTexture();
-        solutionTexture  = gl.createTexture();
-        stabilityTexture = gl.createTexture();
+        let texture = context.createTexture();
 
-        gl.bindTexture(gl.TEXTURE_2D, boardTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, maximumBoardSize, maximumBoardSize, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, emptyTexData);
+        context.bindTexture(context.TEXTURE_2D, texture);
+        context.texImage2D(context.TEXTURE_2D, 0, context.R8UI, maximumBoardSize, maximumBoardSize, 0, context.RED_INTEGER, context.UNSIGNED_BYTE, emptyTexData);
 
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S,     gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T,     gl.CLAMP_TO_EDGE);
+        context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MIN_FILTER, context.NEAREST);
+        context.texParameteri(context.TEXTURE_2D, context.TEXTURE_MAG_FILTER, context.NEAREST);
+        context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_S,     context.CLAMP_TO_EDGE);
+        context.texParameteri(context.TEXTURE_2D, context.TEXTURE_WRAP_T,     context.CLAMP_TO_EDGE);
 
-        gl.bindTexture(gl.TEXTURE_2D, solutionTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, maximumBoardSize, maximumBoardSize, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, emptyTexData);
-
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S,     gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T,     gl.CLAMP_TO_EDGE);
-
-        gl.bindTexture(gl.TEXTURE_2D, stabilityTexture);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8UI, maximumBoardSize, maximumBoardSize, 0, gl.RED_INTEGER, gl.UNSIGNED_BYTE, emptyTexData);
-
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S,     gl.CLAMP_TO_EDGE);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T,     gl.CLAMP_TO_EDGE);
+        return texture;
     }
 
     function createShaders()
+    {       
+        let defaultVS = createDefaultVertexShader(gl);
+
+        squaresShaderProgram   = createSquaresShaderProgram(gl, defaultVS);
+        circlesShaderProgram   = createCirclesShaderProgam(gl, defaultVS);
+        diamondsShaderProgram  = createDiamondsShaderProgram(gl, defaultVS);
+        beamsShaderProgram     = createBeamsShaderProgram(gl, defaultVS);
+        raindropsShaderProgram = createRaindropsShaderProgram(gl, defaultVS);
+        chainsShaderProgram    = createChainsShaderProgram(gl, defaultVS);
+    }
+
+    function createDefaultVertexShader(context)
     {
-        const vsSource = 
+        let defaultVSSource = 
         `#version 300 es
 
         layout(location = 0) in mediump vec4 vScreenPos;
@@ -3689,7 +4859,21 @@ function main()
         }
         `;
 
-        const squaresFsSource = 
+        let defaultVS = context.createShader(context.VERTEX_SHADER);
+        context.shaderSource(defaultVS, defaultVSSource);
+        context.compileShader(defaultVS);
+
+        if(!context.getShaderParameter(defaultVS, context.COMPILE_STATUS))
+        {
+            alert(context.getShaderInfoLog(defaultVS));
+        }
+
+        return defaultVS;
+    }
+
+    function createSquaresShaderProgram(context, vertexShader)
+    {
+        const squaresFSSource = 
         `#version 300 es
 
         #define FLAG_SHOW_SOLUTION  0x01
@@ -3706,7 +4890,7 @@ function main()
         uniform int gImageHeight;
         uniform int gViewportOffsetX;
         uniform int gViewportOffsetY;
- 
+
         uniform lowp vec4 gColorNone;
         uniform lowp vec4 gColorEnabled;
         uniform lowp vec4 gColorSolved;
@@ -3726,24 +4910,24 @@ function main()
             {
                 highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize, gCellSize);
 
-		        uint          cellValue = texelFetch(gBoard, cellNumber, 0).x;
-		        mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
+                uint          cellValue = texelFetch(gBoard, cellNumber, 0).x;
+                mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
 
                 outColor = mix(gColorNone, gColorEnabled, cellPower);
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
-		            uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
-		            mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
+                    uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                    mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
 
                     outColor = mix(outColor, gColorSolved, solutionPower);
                 }
                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
                 {
-        			uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
-			        mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
+                    uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
+                    mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
 
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                     colorStable.a = 1.0f;
 
                     outColor = mix(outColor, colorStable, stablePower);
@@ -3755,8 +4939,13 @@ function main()
             }
         }`;
 
+        return createShaderProgram(context, squaresFSSource, vertexShader);
+    }
+
+    function createCirclesShaderProgam(context, vertexShader)
+    {
         //https://lightstrout.com/blog/2019/05/21/circles-render-mode/
-        const circlesFsSource = 
+        const circlesFSSource = 
         `#version 300 es
 
         #define FLAG_SHOW_SOLUTION  0x01
@@ -3773,7 +4962,7 @@ function main()
         uniform int gImageHeight;
         uniform int gViewportOffsetX;
         uniform int gViewportOffsetY;
- 
+
         uniform lowp vec4 gColorNone;
         uniform lowp vec4 gColorEnabled;
         uniform lowp vec4 gColorSolved;
@@ -3805,9 +4994,9 @@ function main()
                 ivec2 rightCell  = cellNumber + ivec2( 1,  0);
                 ivec2 topCell    = cellNumber + ivec2( 0, -1);
                 ivec2 bottomCell = cellNumber + ivec2( 0,  1);
-        
+
                 bool insideCircle = (dot(cellCoord, cellCoord) <= circleRadius * circleRadius);
-        
+
                 bool nonLeftEdge   = cellNumber.x > 0;
                 bool nonRightEdge  = cellNumber.x < gBoardSize - 1;
                 bool nonTopEdge    = cellNumber.y > 0;
@@ -3819,14 +5008,14 @@ function main()
                     nonRightEdge  = true;
                     nonTopEdge    = true;
                     nonBottomEdge = true;
-        
+
                     const uint maxCheckDistance = 1u; //Different for different render modes
-        
+
                     uvec2 leftCellU   = uvec2(leftCell)   + uvec2(gBoardSize) * maxCheckDistance;
                     uvec2 rightCellU  = uvec2(rightCell)  + uvec2(gBoardSize) * maxCheckDistance;
                     uvec2 topCellU    = uvec2(topCell)    + uvec2(gBoardSize) * maxCheckDistance;
                     uvec2 bottomCellU = uvec2(bottomCell) + uvec2(gBoardSize) * maxCheckDistance;
-        
+
                     leftCell   = ivec2(leftCellU   % uvec2(gBoardSize));
                     rightCell  = ivec2(rightCellU  % uvec2(gBoardSize));
                     topCell    = ivec2(topCellU    % uvec2(gBoardSize));
@@ -3839,49 +5028,49 @@ function main()
                 uint bottomPartValue = uint(nonBottomEdge) * texelFetch(gBoard, bottomCell, 0).x;
 
                 bool circleRuleColored = insideCircle || ((leftPartValue   == cellValue && cellCoord.x <= 0.0f) 
-                                                      ||  (topPartValue    == cellValue && cellCoord.y <= 0.0f) 
-                                                      ||  (rightPartValue  == cellValue && cellCoord.x >= 0.0f) 
-                                                      ||  (bottomPartValue == cellValue && cellCoord.y >= 0.0f));
+                                                        ||  (topPartValue    == cellValue && cellCoord.y <= 0.0f) 
+                                                        ||  (rightPartValue  == cellValue && cellCoord.x >= 0.0f) 
+                                                        ||  (bottomPartValue == cellValue && cellCoord.y >= 0.0f));
 
                 cellPower = cellPower * float(circleRuleColored);
                 outColor  = mix(gColorNone, gColorEnabled, cellPower);
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
-		            uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
-		            mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
+                    uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                    mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
 
                     uint leftPartSolvedValue   = uint(nonLeftEdge)   * texelFetch(gSolution, leftCell,   0).x;
                     uint rightPartSolvedValue  = uint(nonRightEdge)  * texelFetch(gSolution, rightCell,  0).x;
                     uint topPartSolvedValue    = uint(nonTopEdge)    * texelFetch(gSolution, topCell,    0).x;
                     uint bottomPartSolvedValue = uint(nonBottomEdge) * texelFetch(gSolution, bottomCell, 0).x;
-        
+
                     bool circleRuleSolved = insideCircle || ((leftPartSolvedValue   == solutionValue && cellCoord.x <= 0.0f) 
-                                                         ||  (topPartSolvedValue    == solutionValue && cellCoord.y <= 0.0f) 
-                                                         ||  (rightPartSolvedValue  == solutionValue && cellCoord.x >= 0.0f) 
-                                                         ||  (bottomPartSolvedValue == solutionValue && cellCoord.y >= 0.0f));
-        
+                                                            ||  (topPartSolvedValue    == solutionValue && cellCoord.y <= 0.0f) 
+                                                            ||  (rightPartSolvedValue  == solutionValue && cellCoord.x >= 0.0f) 
+                                                            ||  (bottomPartSolvedValue == solutionValue && cellCoord.y >= 0.0f));
+
                     solutionPower = solutionPower * float(circleRuleSolved);
                     outColor      = mix(outColor, gColorSolved, solutionPower);
                 }
                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
                 {
-        			uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
-			        mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
+                    uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
+                    mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
 
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                     colorStable.a = 1.0f;
 
                     uint leftPartStableValue   = uint(nonLeftEdge)   * texelFetch(gStability, leftCell,   0).x;
                     uint rightPartStableValue  = uint(nonRightEdge)  * texelFetch(gStability, rightCell,  0).x;
                     uint topPartStableValue    = uint(nonTopEdge)    * texelFetch(gStability, topCell,    0).x;
                     uint bottomPartStableValue = uint(nonBottomEdge) * texelFetch(gStability, bottomCell, 0).x;
-        
+
                     bool circleRuleStable = insideCircle || ((leftPartStableValue  == stableValue && cellCoord.x <= 0.0f) 
-                                                         || (topPartStableValue    == stableValue && cellCoord.y <= 0.0f) 
-                                                         || (rightPartStableValue  == stableValue && cellCoord.x >= 0.0f) 
-                                                         || (bottomPartStableValue == stableValue && cellCoord.y >= 0.0f));
-        
+                                                            || (topPartStableValue    == stableValue && cellCoord.y <= 0.0f) 
+                                                            || (rightPartStableValue  == stableValue && cellCoord.x >= 0.0f) 
+                                                            || (bottomPartStableValue == stableValue && cellCoord.y >= 0.0f));
+
                     stablePower = stablePower * float(circleRuleStable);
                     outColor    = mix(outColor, colorStable, stablePower);
                 }
@@ -3892,209 +5081,219 @@ function main()
             }
         }`;
 
-        //http://lightstrout.com/blog/2019/12/09/diamonds-render-mode/
-        const diamondsFsSource = 
-        `#version 300 es
+        return createShaderProgram(context, circlesFSSource, vertexShader);
+    }
 
-        #define FLAG_SHOW_SOLUTION  0x01
-        #define FLAG_SHOW_STABILITY 0x02
-        #define FLAG_TOROID_RENDER  0x04
-        #define FLAG_NO_GRID        0x08
-
-        uniform int gBoardSize;
-        uniform int gCellSize;
-        uniform int gDomainSize;
-        uniform int gFlags;
-
-        uniform int gImageWidth;
-        uniform int gImageHeight;
-        uniform int gViewportOffsetX;
-        uniform int gViewportOffsetY;
+    function createDiamondsShaderProgram(context, vertexShader)
+    {
+         //http://lightstrout.com/blog/2019/12/09/diamonds-render-mode/
+         const diamondsFSSource = 
+         `#version 300 es
  
-        uniform lowp vec4 gColorNone;
-        uniform lowp vec4 gColorEnabled;
-        uniform lowp vec4 gColorSolved;
-        uniform lowp vec4 gColorBetween;
+         #define FLAG_SHOW_SOLUTION  0x01
+         #define FLAG_SHOW_STABILITY 0x02
+         #define FLAG_TOROID_RENDER  0x04
+         #define FLAG_NO_GRID        0x08
+ 
+         uniform int gBoardSize;
+         uniform int gCellSize;
+         uniform int gDomainSize;
+         uniform int gFlags;
+ 
+         uniform int gImageWidth;
+         uniform int gImageHeight;
+         uniform int gViewportOffsetX;
+         uniform int gViewportOffsetY;
+ 
+         uniform lowp vec4 gColorNone;
+         uniform lowp vec4 gColorEnabled;
+         uniform lowp vec4 gColorSolved;
+         uniform lowp vec4 gColorBetween;
+ 
+         uniform highp usampler2D gBoard;
+         uniform highp usampler2D gSolution;
+         uniform highp usampler2D gStability;
+ 
+         layout(location = 0) out lowp vec4 outColor;
+ 
+         bvec4 emptyCornerRule(uvec4 edgeValue)
+         {
+             return equal(edgeValue.xyzw, edgeValue.yzwx);
+         }
+ 
+         bvec4 cornerRule(uint cellValue, uvec4 cornerValue)
+         {
+             return equal(uvec4(cellValue), cornerValue.xyzw);
+         }
+ 
+         void main(void)
+         {
+             ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
+ 
+             if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
+             {
+                 highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
+                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
+ 
+                 int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+ 
+                 mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+                 mediump float diamondRadius = float(cellSizeCorrected - 1) / 2.0f;
+                 
+                 mediump float domainFactor = 1.0f / float(gDomainSize - 1);
+ 
+                 bool insideDiamond     = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
+                 bool insideTopLeft     = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
+                 bool insideTopRight    = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
+                 bool insideBottomRight = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
+                 bool insideBottomLeft  = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
+ 
+                 bvec4 insideCorner = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
+ 
+                 ivec2 leftCell        = cellNumber + ivec2(-1,  0);
+                 ivec2 rightCell       = cellNumber + ivec2( 1,  0);
+                 ivec2 topCell         = cellNumber + ivec2( 0, -1);
+                 ivec2 bottomCell      = cellNumber + ivec2( 0,  1);
+                 ivec2 leftTopCell     = cellNumber + ivec2(-1, -1);
+                 ivec2 rightTopCell    = cellNumber + ivec2( 1, -1);
+                 ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
+                 ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
+         
+                 bool nonLeftEdge        = cellNumber.x > 0;
+                 bool nonRightEdge       = cellNumber.x < gBoardSize - 1;
+                 bool nonTopEdge         =                                  cellNumber.y > 0;
+                 bool nonBottomEdge      =                                  cellNumber.y < gBoardSize - 1;
+                 bool nonLeftTopEdge     = cellNumber.x > 0              && cellNumber.y > 0;
+                 bool nonRightTopEdge    = cellNumber.x < gBoardSize - 1 && cellNumber.y > 0;
+                 bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
+                 bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
+ 
+                 if((gFlags & FLAG_TOROID_RENDER) != 0)
+                 {
+                     nonLeftEdge        = true;
+                     nonRightEdge       = true;
+                     nonTopEdge         = true;
+                     nonBottomEdge      = true;
+                     nonLeftTopEdge     = true;
+                     nonRightTopEdge    = true;
+                     nonLeftBottomEdge  = true;
+                     nonRightBottomEdge = true;
+         
+                     const uint maxCheckDistance = 1u; //Different for different render modes
+ 
+                     uvec2 leftCellU        = uvec2(leftCell)        + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 rightCellU       = uvec2(rightCell)       + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 topCellU         = uvec2(topCell)         + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(gBoardSize) * maxCheckDistance;
+                     uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(gBoardSize) * maxCheckDistance;
+ 
+                     leftCell        = ivec2(leftCellU        % uvec2(gBoardSize));
+                     rightCell       = ivec2(rightCellU       % uvec2(gBoardSize));
+                     topCell         = ivec2(topCellU         % uvec2(gBoardSize));
+                     bottomCell      = ivec2(bottomCellU      % uvec2(gBoardSize));
+                     leftTopCell     = ivec2(leftTopCellU     % uvec2(gBoardSize));
+                     rightTopCell    = ivec2(rightTopCellU    % uvec2(gBoardSize));
+                     leftBottomCell  = ivec2(leftBottomCellU  % uvec2(gBoardSize));
+                     rightBottomCell = ivec2(rightBottomCellU % uvec2(gBoardSize));
+                 }
+ 
+                 uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
+                 uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCell,       0).x;
+                 uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCell,         0).x;
+                 uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCell,      0).x;
+                 uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCell,     0).x;
+                 uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCell,    0).x;
+                 uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCell,  0).x;
+                 uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCell, 0).x;
+ 
+                 uvec4 edgeValue   = uvec4(leftPartValue,    topPartValue,      rightPartValue,       bottomPartValue);
+                 uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
+ 
+                 uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)        ) * edgeValue;
+                 uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, cornerValue)) * cellValue;
+ 
+                 uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
+ 
+                 mediump float  cellPower = float(cellValue) * domainFactor;		
+                 mediump vec4 cornerPower =  vec4(resCorner) * domainFactor;
+ 
+                 mediump float enablePower = cellPower * float(insideDiamond) + dot(cornerPower, vec4(insideCorner));
+                 outColor                  = mix(gColorNone, gColorEnabled, enablePower);
+ 
+                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
+                 {
+                     uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+         
+                     uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
+                     uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
+                     uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCell,         0).x;
+                     uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCell,      0).x;
+                     uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCell,     0).x;
+                     uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCell,    0).x;
+                     uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCell,  0).x;
+                     uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCell, 0).x;
+ 
+                     uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
+                     uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
+ 
+                     uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(edgeSolved)            ) * edgeSolved;
+                     uvec4 cornerSolutionCandidate      = uvec4(cornerRule(solutionValue, cornerSolved)) * solutionValue;
+ 
+                     uvec4 resCornerSolved = max(emptyCornerSolutionCandidate, cornerSolutionCandidate);
+         
+                     mediump float      solutionPower =  float(solutionValue) * domainFactor;		
+                     mediump vec4 cornerSolutionPower = vec4(resCornerSolved) * domainFactor;
+ 
+                     mediump float solvedPower = solutionPower * float(insideDiamond) + dot(cornerSolutionPower, vec4(insideCorner));
+                     outColor                  = mix(outColor, gColorSolved, solvedPower);
+                 }
+                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
+                 {
+                     uint stableValue = texelFetch(gStability, cellNumber, 0).x;
+ 
+                     lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                     colorStable.a = 1.0f;
+ 
+                     uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
+                     uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCell,       0).x;
+                     uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCell,         0).x;
+                     uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCell,      0).x;
+                     uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCell,     0).x;
+                     uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCell,    0).x;
+                     uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCell,  0).x;
+                     uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCell, 0).x;
+ 
+                     uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
+                     uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
+         
+                     uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(edgeStable)          ) * edgeStable;
+                     uvec4 cornerStabilityCandidate      = uvec4(cornerRule(stableValue, cornerStable)) * stableValue;
+         
+                     uvec4 resCornerStable = max(emptyCornerStabilityCandidate, cornerStabilityCandidate);
+         
+                     mediump float      stabilityPower =    float(stableValue) * domainFactor;		
+                     mediump vec4 cornerStabilityPower = vec4(resCornerStable) * domainFactor;
+         
+                     mediump float stablePower = stabilityPower * float(insideDiamond) + dot(cornerStabilityPower, vec4(insideCorner));
+                     outColor                  = mix(outColor, colorStable, stablePower);
+                 }
+             }
+             else
+             {
+                 outColor = gColorBetween;
+             }
+         }`;
+ 
+         return createShaderProgram(context, diamondsFSSource, vertexShader);
+    }
 
-        uniform highp usampler2D gBoard;
-        uniform highp usampler2D gSolution;
-        uniform highp usampler2D gStability;
-
-        layout(location = 0) out lowp vec4 outColor;
-
-        bvec4 emptyCornerRule(uvec4 edgeValue)
-        {
-            return equal(edgeValue.xyzw, edgeValue.yzwx);
-        }
-
-        bvec4 cornerRule(uint cellValue, uvec4 cornerValue)
-        {
-            return equal(uvec4(cellValue), cornerValue.xyzw);
-        }
-
-        void main(void)
-        {
-            ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
-
-            if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
-            {
-                highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
-                uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
-
-                int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
-
-                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-                mediump float diamondRadius = float(cellSizeCorrected - 1) / 2.0f;
-                
-                mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-
-                bool insideDiamond     = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
-                bool insideTopLeft     = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
-                bool insideTopRight    = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-                bool insideBottomRight = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
-                bool insideBottomLeft  = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
-
-                bvec4 insideCorner = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
-
-                ivec2 leftCell        = cellNumber + ivec2(-1,  0);
-                ivec2 rightCell       = cellNumber + ivec2( 1,  0);
-                ivec2 topCell         = cellNumber + ivec2( 0, -1);
-                ivec2 bottomCell      = cellNumber + ivec2( 0,  1);
-                ivec2 leftTopCell     = cellNumber + ivec2(-1, -1);
-                ivec2 rightTopCell    = cellNumber + ivec2( 1, -1);
-                ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
-                ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
-        
-                bool nonLeftEdge        = cellNumber.x > 0;
-                bool nonRightEdge       = cellNumber.x < gBoardSize - 1;
-                bool nonTopEdge         =                                  cellNumber.y > 0;
-                bool nonBottomEdge      =                                  cellNumber.y < gBoardSize - 1;
-                bool nonLeftTopEdge     = cellNumber.x > 0              && cellNumber.y > 0;
-                bool nonRightTopEdge    = cellNumber.x < gBoardSize - 1 && cellNumber.y > 0;
-                bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
-                bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
-
-                if((gFlags & FLAG_TOROID_RENDER) != 0)
-                {
-                    nonLeftEdge        = true;
-                    nonRightEdge       = true;
-                    nonTopEdge         = true;
-                    nonBottomEdge      = true;
-                    nonLeftTopEdge     = true;
-                    nonRightTopEdge    = true;
-                    nonLeftBottomEdge  = true;
-                    nonRightBottomEdge = true;
-        
-                    const uint maxCheckDistance = 1u; //Different for different render modes
-
-                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 topCellU         = uvec2(topCell)         + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(gBoardSize) * maxCheckDistance;
-
-                    leftCell        = ivec2(leftCellU        % uvec2(gBoardSize));
-                    rightCell       = ivec2(rightCellU       % uvec2(gBoardSize));
-                    topCell         = ivec2(topCellU         % uvec2(gBoardSize));
-                    bottomCell      = ivec2(bottomCellU      % uvec2(gBoardSize));
-                    leftTopCell     = ivec2(leftTopCellU     % uvec2(gBoardSize));
-                    rightTopCell    = ivec2(rightTopCellU    % uvec2(gBoardSize));
-                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(gBoardSize));
-                    rightBottomCell = ivec2(rightBottomCellU % uvec2(gBoardSize));
-                }
-
-                uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
-                uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCell,       0).x;
-                uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCell,         0).x;
-                uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCell,      0).x;
-                uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCell,     0).x;
-                uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCell,    0).x;
-                uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCell,  0).x;
-                uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCell, 0).x;
-
-                uvec4 edgeValue   = uvec4(leftPartValue,    topPartValue,      rightPartValue,       bottomPartValue);
-                uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
-
-                uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)        ) * edgeValue;
-                uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, cornerValue)) * cellValue;
-
-                uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
-
-                mediump float  cellPower = float(cellValue) * domainFactor;		
-                mediump vec4 cornerPower =  vec4(resCorner) * domainFactor;
-
-                mediump float enablePower = cellPower * float(insideDiamond) + dot(cornerPower, vec4(insideCorner));
-                outColor                  = mix(gColorNone, gColorEnabled, enablePower);
-
-                if((gFlags & FLAG_SHOW_SOLUTION) != 0)
-                {
-		            uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
-        
-                    uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
-                    uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
-                    uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCell,         0).x;
-                    uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCell,      0).x;
-                    uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCell,     0).x;
-                    uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCell,    0).x;
-                    uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCell,  0).x;
-                    uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCell, 0).x;
-
-                    uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
-                    uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
-
-                    uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(edgeSolved)            ) * edgeSolved;
-                    uvec4 cornerSolutionCandidate      = uvec4(cornerRule(solutionValue, cornerSolved)) * solutionValue;
-
-                    uvec4 resCornerSolved = max(emptyCornerSolutionCandidate, cornerSolutionCandidate);
-        
-                    mediump float      solutionPower =  float(solutionValue) * domainFactor;		
-                    mediump vec4 cornerSolutionPower = vec4(resCornerSolved) * domainFactor;
-
-                    mediump float solvedPower = solutionPower * float(insideDiamond) + dot(cornerSolutionPower, vec4(insideCorner));
-                    outColor                  = mix(outColor, gColorSolved, solvedPower);
-                }
-                else if((gFlags & FLAG_SHOW_STABILITY) != 0)
-                {
-        			uint stableValue = texelFetch(gStability, cellNumber, 0).x;
-
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
-                    colorStable.a = 1.0f;
-
-                    uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
-                    uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCell,       0).x;
-                    uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCell,         0).x;
-                    uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCell,      0).x;
-                    uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCell,     0).x;
-                    uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCell,    0).x;
-                    uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCell,  0).x;
-                    uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCell, 0).x;
-
-                    uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
-                    uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
-        
-                    uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(edgeStable)          ) * edgeStable;
-                    uvec4 cornerStabilityCandidate      = uvec4(cornerRule(stableValue, cornerStable)) * stableValue;
-        
-                    uvec4 resCornerStable = max(emptyCornerStabilityCandidate, cornerStabilityCandidate);
-        
-                    mediump float      stabilityPower =    float(stableValue) * domainFactor;		
-                    mediump vec4 cornerStabilityPower = vec4(resCornerStable) * domainFactor;
-        
-                    mediump float stablePower = stabilityPower * float(insideDiamond) + dot(cornerStabilityPower, vec4(insideCorner));
-                    outColor                  = mix(outColor, colorStable, stablePower);
-                }
-            }
-            else
-            {
-                outColor = gColorBetween;
-            }
-        }`;
-
+    function createBeamsShaderProgram(context, vertexShader)
+    {
         //https://lightstrout.com/blog/2019/12/18/beams-render-mode/
-        const beamsFsSource = 
+        const beamsFSSource = 
         `#version 300 es
 
         #define FLAG_SHOW_SOLUTION  0x01
@@ -4111,7 +5310,7 @@ function main()
         uniform int gImageHeight;
         uniform int gViewportOffsetX;
         uniform int gViewportOffsetY;
- 
+
         uniform lowp vec4 gColorNone;
         uniform lowp vec4 gColorEnabled;
         uniform lowp vec4 gColorSolved;
@@ -4363,7 +5562,7 @@ function main()
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
-		            uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                    uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
         
                     uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
                     uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
@@ -4376,29 +5575,29 @@ function main()
 
                     uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
                     uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
-    
+
                     uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(solutionValue, edgeSolved, cornerSolved)) * edgeSolved;
-    
+
                     uvec4 regionBSolutionCandidate = uvec4(regBRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
                     uvec4 regionISolutionCandidate = uvec4(regIRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-    
+
                     uvec4 regionYTopRightSolutionCandidate   = uvec4(regYTopRightRule(solutionValue, edgeSolved, cornerSolved))   * solutionValue;
                     uvec4 regionYBottomLeftSolutionCandidate = uvec4(regYBottomLeftRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-    
+
                     uvec4 regionVSolutionCandidate = uvec4(regVRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-    
+
                     uvec4 resBSolution           = max(regionBSolutionCandidate,           emptyCornerSolutionCandidate.xyzw);
                     uvec4 resYTopRightSolution   = max(regionYTopRightSolutionCandidate,   emptyCornerSolutionCandidate.xyyz);
                     uvec4 resYBottomLeftSolution = max(regionYBottomLeftSolutionCandidate, emptyCornerSolutionCandidate.zwwx);
                     uvec4 resVSolution           = max(regionVSolutionCandidate,           emptyCornerSolutionCandidate.xyzw);
-    
+
                     mediump float regGSolutionPower           = float(solutionValue           ) *      domainFactor;
                     mediump vec4  regISolutionPower           = vec4( regionISolutionCandidate) * vec4(domainFactor);
                     mediump vec4  regBSolutionPower           = vec4( resBSolution            ) * vec4(domainFactor);
                     mediump vec4  regYTopRightSolutionPower   = vec4( resYTopRightSolution    ) * vec4(domainFactor);
                     mediump vec4  regYBottomLeftSolutionPower = vec4( resYBottomLeftSolution  ) * vec4(domainFactor);
                     mediump vec4  regVSolutionPower           = vec4( resVSolution            ) * vec4(domainFactor);
-    
+
                     mediump float solvedPower =    float(insideG)      *     regGSolutionPower;
                     solvedPower              += dot(vec4(insideB),           regBSolutionPower);
                     solvedPower              += dot(vec4(insideI),           regISolutionPower); 
@@ -4410,9 +5609,9 @@ function main()
                 }
                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
                 {
-        			uint stabilityValue = texelFetch(gStability, cellNumber, 0).x;
+                    uint stabilityValue = texelFetch(gStability, cellNumber, 0).x;
 
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                     colorStable.a = 1.0f;
 
                     uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
@@ -4426,29 +5625,29 @@ function main()
 
                     uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
                     uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
-    
+
                     uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(stabilityValue, edgeStable, cornerStable)) * edgeStable;
-    
+
                     uvec4 regionBStabilityCandidate = uvec4(regBRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
                     uvec4 regionIStabilityCandidate = uvec4(regIRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
-    
+
                     uvec4 regionYTopRightStabilityCandidate   = uvec4(regYTopRightRule(stabilityValue, edgeStable, cornerStable))   * stabilityValue;
                     uvec4 regionYBottomLeftStabilityCandidate = uvec4(regYBottomLeftRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
-    
+
                     uvec4 regionVStabilityCandidate = uvec4(regVRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
-    
+
                     uvec4 resBStability           = max(regionBStabilityCandidate,           emptyCornerStabilityCandidate.xyzw);
                     uvec4 resYTopRightStability   = max(regionYTopRightStabilityCandidate,   emptyCornerStabilityCandidate.xyyz);
                     uvec4 resYBottomLeftStability = max(regionYBottomLeftStabilityCandidate, emptyCornerStabilityCandidate.zwwx);
                     uvec4 resVStability           = max(regionVStabilityCandidate,           emptyCornerStabilityCandidate.xyzw);
-    
+
                     mediump float regGStabilityPower           = float(stabilityValue           ) *      domainFactor;
                     mediump vec4  regIStabilityPower           = vec4( regionIStabilityCandidate) * vec4(domainFactor);
                     mediump vec4  regBStabilityPower           = vec4( resBStability            ) * vec4(domainFactor);
                     mediump vec4  regYTopRightStabilityPower   = vec4( resYTopRightStability    ) * vec4(domainFactor);
                     mediump vec4  regYBottomLeftStabilityPower = vec4( resYBottomLeftStability  ) * vec4(domainFactor);
                     mediump vec4  regVStabilityPower           = vec4( resVStability            ) * vec4(domainFactor);
-    
+
                     mediump float stablePower =    float(insideG)      *     regGStabilityPower;
                     stablePower              += dot(vec4(insideB),           regBStabilityPower);
                     stablePower              += dot(vec4(insideI),           regIStabilityPower); 
@@ -4465,8 +5664,13 @@ function main()
             }
         }`;
 
+        return createShaderProgram(context, beamsFSSource, vertexShader);
+    }
+
+    function createRaindropsShaderProgram(context, vertexShader)
+    {
         //https://lightstrout.com/blog/2019/05/21/raindrops-render-mode/
-        const raindropsFsSource = 
+        const raindropsFSSource = 
         `#version 300 es
 
         #define FLAG_SHOW_SOLUTION  0x01
@@ -4483,7 +5687,7 @@ function main()
         uniform int gImageHeight;
         uniform int gViewportOffsetX;
         uniform int gViewportOffsetY;
- 
+
         uniform lowp vec4 gColorNone;
         uniform lowp vec4 gColorEnabled;
         uniform lowp vec4 gColorSolved;
@@ -4621,7 +5825,7 @@ function main()
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
-		            uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                    uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
         
                     uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
                     uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
@@ -4648,9 +5852,9 @@ function main()
                 }
                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
                 {
-        			uint stableValue = texelFetch(gStability, cellNumber, 0).x;
+                    uint stableValue = texelFetch(gStability, cellNumber, 0).x;
 
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                     colorStable.a = 1.0f;
 
                     uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
@@ -4683,8 +5887,13 @@ function main()
             }
         }`;
 
+        return createShaderProgram(context, raindropsFSSource, vertexShader);
+    }
+
+    function createChainsShaderProgram(context, vertexShader)
+    {
         //https://lightstrout.com/blog/2019/05/21/chains-render-mode/
-        const chainsFsSource = 
+        const chainsFSSource = 
         `#version 300 es
 
         #define FLAG_SHOW_SOLUTION  0x01
@@ -4701,7 +5910,7 @@ function main()
         uniform int gImageHeight;
         uniform int gViewportOffsetX;
         uniform int gViewportOffsetY;
- 
+
         uniform lowp vec4 gColorNone;
         uniform lowp vec4 gColorEnabled;
         uniform lowp vec4 gColorSolved;
@@ -4943,7 +6152,7 @@ function main()
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
-		            uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                    uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
         
                     uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
                     uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
@@ -4995,9 +6204,9 @@ function main()
                 }
                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
                 {
-        			uint stabilityValue = texelFetch(gStability, cellNumber, 0).x;
+                    uint stabilityValue = texelFetch(gStability, cellNumber, 0).x;
 
-			        lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                     colorStable.a = 1.0f;
 
                     uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
@@ -5054,175 +6263,45 @@ function main()
                 outColor = gColorBetween;
             }
         }`;
-        
-        let defaultVS = gl.createShader(gl.VERTEX_SHADER);
-        gl.shaderSource(defaultVS, vsSource);
-        gl.compileShader(defaultVS);
 
-        if(!gl.getShaderParameter(defaultVS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(defaultVS));
-        }
-
-        let squaresFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(squaresFS, squaresFsSource);
-        gl.compileShader(squaresFS);
-
-        if(!gl.getShaderParameter(squaresFS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(squaresFS));
-        }
-
-        let circlesFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(circlesFS, circlesFsSource);
-        gl.compileShader(circlesFS);
-
-        if(!gl.getShaderParameter(circlesFS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(circlesFS));
-        }
-
-        let diamondsFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(diamondsFS, diamondsFsSource);
-        gl.compileShader(diamondsFS);
-
-        if(!gl.getShaderParameter(diamondsFS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(diamondsFS));
-        }
-
-        let beamsFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(beamsFS, beamsFsSource);
-        gl.compileShader(beamsFS);
-
-        if(!gl.getShaderParameter(beamsFS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(beamsFS));
-        }
-
-        let raindropsFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(raindropsFS, raindropsFsSource);
-        gl.compileShader(raindropsFS);
-
-        if(!gl.getShaderParameter(raindropsFS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(raindropsFS));
-        }
-
-        let chainsFS = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(chainsFS, chainsFsSource);
-        gl.compileShader(chainsFS);
-
-        if(!gl.getShaderParameter(chainsFS, gl.COMPILE_STATUS))
-        {
-            alert(gl.getShaderInfoLog(chainsFS));
-        }
-
-        squaresShaderProgram = gl.createProgram();
-        gl.attachShader(squaresShaderProgram, defaultVS);
-        gl.attachShader(squaresShaderProgram, squaresFS);
-        gl.linkProgram(squaresShaderProgram);
-
-        if(!gl.getProgramParameter(squaresShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(squaresShaderProgram));
-        }
-
-        circlesShaderProgram = gl.createProgram();
-        gl.attachShader(circlesShaderProgram, defaultVS);
-        gl.attachShader(circlesShaderProgram, circlesFS);
-        gl.linkProgram(circlesShaderProgram);
-
-        if(!gl.getProgramParameter(circlesShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(circlesShaderProgram));
-        }
-
-        diamondsShaderProgram = gl.createProgram();
-        gl.attachShader(diamondsShaderProgram, defaultVS);
-        gl.attachShader(diamondsShaderProgram, diamondsFS);
-        gl.linkProgram(diamondsShaderProgram);
-
-        if(!gl.getProgramParameter(diamondsShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(diamondsShaderProgram));
-        }
-
-        beamsShaderProgram = gl.createProgram();
-        gl.attachShader(beamsShaderProgram, defaultVS);
-        gl.attachShader(beamsShaderProgram, beamsFS);
-        gl.linkProgram(beamsShaderProgram);
-
-        if(!gl.getProgramParameter(beamsShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(beamsShaderProgram));
-        }
-
-        raindropsShaderProgram = gl.createProgram();
-        gl.attachShader(raindropsShaderProgram, defaultVS);
-        gl.attachShader(raindropsShaderProgram, raindropsFS);
-        gl.linkProgram(raindropsShaderProgram);
-
-        if(!gl.getProgramParameter(raindropsShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(raindropsShaderProgram));
-        }
-
-        chainsShaderProgram = gl.createProgram();
-        gl.attachShader(chainsShaderProgram, defaultVS);
-        gl.attachShader(chainsShaderProgram, chainsFS);
-        gl.linkProgram(chainsShaderProgram);
-
-        if(!gl.getProgramParameter(chainsShaderProgram, gl.LINK_STATUS))
-        {
-            alert(gl.getProgramInfoLog(chainsShaderProgram));
-        }
+        return createShaderProgram(context, chainsFSSource, vertexShader);
     }
 
-    function updateBoardTexture()
+    function createShaderProgram(context, fragmentShaderSource, vertexShader)
     {
-        if(currentGameBoard === null)
+        let fragmentShader = context.createShader(context.FRAGMENT_SHADER);
+        context.shaderSource(fragmentShader, fragmentShaderSource);
+        context.compileShader(fragmentShader);
+
+        if(!context.getShaderParameter(fragmentShader, context.COMPILE_STATUS))
+        {
+            alert(context.getShaderInfoLog(fragmentShader));
+        }
+
+        let shaderProgram = context.createProgram();
+        context.attachShader(shaderProgram, vertexShader);
+        context.attachShader(shaderProgram, fragmentShader);
+        context.linkProgram(shaderProgram);
+
+        if(!context.getProgramParameter(shaderProgram, context.LINK_STATUS))
+        {
+            alert(context.getProgramInfoLog(shaderProgram));
+        }
+
+        return shaderProgram;
+    }
+
+    function updateBoardLikeTexture(context, boardData, gameSize, boardLikeTexture)
+    {
+        if(boardData === null)
         {
             return;
         }
 
-        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-        gl.bindTexture(gl.TEXTURE_2D, boardTexture);
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, currentGameSize, currentGameSize, gl.RED_INTEGER, gl.UNSIGNED_BYTE, currentGameBoard);
-        gl.bindTexture(gl.TEXTURE_2D, null);
-    }
-
-    function updateSolutionTexture()
-    {
-        if(currentGameSolution === null)
-        {
-            return;
-        }
-
-        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-        gl.bindTexture(gl.TEXTURE_2D, solutionTexture);
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, currentGameSize, currentGameSize, gl.RED_INTEGER, gl.UNSIGNED_BYTE, currentGameSolution);
-        gl.bindTexture(gl.TEXTURE_2D, null);
-    }
-
-    function updateStabilityTexture()
-    {
-        if(currentGameStability === null && currentGameLitStability === null)
-        {
-            return;
-        }
-
-        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-        gl.bindTexture(gl.TEXTURE_2D, stabilityTexture);
-        if(flagShowLitStability && currentGameLitStability !== null)
-        {
-            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, currentGameSize, currentGameSize, gl.RED_INTEGER, gl.UNSIGNED_BYTE, currentGameLitStability);
-        }
-        else if(currentGameStability !== null)
-        {
-            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, currentGameSize, currentGameSize, gl.RED_INTEGER, gl.UNSIGNED_BYTE, currentGameStability);
-        }
-        gl.bindTexture(gl.TEXTURE_2D, null);
+        context.pixelStorei(context.UNPACK_ALIGNMENT, 1);
+        context.bindTexture(context.TEXTURE_2D, boardLikeTexture);
+        context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, gameSize, gameSize, context.RED_INTEGER, context.UNSIGNED_BYTE, boardData);
+        context.bindTexture(context.TEXTURE_2D, null);
     }
 
     function mainDraw()
@@ -5243,34 +6322,34 @@ function main()
         {
             drawFlags = drawFlags | 4;
         }
-        if(flagNoGrid)
+        if(!gridCheckBox.checked)
         {
             drawFlags = drawFlags | 8;
         }
 
-        gl.bindVertexArray(drawVertexBuffer);
+        gl.bindVertexArray(drawVertexArray);
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.useProgram(currentShaderProgram);
 
-        gl.uniform1i(boardSizeUniformLocation,  currentGameSize);
-        gl.uniform1i(cellSizeUniformLocation,   currentCellSize);
-        gl.uniform1i(domainSizeUniformLocation, currentDomainSize);
-        gl.uniform1i(flagsUniformLocation,      drawFlags);
+        gl.uniform1i(drawShaderVariables.BoardSizeUniformLocation,  currentGameSize);
+        gl.uniform1i(drawShaderVariables.CellSizeUniformLocation,   currentCellSize);
+        gl.uniform1i(drawShaderVariables.DomainSizeUniformLocation, currentDomainSize);
+        gl.uniform1i(drawShaderVariables.FlagsUniformLocation,      drawFlags);
 
-        gl.uniform1i(canvasWidthUniformLocation,     currentViewportWidth);
-        gl.uniform1i(canvasHeightUniformLocation,    currentViewportHeight);
-        gl.uniform1i(viewportXOffsetUniformLocation, currentViewportOffsetX);
-        gl.uniform1i(viewportYOffsetUniformLocation, currentViewportOffsetY);
+        gl.uniform1i(drawShaderVariables.CanvasWidthUniformLocation,     currentViewportWidth);
+        gl.uniform1i(drawShaderVariables.CanvasHeightUniformLocation,    currentViewportHeight);
+        gl.uniform1i(drawShaderVariables.ViewportXOffsetUniformLocation, currentViewportOffsetX);
+        gl.uniform1i(drawShaderVariables.ViewportYOffsetUniformLocation, currentViewportOffsetY);
 
-        gl.uniform4f(colorNoneUniformLocation,    currentColorUnlit[0],   currentColorUnlit[1],   currentColorUnlit[2],   currentColorUnlit[3]);
-        gl.uniform4f(colorEnabledUniformLocation, currentColorLit[0],     currentColorLit[1],     currentColorLit[2],     currentColorLit[3]);
-        gl.uniform4f(colorSolvedUniformLocation,  currentColorSolved[0],  currentColorSolved[1],  currentColorSolved[2],  currentColorSolved[3]);
-        gl.uniform4f(colorBetweenUniformLocation, currentColorBetween[0], currentColorBetween[1], currentColorBetween[2], currentColorBetween[3]);
+        gl.uniform4f(drawShaderVariables.ColorNoneUniformLocation,    currentColorUnlit[0],   currentColorUnlit[1],   currentColorUnlit[2],   currentColorUnlit[3]);
+        gl.uniform4f(drawShaderVariables.ColorEnabledUniformLocation, currentColorLit[0],     currentColorLit[1],     currentColorLit[2],     currentColorLit[3]);
+        gl.uniform4f(drawShaderVariables.ColorSolvedUniformLocation,  currentColorSolved[0],  currentColorSolved[1],  currentColorSolved[2],  currentColorSolved[3]);
+        gl.uniform4f(drawShaderVariables.ColorBetweenUniformLocation, currentColorBetween[0], currentColorBetween[1], currentColorBetween[2], currentColorBetween[3]);
 
-        gl.uniform1i(boardTextureUniformLocation,     0);
-        gl.uniform1i(solutionTextureUniformLocation,  1);
-        gl.uniform1i(stabilityTextureUniformLocation, 2);
+        gl.uniform1i(drawShaderVariables.BoardTextureUniformLocation,     0);
+        gl.uniform1i(drawShaderVariables.SolutionTextureUniformLocation,  1);
+        gl.uniform1i(drawShaderVariables.StabilityTextureUniformLocation, 2);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, boardTexture);
@@ -5285,20 +6364,20 @@ function main()
 
         gl.bindVertexArray(null);
 
-        gl.uniform1i(boardSizeUniformLocation,  null);
-        gl.uniform1i(cellSizeUniformLocation,   null);
-        gl.uniform1i(domainSizeUniformLocation, null);
-        gl.uniform1i(flagsUniformLocation,      null);
+        gl.uniform1i(drawShaderVariables.BoardSizeUniformLocation,  null);
+        gl.uniform1i(drawShaderVariables.CellSizeUniformLocation,   null);
+        gl.uniform1i(drawShaderVariables.DomainSizeUniformLocation, null);
+        gl.uniform1i(drawShaderVariables.FlagsUniformLocation,      null);
 
-        gl.uniform1i(canvasWidthUniformLocation,     null);
-        gl.uniform1i(canvasHeightUniformLocation,    null);
-        gl.uniform1i(viewportXOffsetUniformLocation, null);
-        gl.uniform1i(viewportYOffsetUniformLocation, null);
+        gl.uniform1i(drawShaderVariables.CanvasWidthUniformLocation,     null);
+        gl.uniform1i(drawShaderVariables.CanvasHeightUniformLocation,    null);
+        gl.uniform1i(drawShaderVariables.ViewportXOffsetUniformLocation, null);
+        gl.uniform1i(drawShaderVariables.ViewportYOffsetUniformLocation, null);
 
-        gl.uniform4f(colorNoneUniformLocation,    0, 0, 0, 0);
-        gl.uniform4f(colorEnabledUniformLocation, 0, 0, 0, 0);
-        gl.uniform4f(colorSolvedUniformLocation,  0, 0, 0, 0);
-        gl.uniform4f(colorBetweenUniformLocation, 0, 0, 0, 0);
+        gl.uniform4f(drawShaderVariables.ColorNoneUniformLocation,    0, 0, 0, 0);
+        gl.uniform4f(drawShaderVariables.ColorEnabledUniformLocation, 0, 0, 0, 0);
+        gl.uniform4f(drawShaderVariables.ColorSolvedUniformLocation,  0, 0, 0, 0);
+        gl.uniform4f(drawShaderVariables.ColorBetweenUniformLocation, 0, 0, 0, 0);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, null);
