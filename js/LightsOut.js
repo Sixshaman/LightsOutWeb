@@ -1706,6 +1706,8 @@ function main()
         setRenderMode(renderModeSelect.value);
         renderModeSelect.blur(); //Blur - Beetlebum
         canvas.focus();
+
+        requestRedraw();
     };
 
     colorThemeSelect.onchange = function()
@@ -2046,11 +2048,11 @@ function main()
         if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
         {
             let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
-            saveMatrixWithRenderModeToImage(lightsOutMatrix, matrixCellSize, currentShaderProgram, !flagNoGrid);
+            saveMatrixWithRenderModeToImage(lightsOutMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked);
         }   
         else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
-            saveMatrixWithRenderModeToImage(currentGameMatrix, matrixCellSize, currentShaderProgram, !flagNoGrid);
+            saveMatrixWithRenderModeToImage(currentGameMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked);
         }    
     }
 
@@ -2172,7 +2174,6 @@ function main()
     let flagShowInverseSolution     = false;
     let flagShowStability           = false;
     let flagShowLitStability        = false;
-    let flagNoGrid                  = false;
     let flagPeriodCounting          = false;
     let flagEigvecCounting          = false;
     let flagPerio4Counting          = false;
@@ -2233,28 +2234,8 @@ function main()
     let solutionTexture  = null;
     let stabilityTexture = null;
 
-    let boardTextureUniformLocation     = null;
-    let solutionTextureUniformLocation  = null;
-    let stabilityTextureUniformLocation = null;
-
-    let boardSizeUniformLocation  = null;
-    let cellSizeUniformLocation   = null;
-    let domainSizeUniformLocation = null;
-    let flagsUniformLocation      = null;
-
-    let canvasWidthUniformLocation     = null;
-    let canvasHeightUniformLocation    = null;
-    let viewportXOffsetUniformLocation = null;
-    let viewportYOffsetUniformLocation = null;
-
-    let colorNoneUniformLocation    = null;
-    let colorEnabledUniformLocation = null;
-    let colorSolvedUniformLocation  = null;
-    let colorBetweenUniformLocation = null;
-
-    let drawVertexBuffer = null; //Still don't know about WebGL gl_VertexID support :/
-
-    let drawVertexBufferAttribLocation = null;
+    let drawShaderVariables = null;
+    let drawVertexBuffer    = null;
 
     let solutionMatrixWorker = null;
 
@@ -2341,7 +2322,7 @@ function main()
 
         currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
 
-        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, !flagNoGrid);
+        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, gridCheckBox.checked);
         currentViewportWidth  = newCanvasSize.width;
         currentViewportHeight = newCanvasSize.height;
 
@@ -2399,7 +2380,7 @@ function main()
 
     function clickAtPoint(x, y, isConstruct)
     {
-        let boardPoint = boardPointFromCanvasPoint(x, y, currentGameSize, currentViewportOffsetX, currentViewportOffsetY, currentViewportWidth, currentViewportHeight, !flagNoGrid);
+        let boardPoint = boardPointFromCanvasPoint(x, y, currentGameSize, currentViewportOffsetX, currentViewportOffsetY, currentViewportWidth, currentViewportHeight, gridCheckBox.checked);
 
         let modX = boardPoint.xBoard;
         let modY = boardPoint.yBoard;
@@ -2715,7 +2696,7 @@ function main()
                 {
                     const matrixCellSize = 5;
 
-                    saveMatrixWithRenderModeToImage(currentSolutionMatrix, matrixCellSize, currentShaderProgram, !flagNoGrid);
+                    saveMatrixWithRenderModeToImage(currentSolutionMatrix, matrixCellSize, currentShaderProgram, gridCheckBox.checked);
                 }
 
                 break;
@@ -3495,49 +3476,10 @@ function main()
 
         renderModeSelect.value = valueSelect;
         
+        drawVertexBuffer    = createVertexBuffer(gl, currentShaderProgram);
+        drawShaderVariables = obtainShaderVariables(gl, currentShaderProgram);
+
         updateAddressBar(50);
-
-        boardSizeUniformLocation  = gl.getUniformLocation(currentShaderProgram, "gBoardSize");
-        cellSizeUniformLocation   = gl.getUniformLocation(currentShaderProgram, "gCellSize");
-        domainSizeUniformLocation = gl.getUniformLocation(currentShaderProgram, "gDomainSize");
-        flagsUniformLocation      = gl.getUniformLocation(currentShaderProgram, "gFlags");
-
-        canvasWidthUniformLocation     = gl.getUniformLocation(currentShaderProgram, "gImageWidth");
-        canvasHeightUniformLocation    = gl.getUniformLocation(currentShaderProgram, "gImageHeight");
-        viewportXOffsetUniformLocation = gl.getUniformLocation(currentShaderProgram, "gViewportOffsetX");
-        viewportYOffsetUniformLocation = gl.getUniformLocation(currentShaderProgram, "gViewportOffsetY");
-
-        colorNoneUniformLocation    = gl.getUniformLocation(currentShaderProgram, "gColorNone");
-        colorEnabledUniformLocation = gl.getUniformLocation(currentShaderProgram, "gColorEnabled");
-        colorSolvedUniformLocation  = gl.getUniformLocation(currentShaderProgram, "gColorSolved");
-        colorBetweenUniformLocation = gl.getUniformLocation(currentShaderProgram, "gColorBetween");
-
-        boardTextureUniformLocation     = gl.getUniformLocation(currentShaderProgram, "gBoard");
-        solutionTextureUniformLocation  = gl.getUniformLocation(currentShaderProgram, "gSolution");
-        stabilityTextureUniformLocation = gl.getUniformLocation(currentShaderProgram, "gStability");
-                
-        drawVertexBufferAttribLocation = gl.getAttribLocation(currentShaderProgram, "vScreenPos");
-
-        const posArray = new Float32Array([-1.0,  1.0, 0.0, 1.0, // eslint-disable-next-line indent
-                                            1.0,  1.0, 0.0, 1.0, // eslint-disable-next-line indent
-                                           -1.0, -1.0, 0.0, 1.0, // eslint-disable-next-line indent
-                                            1.0, -1.0, 0.0, 1.0]);
-
-        let posBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, posArray, gl.STATIC_DRAW);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-        drawVertexBuffer = gl.createVertexArray();
-        gl.bindVertexArray(drawVertexBuffer);
-        gl.enableVertexAttribArray(drawVertexBufferAttribLocation);
-        gl.bindBuffer(gl.ARRAY_BUFFER, posBuffer);
-        gl.vertexAttribPointer(drawVertexBufferAttribLocation, 4, gl.FLOAT, false, 0, 0);
-        gl.bindBuffer(gl.ARRAY_BUFFER, null);
-
-        gl.bindVertexArray(null);
-
-        requestRedraw();
     }
 
     function setColorTheme(colorTheme)
@@ -3629,8 +3571,6 @@ function main()
 
     function setGridVisible(visible)
     {
-        flagNoGrid = !visible;
-
         let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, visible);
         currentCellSize   = Math.ceil(canvasSize / currentGameSize) - 1;
 
@@ -4123,7 +4063,7 @@ function main()
         canvasMatrix.remove();
     }
 
-    function saveMatrixWithRenderModeToImage(matrix, matrixCellSize, shaderProgram, showGrid)
+    function saveMatrixWithRenderModeToImage(matrix, matrixCellSize, renderMode, showGrid)
     {
         const canvasMatrix = document.createElement("canvas");
         const canvasRow    = document.createElement("canvas");
@@ -4412,11 +4352,11 @@ function main()
             enableCustomClickRule(decodedClickRuleData.clickrule, decodedClickRuleData.clickrulesize, decodedClickRuleData.istoroid);
         }
 
-        changeGameSize(gameSize);
-        changeDomainSize(domainSize);
-
         setRenderMode(renderMode);
         setColorTheme(colorTheme);
+
+        changeGameSize(gameSize);
+        changeDomainSize(domainSize);
 
         gridCheckBox.checked = showGrid;
         setGridVisible(showGrid);
@@ -4454,6 +4394,59 @@ function main()
     function requestRedraw()
     {
         mainDraw();
+    }
+
+    function obtainShaderVariables(context, shaderProgram)
+    {
+        let variables = 
+        {
+            BoardSizeUniformLocation:  context.getUniformLocation(shaderProgram, "gBoardSize"),
+            CellSizeUniformLocation:   context.getUniformLocation(shaderProgram, "gCellSize"),
+            DomainSizeUniformLocation: context.getUniformLocation(shaderProgram, "gDomainSize"),
+            FlagsUniformLocation:      context.getUniformLocation(shaderProgram, "gFlags"),
+    
+            CanvasWidthUniformLocation:     context.getUniformLocation(shaderProgram, "gImageWidth"),
+            CanvasHeightUniformLocation:    context.getUniformLocation(shaderProgram, "gImageHeight"),
+            ViewportXOffsetUniformLocation: context.getUniformLocation(shaderProgram, "gViewportOffsetX"),
+            ViewportYOffsetUniformLocation: context.getUniformLocation(shaderProgram, "gViewportOffsetY"),
+    
+            ColorNoneUniformLocation:    context.getUniformLocation(shaderProgram, "gColorNone"),
+            ColorEnabledUniformLocation: context.getUniformLocation(shaderProgram, "gColorEnabled"),
+            ColorSolvedUniformLocation:  context.getUniformLocation(shaderProgram, "gColorSolved"),
+            colorBetweenUniformLocation: context.getUniformLocation(shaderProgram, "gColorBetween"),
+    
+            BoardTextureUniformLocation:     context.getUniformLocation(shaderProgram, "gBoard"),
+            SolutionTextureUniformLocation:  context.getUniformLocation(shaderProgram, "gSolution"),
+            StabilityTextureUniformLocation: context.getUniformLocation(shaderProgram, "gStability")
+        };
+
+        return variables;
+    }
+
+    function createVertexBuffer(context, shaderProgram)
+    {
+        let bufferAttribLocation = context.getAttribLocation(shaderProgram, "vScreenPos");
+
+        const posArray = new Float32Array([-1.0,  1.0, 0.0, 1.0, // eslint-disable-next-line indent
+                                            1.0,  1.0, 0.0, 1.0, // eslint-disable-next-line indent
+                                           -1.0, -1.0, 0.0, 1.0, // eslint-disable-next-line indent
+                                            1.0, -1.0, 0.0, 1.0]);
+
+        let posBuffer = context.createBuffer();
+        context.bindBuffer(context.ARRAY_BUFFER, posBuffer);
+        context.bufferData(context.ARRAY_BUFFER, posArray, context.STATIC_DRAW);
+        context.bindBuffer(context.ARRAY_BUFFER, null);
+
+        let vertexBuffer = context.createVertexArray();
+        context.bindVertexArray(vertexBuffer);
+        context.enableVertexAttribArray(bufferAttribLocation);
+        context.bindBuffer(context.ARRAY_BUFFER, posBuffer);
+        context.vertexAttribPointer(bufferAttribLocation, 4, context.FLOAT, false, 0, 0);
+        context.bindBuffer(context.ARRAY_BUFFER, null);
+
+        context.bindVertexArray(null);
+
+        return vertexBuffer;
     }
 
     function createTextures()
@@ -6001,7 +5994,7 @@ function main()
         {
             drawFlags = drawFlags | 4;
         }
-        if(flagNoGrid)
+        if(!gridCheckBox.checked)
         {
             drawFlags = drawFlags | 8;
         }
@@ -6011,24 +6004,24 @@ function main()
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.useProgram(currentShaderProgram);
 
-        gl.uniform1i(boardSizeUniformLocation,  currentGameSize);
-        gl.uniform1i(cellSizeUniformLocation,   currentCellSize);
-        gl.uniform1i(domainSizeUniformLocation, currentDomainSize);
-        gl.uniform1i(flagsUniformLocation,      drawFlags);
+        gl.uniform1i(drawShaderVariables.BoardSizeUniformLocation,  currentGameSize);
+        gl.uniform1i(drawShaderVariables.CellSizeUniformLocation,   currentCellSize);
+        gl.uniform1i(drawShaderVariables.DomainSizeUniformLocation, currentDomainSize);
+        gl.uniform1i(drawShaderVariables.FlagsUniformLocation,      drawFlags);
 
-        gl.uniform1i(canvasWidthUniformLocation,     currentViewportWidth);
-        gl.uniform1i(canvasHeightUniformLocation,    currentViewportHeight);
-        gl.uniform1i(viewportXOffsetUniformLocation, currentViewportOffsetX);
-        gl.uniform1i(viewportYOffsetUniformLocation, currentViewportOffsetY);
+        gl.uniform1i(drawShaderVariables.CanvasWidthUniformLocation,     currentViewportWidth);
+        gl.uniform1i(drawShaderVariables.CanvasHeightUniformLocation,    currentViewportHeight);
+        gl.uniform1i(drawShaderVariables.ViewportXOffsetUniformLocation, currentViewportOffsetX);
+        gl.uniform1i(drawShaderVariables.ViewportYOffsetUniformLocation, currentViewportOffsetY);
 
-        gl.uniform4f(colorNoneUniformLocation,    currentColorUnlit[0],   currentColorUnlit[1],   currentColorUnlit[2],   currentColorUnlit[3]);
-        gl.uniform4f(colorEnabledUniformLocation, currentColorLit[0],     currentColorLit[1],     currentColorLit[2],     currentColorLit[3]);
-        gl.uniform4f(colorSolvedUniformLocation,  currentColorSolved[0],  currentColorSolved[1],  currentColorSolved[2],  currentColorSolved[3]);
-        gl.uniform4f(colorBetweenUniformLocation, currentColorBetween[0], currentColorBetween[1], currentColorBetween[2], currentColorBetween[3]);
+        gl.uniform4f(drawShaderVariables.ColorNoneUniformLocation,    currentColorUnlit[0],   currentColorUnlit[1],   currentColorUnlit[2],   currentColorUnlit[3]);
+        gl.uniform4f(drawShaderVariables.ColorEnabledUniformLocation, currentColorLit[0],     currentColorLit[1],     currentColorLit[2],     currentColorLit[3]);
+        gl.uniform4f(drawShaderVariables.ColorSolvedUniformLocation,  currentColorSolved[0],  currentColorSolved[1],  currentColorSolved[2],  currentColorSolved[3]);
+        gl.uniform4f(drawShaderVariables.ColorBetweenUniformLocation, currentColorBetween[0], currentColorBetween[1], currentColorBetween[2], currentColorBetween[3]);
 
-        gl.uniform1i(boardTextureUniformLocation,     0);
-        gl.uniform1i(solutionTextureUniformLocation,  1);
-        gl.uniform1i(stabilityTextureUniformLocation, 2);
+        gl.uniform1i(drawShaderVariables.BoardTextureUniformLocation,     0);
+        gl.uniform1i(drawShaderVariables.SolutionTextureUniformLocation,  1);
+        gl.uniform1i(drawShaderVariables.StabilityTextureUniformLocation, 2);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, boardTexture);
@@ -6043,20 +6036,20 @@ function main()
 
         gl.bindVertexArray(null);
 
-        gl.uniform1i(boardSizeUniformLocation,  null);
-        gl.uniform1i(cellSizeUniformLocation,   null);
-        gl.uniform1i(domainSizeUniformLocation, null);
-        gl.uniform1i(flagsUniformLocation,      null);
+        gl.uniform1i(drawShaderVariables.BoardSizeUniformLocation,  null);
+        gl.uniform1i(drawShaderVariables.CellSizeUniformLocation,   null);
+        gl.uniform1i(drawShaderVariables.DomainSizeUniformLocation, null);
+        gl.uniform1i(drawShaderVariables.FlagsUniformLocation,      null);
 
-        gl.uniform1i(canvasWidthUniformLocation,     null);
-        gl.uniform1i(canvasHeightUniformLocation,    null);
-        gl.uniform1i(viewportXOffsetUniformLocation, null);
-        gl.uniform1i(viewportYOffsetUniformLocation, null);
+        gl.uniform1i(drawShaderVariables.CanvasWidthUniformLocation,     null);
+        gl.uniform1i(drawShaderVariables.CanvasHeightUniformLocation,    null);
+        gl.uniform1i(drawShaderVariables.ViewportXOffsetUniformLocation, null);
+        gl.uniform1i(drawShaderVariables.ViewportYOffsetUniformLocation, null);
 
-        gl.uniform4f(colorNoneUniformLocation,    0, 0, 0, 0);
-        gl.uniform4f(colorEnabledUniformLocation, 0, 0, 0, 0);
-        gl.uniform4f(colorSolvedUniformLocation,  0, 0, 0, 0);
-        gl.uniform4f(colorBetweenUniformLocation, 0, 0, 0, 0);
+        gl.uniform4f(drawShaderVariables.ColorNoneUniformLocation,    0, 0, 0, 0);
+        gl.uniform4f(drawShaderVariables.ColorEnabledUniformLocation, 0, 0, 0, 0);
+        gl.uniform4f(drawShaderVariables.ColorSolvedUniformLocation,  0, 0, 0, 0);
+        gl.uniform4f(drawShaderVariables.ColorBetweenUniformLocation, 0, 0, 0, 0);
 
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, null);
