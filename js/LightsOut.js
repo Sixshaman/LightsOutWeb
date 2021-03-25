@@ -2316,11 +2316,11 @@ function main()
             resetStability();
             if(flagShowLitStability)
             {
-                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, Math.floor(currentGameSize / 2), Math.floor(currentGameSize / 2), false);
@@ -2338,7 +2338,7 @@ function main()
         canvas.clientWidth  = currentViewportWidth;
         canvas.clientHeight = currentViewportHeight;
 
-        updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+        updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
         updateViewport();
         requestRedraw();
@@ -2380,7 +2380,7 @@ function main()
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
 
         infoText.textContent = "Lights Out  " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
-        updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+        updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
         requestRedraw();
     }
@@ -2417,7 +2417,7 @@ function main()
         if(flagShowSolution)
         {
             currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-            updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+            updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
         }
         else if(flagShowInverseSolution)
         {
@@ -2430,20 +2430,20 @@ function main()
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
             }
 
-            updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+            updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
         }
 
         if(flagShowStability)
         {
-            updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+            updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
         }
         else if(flagShowLitStability)
         {
             calculateLitStability();
-            updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+            updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
         }
 
-        updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+        updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
         requestRedraw();
     }
 
@@ -2648,7 +2648,7 @@ function main()
                 if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                    updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+                    updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
     
                     currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
     
@@ -2665,7 +2665,7 @@ function main()
                 if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                    updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+                    updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
     
                     currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
     
@@ -2762,17 +2762,17 @@ function main()
             resetStability();
             if(flagShowLitStability)
             {
-                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             if(flagShowSolution)
             {
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
             else if(flagShowInverseSolution)
             {
@@ -2785,7 +2785,7 @@ function main()
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
                 }
 
-                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
         }
         else if(resetMode === resetModes.RESET_SOLUTION)
@@ -2803,11 +2803,11 @@ function main()
                 if(flagShowLitStability)
                 {
                     currentGameLitStability = calculateLitStability();
-                    updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                    updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
                 }
                 else if(flagShowStability)
                 {
-                    updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                    updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
                 }
 
                 showSolution(false);
@@ -2820,7 +2820,7 @@ function main()
                 showStability(false);
                 resetStability();
 
-                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowLitStability)
             {
@@ -2829,7 +2829,7 @@ function main()
                 showLitStability(false);
                 resetStability();
 
-                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
         }
         else if(resetMode === resetModes.RESET_INVERTO || resetMode === resetModes.RESET_DOMAIN_ROTATE_NONZERO)
@@ -2858,17 +2858,17 @@ function main()
             resetStability();
             if(flagShowLitStability)
             {
-                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             if(flagShowSolution)
             {
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
             else if(flagShowInverseSolution)
             {
@@ -2881,7 +2881,7 @@ function main()
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
                 }
 
-                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
         }
         else if(resetMode === resetModes.RESET_SOLVABLE_RANDOM)
@@ -2910,11 +2910,11 @@ function main()
             resetStability();
             if(flagShowLitStability)
             {
-                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
         }
         else
@@ -2973,15 +2973,15 @@ function main()
             resetStability();
             if(flagShowLitStability)
             {
-                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
         }
 
-        updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+        updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
         requestRedraw();
     }
 
@@ -3231,7 +3231,7 @@ function main()
 
             changeGameSize(currentClickRuleSize);
             currentGameBoard = currentGameClickRule;
-            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
 
@@ -3294,7 +3294,7 @@ function main()
             changeGameSize(currentSavedGameSize);
             currentGameBoard = currentSavedBoard.slice();
 
-            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             requestRedraw();
             changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
@@ -3310,7 +3310,7 @@ function main()
             changeGameSize(currentSavedGameSize);
             currentGameBoard = currentSavedBoard.slice();
 
-            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             requestRedraw();
             if(currentSavedWorkingMode === workingModes.LIT_BOARD_MATRIX)
@@ -3363,7 +3363,7 @@ function main()
             flagShowSolution = true;
 
             currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-            updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+            updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
         }
         else
         {
@@ -3399,7 +3399,7 @@ function main()
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
             }
             
-            updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+            updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
         }
         else
         {
@@ -3427,7 +3427,7 @@ function main()
             flagShowStability = true;
             showSolution(false);
 
-            updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+            updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
         }
         else
         {
@@ -3456,7 +3456,7 @@ function main()
             showSolution(false);
 
             currentGameLitStability = calculateLitStability();
-            updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+            updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
         }
         else
         {
@@ -3656,22 +3656,22 @@ function main()
                 currentGameBoard = makeTurnMatrix(currentGameBoard, currentGameMatrix, currentGameSize, currentDomainSize, turn.cellX, turn.cellY);   
             }
 
-            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             resetStability();
             if(flagShowLitStability)
             {
-                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             if(flagShowSolution && currentSolutionMatrixCalculated)
             {
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
             else if(flagShowInverseSolution)
             {
@@ -3684,7 +3684,7 @@ function main()
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
                 }
         
-                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+                updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
 
             if(currentTurnList.length === 0)
@@ -3709,16 +3709,16 @@ function main()
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
 
-            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             if(flagStopCountingWhenFound && equalsBoard(currentGameBoard, currentCountedBoard))
@@ -3747,16 +3747,16 @@ function main()
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
 
-            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             if(flagStopCountingWhenFound && equalsBoard(currentGameBoard, currentCountedBoard))
@@ -3796,16 +3796,16 @@ function main()
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
 
-            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             if(!flagTickLoop) //Just stopped, period is found
@@ -3845,16 +3845,16 @@ function main()
 
             currentGameBoard = domainInverseBoard(currentGameBoard, currentDomainSize);
 
-            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
+            updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+                updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
             if(!flagTickLoop) //Just stopped, period is found
@@ -4180,10 +4180,10 @@ function main()
         }
         }
 
-        let shaderVariables = obtainShaderVariables(glRow, matrixShaderProgram);
-        let vertexBuffer    = createVertexBuffer(glRow, matrixShaderProgram);
+        let rowShaderVariables = obtainShaderVariables(glRow, matrixShaderProgram);
+        let rowVertexBuffer    = createVertexBuffer(glRow, matrixShaderProgram);
 
-        let boardTex = createBoardLikeTexture(glRow);
+        let rowBoardTex = createBoardLikeTexture(glRow);
 
         let drawCellSize = 0;
         if(showGrid)
@@ -4207,7 +4207,67 @@ function main()
             canvasRow.height = (currentGameSize + 2 * paddingCanvasCells) * matrixCellSize;
         }
 
+        canvasRow.clientWidth  = canvasRow.width;
+        canvasRow.clientHeight = canvasRow.height;
 
+        for(let row = 0; row < matrix.length; row++)
+        {
+            let boardSize = currentGameSize + 2 * paddingCanvasCells;
+
+            let rowBoard = new Uint8Array(boardSize * boardSize);
+            for(let y = 0; y < currentGameSize; y++)
+            {
+                for(let x = 0; x < currentGameSize; x++)
+                {
+                    let indexPadded = flatCellIndex(boardSize, x + paddingCanvasCells, y + paddingCanvasCells);
+                    let indexPlain  = flatCellIndex(currentGameSize, x, y);
+
+                    rowBoard[indexPadded] = matrix[row][indexPlain];
+                }
+            }
+
+            updateBoardLikeTexture(glRow, rowBoard, boardSize, rowBoardTex);
+
+            glRow.clearColor(0.0, 0.0, 0.0, 0.0);
+            glRow.clear(glRow.COLOR_BUFFER_BIT);
+
+            let drawFlags = 0;
+            if(!gridCheckBox.checked)
+            {
+                drawFlags = drawFlags | 8;
+            }
+
+            glRow.bindVertexArray(rowVertexBuffer);
+
+            glRow.bindFramebuffer(glRow.FRAMEBUFFER, null);
+            glRow.useProgram(matrixShaderProgram);
+
+            glRow.viewport(0, 0, canvasRow.clientWidth, canvasRow.clientHeight);
+
+            glRow.uniform1i(rowShaderVariables.BoardSizeUniformLocation,  boardSize);
+            glRow.uniform1i(rowShaderVariables.CellSizeUniformLocation,   drawCellSize);
+            glRow.uniform1i(rowShaderVariables.DomainSizeUniformLocation, currentDomainSize);
+            glRow.uniform1i(rowShaderVariables.FlagsUniformLocation,      drawFlags);
+
+            glRow.uniform1i(rowShaderVariables.CanvasWidthUniformLocation,     canvasRow.clientWidth);
+            glRow.uniform1i(rowShaderVariables.CanvasHeightUniformLocation,    canvasRow.clientHeight);
+            glRow.uniform1i(rowShaderVariables.ViewportXOffsetUniformLocation, 0);
+            glRow.uniform1i(rowShaderVariables.ViewportYOffsetUniformLocation, 0);
+
+            glRow.uniform4f(rowShaderVariables.ColorNoneUniformLocation,    currentColorUnlit[0],   currentColorUnlit[1],   currentColorUnlit[2],   currentColorUnlit[3]);
+            glRow.uniform4f(rowShaderVariables.ColorEnabledUniformLocation, currentColorLit[0],     currentColorLit[1],     currentColorLit[2],     currentColorLit[3]);
+            glRow.uniform4f(rowShaderVariables.ColorSolvedUniformLocation,  currentColorSolved[0],  currentColorSolved[1],  currentColorSolved[2],  currentColorSolved[3]);
+            glRow.uniform4f(rowShaderVariables.ColorBetweenUniformLocation, currentColorBetween[0], currentColorBetween[1], currentColorBetween[2], currentColorBetween[3]);
+
+            glRow.uniform1i(rowShaderVariables.BoardTextureUniformLocation,      0);
+            glRow.uniform1i(rowShaderVariables.SolutionTextureUniformLocation,  -1);
+            glRow.uniform1i(rowShaderVariables.StabilityTextureUniformLocation, -1);
+
+            glRow.activeTexture(gl.TEXTURE0);
+            glRow.bindTexture(gl.TEXTURE_2D, boardTexture);
+
+            glRow.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
+        }
 
         glRow.getExtension('WEBGL_lose_context').loseContext();
 
@@ -6048,7 +6108,7 @@ function main()
         return shaderProgram;
     }
 
-    function updateBoardLikeTexture(context, boardData, boardLikeTexture)
+    function updateBoardLikeTexture(context, boardData, gameSize, boardLikeTexture)
     {
         if(boardData === null)
         {
@@ -6057,7 +6117,7 @@ function main()
 
         context.pixelStorei(context.UNPACK_ALIGNMENT, 1);
         context.bindTexture(context.TEXTURE_2D, boardLikeTexture);
-        context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, currentGameSize, currentGameSize, context.RED_INTEGER, context.UNSIGNED_BYTE, boardData);
+        context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, gameSize, gameSize, context.RED_INTEGER, context.UNSIGNED_BYTE, boardData);
         context.bindTexture(context.TEXTURE_2D, null);
     }
 
