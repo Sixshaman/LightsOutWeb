@@ -292,10 +292,10 @@ function decodeBase64ClickRule(base64Str, domainSize, minSize, maxSize)
     return {clickrule: clickRule, clickrulesize: clickRuleSize, istoroid: isToroid};
 }
 
-//Returns (num % domainSize) with regard to the sign of num
-function wholeMod(num, domainSize)
+//Returns (num % modulo) with regard to the sign of num
+function wholeMod(num, modulo)
 {
-    return ((num % domainSize) + domainSize) % domainSize;
+    return ((num % modulo) + modulo) % modulo;
 }
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -2043,16 +2043,16 @@ function main()
 
     saveRegularMatrixRenderModeButton.onclick = function()
     {
-        let matrixCellSize = 5;
+        let matrixCellSize = 15;
 
         if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
         {
             let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
-            saveMatrixWithRenderModeToImage(lightsOutMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked);
+            saveMatrixWithRenderModeToImage(lightsOutMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, flagToroidBoard);
         }   
         else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
         {
-            saveMatrixWithRenderModeToImage(currentGameMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked);
+            saveMatrixWithRenderModeToImage(currentGameMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, flagToroidBoard);
         }    
     }
 
@@ -2235,7 +2235,7 @@ function main()
     let stabilityTexture = null;
 
     let drawShaderVariables = null;
-    let drawVertexBuffer    = null;
+    let drawVertexArray     = null;
 
     let solutionMatrixWorker = null;
 
@@ -2701,9 +2701,9 @@ function main()
             {
                 if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
                 {
-                    const matrixCellSize = 5;
+                    const matrixCellSize = 15;
 
-                    saveMatrixWithRenderModeToImage(currentSolutionMatrix, matrixCellSize, currentShaderProgram, gridCheckBox.checked);
+                    saveMatrixWithRenderModeToImage(currentSolutionMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, flagToroidBoard);
                 }
 
                 break;
@@ -3511,7 +3511,7 @@ function main()
 
         renderModeSelect.value = valueSelect;
         
-        drawVertexBuffer    = createVertexBuffer(gl, currentShaderProgram);
+        drawVertexArray     = createVertexArray(gl, currentShaderProgram);
         drawShaderVariables = obtainShaderVariables(gl, currentShaderProgram);
 
         updateAddressBar(50);
@@ -4121,12 +4121,14 @@ function main()
         canvasMatrix.remove();
     }
 
-    function saveMatrixWithRenderModeToImage(matrix, matrixCellSize, renderMode, showGrid)
+    function saveMatrixWithRenderModeToImage(matrix, matrixCellSize, renderMode, showGrid, isToroid)
     {
         const canvasMatrix = document.createElement("canvas");
         const canvasRow    = document.createElement("canvas");
 
-        const glRow = canvasRow.getContext("webgl2");
+        const matrixContext = canvasMatrix.getContext("2d");
+
+        const glRow = canvasRow.getContext("webgl2", {preserveDrawingBuffer: true});
         if(!glRow)
         {
             alert("Unable to initialize WebGL. Your browser or machine may not support it.");
@@ -4181,14 +4183,19 @@ function main()
         }
 
         let rowShaderVariables = obtainShaderVariables(glRow, matrixShaderProgram);
-        let rowVertexBuffer    = createVertexBuffer(glRow, matrixShaderProgram);
+        let rowVertexArray     = createVertexArray(glRow, matrixShaderProgram);
 
         let rowBoardTex = createBoardLikeTexture(glRow);
 
         let drawCellSize = 0;
+        let copySizeX    = 0;
+        let copySizeY    = 0;
         if(showGrid)
         {
             drawCellSize = matrixCellSize + 1;
+
+            copySizeX = currentGameSize * drawCellSize + 1;
+            copySizeY = currentGameSize * drawCellSize + 1;
 
             canvasMatrix.width  = currentGameSize * currentGameSize * drawCellSize + 1;
             canvasMatrix.height = currentGameSize * currentGameSize * drawCellSize + 1;
@@ -4200,6 +4207,9 @@ function main()
         {
             drawCellSize = matrixCellSize;
 
+            copySizeX = currentGameSize * matrixCellSize;
+            copySizeY = currentGameSize * matrixCellSize;
+
             canvasMatrix.width  = currentGameSize * currentGameSize * matrixCellSize;
             canvasMatrix.height = currentGameSize * currentGameSize * matrixCellSize;
 
@@ -4207,69 +4217,241 @@ function main()
             canvasRow.height = (currentGameSize + 2 * paddingCanvasCells) * matrixCellSize;
         }
 
+        let copyOffsetX = drawCellSize * paddingCanvasCells;
+        let copyOffsetY = drawCellSize * paddingCanvasCells;
+
         canvasRow.clientWidth  = canvasRow.width;
         canvasRow.clientHeight = canvasRow.height;
 
-        for(let row = 0; row < matrix.length; row++)
+        glRow.viewport(0, 0, canvasRow.width, canvasRow.height);
+
+        for(let yBig = 0; yBig < currentGameSize; yBig++)
         {
-            let boardSize = currentGameSize + 2 * paddingCanvasCells;
-
-            let rowBoard = new Uint8Array(boardSize * boardSize);
-            for(let y = 0; y < currentGameSize; y++)
+            for(let xBig = 0; xBig < currentGameSize; xBig++)
             {
-                for(let x = 0; x < currentGameSize; x++)
+                let row = flatCellIndex(currentGameSize, xBig, yBig);
+
+                let boardSize = currentGameSize + 2 * paddingCanvasCells;
+                let rowBoard  = new Uint8Array(boardSize * boardSize);
+
+                //Main row board data
+                for(let y = 0; y < currentGameSize; y++)
                 {
-                    let indexPadded = flatCellIndex(boardSize, x + paddingCanvasCells, y + paddingCanvasCells);
-                    let indexPlain  = flatCellIndex(currentGameSize, x, y);
+                    for(let x = 0; x < currentGameSize; x++)
+                    {
+                        let indexPadded = flatCellIndex(boardSize, x + paddingCanvasCells, y + paddingCanvasCells);
+                        let indexPlain  = flatCellIndex(currentGameSize, x, y);
 
-                    rowBoard[indexPadded] = matrix[row][indexPlain];
+                        rowBoard[indexPadded] = matrix[row][indexPlain];
+                    }
                 }
+
+                //Top padded rows
+                for(let padY = 0; padY < paddingCanvasCells; padY++)
+                {
+                    let y = padY;
+
+                    let bigY   = yBig - Math.ceil((paddingCanvasCells - padY) / currentGameSize);
+                    let smallY = wholeMod((currentGameSize - (paddingCanvasCells - padY)), currentGameSize);
+
+                    if(isToroid && bigY < 0)
+                    {
+                        bigY = wholeMod(bigY, currentGameSize);
+                    }
+                    else if(bigY < 0)
+                    {
+                        continue;
+                    }
+
+                    for(let x = 0; x < boardSize; x++)
+                    {
+                        let bigX   = -1;
+                        let smallX = -1;
+                        if(x < paddingCanvasCells)
+                        {
+                            let padX = x;
+                            bigX     = xBig - Math.ceil((paddingCanvasCells - padX) / currentGameSize);
+                            smallX   = wholeMod((currentGameSize - (paddingCanvasCells - padX)), currentGameSize);
+                        }
+                        else if(x >= paddingCanvasCells + currentGameSize)
+                        {
+                            let padX = x - paddingCanvasCells - currentGameSize;
+                            bigX     = xBig + Math.ceil((padX + 1) / currentGameSize);
+                            smallX   = wholeMod(padX, currentGameSize);
+                        }
+                        else
+                        {
+                            bigX   = xBig;
+                            smallX = x - paddingCanvasCells;
+                        }
+
+                        if(isToroid && (bigX < 0 || bigX >= currentGameSize))
+                        {
+                            bigX = wholeMod(bigX, currentGameSize);
+                        }
+                        else if(bigX < 0 || bigX >= currentGameSize)
+                        {
+                            continue;
+                        }
+
+                        let matrixRowIndex    = flatCellIndex(currentGameSize, bigX,   bigY);
+                        let matrixColumnIndex = flatCellIndex(currentGameSize, smallX, smallY); 
+                        let boardIndex        = flatCellIndex(boardSize,       x,      y);
+
+                        rowBoard[boardIndex] = matrix[matrixRowIndex][matrixColumnIndex];
+                    }
+                }
+
+                //Left and right padded columns
+                for(let smallY = 0; smallY < currentGameSize; smallY++)
+                {
+                    let bigY = yBig;
+                    let y    = smallY + paddingCanvasCells;
+
+                    for(let padX = 0; padX < paddingCanvasCells; padX++)
+                    {
+                        let bigXLeft   = xBig - Math.ceil((paddingCanvasCells - padX) / currentGameSize);
+                        let smallXLeft = wholeMod((currentGameSize - (paddingCanvasCells - padX)), currentGameSize);
+                        let xLeft      = padX;
+
+                        let bigXRight   = xBig + Math.ceil((padX + 1) / currentGameSize);
+                        let smallXRight = wholeMod(padX, currentGameSize);
+                        let xRight      = padX + currentGameSize + paddingCanvasCells;
+
+                        if(isToroid && (bigXLeft < 0 || bigXRight >= currentGameSize))
+                        {
+                            bigXLeft  = wholeMod(bigXLeft, currentGameSize);
+                            bigXRight = wholeMod(bigXRight, currentGameSize);
+                        }
+
+                        if(bigXLeft >= 0) //Can be if !isToroid 
+                        {
+                            let matrixRowIndexLeft    = flatCellIndex(currentGameSize, bigXLeft,   bigY);
+                            let matrixColumnIndexLeft = flatCellIndex(currentGameSize, smallXLeft, smallY); 
+                            let boardIndexLeft        = flatCellIndex(boardSize,       xLeft,      y);
+
+                            rowBoard[boardIndexLeft] = matrix[matrixRowIndexLeft][matrixColumnIndexLeft];
+                        }
+
+                        if(bigXRight < currentGameSize) //Can be if !isToroid 
+                        {
+                            let matrixRowIndexRight    = flatCellIndex(currentGameSize, bigXRight,   bigY);
+                            let matrixColumnIndexRight = flatCellIndex(currentGameSize, smallXRight, smallY); 
+                            let boardIndexRight        = flatCellIndex(boardSize,       xRight,      y);
+
+                            rowBoard[boardIndexRight] = matrix[matrixRowIndexRight][matrixColumnIndexRight];
+                        }
+                    }
+                }
+
+                //Bottom padded rows
+                for(let padY = 0; padY < paddingCanvasCells; padY++)
+                {
+                    let y = padY + currentGameSize + paddingCanvasCells;
+
+                    let bigY   = yBig + Math.ceil((padY + 1) / currentGameSize);
+                    let smallY = wholeMod(padY, currentGameSize);
+
+                    if(isToroid && bigY >= currentGameSize)
+                    {
+                        bigY = wholeMod(bigY, currentGameSize);
+                    }
+                    else if(bigY >= currentGameSize)
+                    {
+                        continue;
+                    }
+
+                    for(let x = 0; x < boardSize; x++)
+                    {
+                        let bigX   = -1;
+                        let smallX = -1;
+                        if(x < paddingCanvasCells)
+                        {
+                            let padX = x;
+                            bigX     = xBig - Math.ceil((paddingCanvasCells - padX) / currentGameSize);
+                            smallX   = wholeMod((currentGameSize - (paddingCanvasCells - padX)), currentGameSize);
+                        }
+                        else if(x >= paddingCanvasCells + currentGameSize)
+                        {
+                            let padX = x - paddingCanvasCells - currentGameSize;
+                            bigX     = xBig + Math.ceil((padX + 1) / currentGameSize);
+                            smallX   = wholeMod(padX, currentGameSize);
+                        }
+                        else
+                        {
+                            bigX   = xBig;
+                            smallX = x - paddingCanvasCells;
+                        }
+
+                        if(isToroid && (bigX < 0 || bigX >= currentGameSize))
+                        {
+                            bigX = wholeMod(bigX, currentGameSize);
+                        }
+                        else if(bigX < 0 || bigX >= currentGameSize)
+                        {
+                            continue;
+                        }
+
+                        let matrixRowIndex    = flatCellIndex(currentGameSize, bigX,   bigY);
+                        let matrixColumnIndex = flatCellIndex(currentGameSize, smallX, smallY); 
+                        let boardIndex        = flatCellIndex(boardSize,       x,      y);
+
+                        rowBoard[boardIndex] = matrix[matrixRowIndex][matrixColumnIndex];
+                    }
+                }
+
+                updateBoardLikeTexture(glRow, rowBoard, boardSize, rowBoardTex);
+
+                glRow.clearColor(0.0, 0.0, 0.0, 0.0);
+                glRow.clear(glRow.COLOR_BUFFER_BIT);
+
+                let drawFlags = 0;
+                if(!gridCheckBox.checked)
+                {
+                    drawFlags = drawFlags | 8;
+                }
+
+                glRow.bindVertexArray(rowVertexArray);
+
+                glRow.bindFramebuffer(glRow.FRAMEBUFFER, null);
+                glRow.useProgram(matrixShaderProgram);
+
+                glRow.uniform1i(rowShaderVariables.BoardSizeUniformLocation,  boardSize);
+                glRow.uniform1i(rowShaderVariables.CellSizeUniformLocation,   drawCellSize);
+                glRow.uniform1i(rowShaderVariables.DomainSizeUniformLocation, currentDomainSize);
+                glRow.uniform1i(rowShaderVariables.FlagsUniformLocation,      drawFlags);
+
+                glRow.uniform1i(rowShaderVariables.CanvasWidthUniformLocation,     canvasRow.width);
+                glRow.uniform1i(rowShaderVariables.CanvasHeightUniformLocation,    canvasRow.height);
+                glRow.uniform1i(rowShaderVariables.ViewportXOffsetUniformLocation, 0);
+                glRow.uniform1i(rowShaderVariables.ViewportYOffsetUniformLocation, 0);
+
+                glRow.uniform4f(rowShaderVariables.ColorNoneUniformLocation,    currentColorUnlit[0],   currentColorUnlit[1],   currentColorUnlit[2],   currentColorUnlit[3]);
+                glRow.uniform4f(rowShaderVariables.ColorEnabledUniformLocation, currentColorLit[0],     currentColorLit[1],     currentColorLit[2],     currentColorLit[3]);
+                glRow.uniform4f(rowShaderVariables.ColorSolvedUniformLocation,  currentColorSolved[0],  currentColorSolved[1],  currentColorSolved[2],  currentColorSolved[3]);
+                glRow.uniform4f(rowShaderVariables.ColorBetweenUniformLocation, currentColorBetween[0], currentColorBetween[1], currentColorBetween[2], currentColorBetween[3]);
+
+                glRow.uniform1i(rowShaderVariables.BoardTextureUniformLocation, 0);
+
+                glRow.activeTexture(glRow.TEXTURE0);
+                glRow.bindTexture(glRow.TEXTURE_2D, rowBoardTex);
+
+                glRow.drawArrays(glRow.TRIANGLE_STRIP, 0, 4);
+
+                let copyDestOffsetX = xBig * drawCellSize * currentGameSize;
+                let copyDestOffsetY = yBig * drawCellSize * currentGameSize;
+                matrixContext.drawImage(canvasRow, copyOffsetX, copyOffsetY, copySizeX, copySizeY, copyDestOffsetX, copyDestOffsetY, copySizeX, copySizeY);
             }
-
-            updateBoardLikeTexture(glRow, rowBoard, boardSize, rowBoardTex);
-
-            glRow.clearColor(0.0, 0.0, 0.0, 0.0);
-            glRow.clear(glRow.COLOR_BUFFER_BIT);
-
-            let drawFlags = 0;
-            if(!gridCheckBox.checked)
-            {
-                drawFlags = drawFlags | 8;
-            }
-
-            glRow.bindVertexArray(rowVertexBuffer);
-
-            glRow.bindFramebuffer(glRow.FRAMEBUFFER, null);
-            glRow.useProgram(matrixShaderProgram);
-
-            glRow.viewport(0, 0, canvasRow.clientWidth, canvasRow.clientHeight);
-
-            glRow.uniform1i(rowShaderVariables.BoardSizeUniformLocation,  boardSize);
-            glRow.uniform1i(rowShaderVariables.CellSizeUniformLocation,   drawCellSize);
-            glRow.uniform1i(rowShaderVariables.DomainSizeUniformLocation, currentDomainSize);
-            glRow.uniform1i(rowShaderVariables.FlagsUniformLocation,      drawFlags);
-
-            glRow.uniform1i(rowShaderVariables.CanvasWidthUniformLocation,     canvasRow.clientWidth);
-            glRow.uniform1i(rowShaderVariables.CanvasHeightUniformLocation,    canvasRow.clientHeight);
-            glRow.uniform1i(rowShaderVariables.ViewportXOffsetUniformLocation, 0);
-            glRow.uniform1i(rowShaderVariables.ViewportYOffsetUniformLocation, 0);
-
-            glRow.uniform4f(rowShaderVariables.ColorNoneUniformLocation,    currentColorUnlit[0],   currentColorUnlit[1],   currentColorUnlit[2],   currentColorUnlit[3]);
-            glRow.uniform4f(rowShaderVariables.ColorEnabledUniformLocation, currentColorLit[0],     currentColorLit[1],     currentColorLit[2],     currentColorLit[3]);
-            glRow.uniform4f(rowShaderVariables.ColorSolvedUniformLocation,  currentColorSolved[0],  currentColorSolved[1],  currentColorSolved[2],  currentColorSolved[3]);
-            glRow.uniform4f(rowShaderVariables.ColorBetweenUniformLocation, currentColorBetween[0], currentColorBetween[1], currentColorBetween[2], currentColorBetween[3]);
-
-            glRow.uniform1i(rowShaderVariables.BoardTextureUniformLocation,      0);
-            glRow.uniform1i(rowShaderVariables.SolutionTextureUniformLocation,  -1);
-            glRow.uniform1i(rowShaderVariables.StabilityTextureUniformLocation, -1);
-
-            glRow.activeTexture(gl.TEXTURE0);
-            glRow.bindTexture(gl.TEXTURE_2D, boardTexture);
-
-            glRow.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
         }
 
-        glRow.getExtension('WEBGL_lose_context').loseContext();
+        //glRow.getExtension('WEBGL_lose_context').loseContext();
+
+        let link      = document.createElement("a");
+        link.href     = canvasMatrix.toDataURL("image/png");
+        link.download = "LightsOutMatrix.png";
+
+        link.click();
+        link.remove();
 
         canvasRow.remove();
         canvasMatrix.remove();
@@ -4591,7 +4773,7 @@ function main()
             ColorNoneUniformLocation:    context.getUniformLocation(shaderProgram, "gColorNone"),
             ColorEnabledUniformLocation: context.getUniformLocation(shaderProgram, "gColorEnabled"),
             ColorSolvedUniformLocation:  context.getUniformLocation(shaderProgram, "gColorSolved"),
-            colorBetweenUniformLocation: context.getUniformLocation(shaderProgram, "gColorBetween"),
+            ColorBetweenUniformLocation: context.getUniformLocation(shaderProgram, "gColorBetween"),
     
             BoardTextureUniformLocation:     context.getUniformLocation(shaderProgram, "gBoard"),
             SolutionTextureUniformLocation:  context.getUniformLocation(shaderProgram, "gSolution"),
@@ -4601,7 +4783,7 @@ function main()
         return variables;
     }
 
-    function createVertexBuffer(context, shaderProgram)
+    function createVertexArray(context, shaderProgram)
     {
         let bufferAttribLocation = context.getAttribLocation(shaderProgram, "vScreenPos");
 
@@ -4615,8 +4797,9 @@ function main()
         context.bufferData(context.ARRAY_BUFFER, posArray, context.STATIC_DRAW);
         context.bindBuffer(context.ARRAY_BUFFER, null);
 
-        let vertexBuffer = context.createVertexArray();
-        context.bindVertexArray(vertexBuffer);
+        let vertexArray = context.createVertexArray();
+        context.bindVertexArray(vertexArray);
+
         context.enableVertexAttribArray(bufferAttribLocation);
         context.bindBuffer(context.ARRAY_BUFFER, posBuffer);
         context.vertexAttribPointer(bufferAttribLocation, 4, context.FLOAT, false, 0, 0);
@@ -4624,7 +4807,7 @@ function main()
 
         context.bindVertexArray(null);
 
-        return vertexBuffer;
+        return vertexArray;
     }
 
     function createTextures()
@@ -6144,7 +6327,7 @@ function main()
             drawFlags = drawFlags | 8;
         }
 
-        gl.bindVertexArray(drawVertexBuffer);
+        gl.bindVertexArray(drawVertexArray);
 
         gl.bindFramebuffer(gl.FRAMEBUFFER, null);
         gl.useProgram(currentShaderProgram);
