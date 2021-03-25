@@ -2314,7 +2314,14 @@ function main()
             currentGameBoard = generateNewBoard(currentGameSize, currentDomainSize, boardGenModes.BOARDGEN_ZERO_ELEMENT);
 
             resetStability();
-            updateStabilityTexture();
+            if(flagShowLitStability)
+            {
+                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+            }
 
             currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, Math.floor(currentGameSize / 2), Math.floor(currentGameSize / 2), false);
             infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
@@ -2331,7 +2338,7 @@ function main()
         canvas.clientWidth  = currentViewportWidth;
         canvas.clientHeight = currentViewportHeight;
 
-        updateBoardTexture();
+        updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
 
         updateViewport();
         requestRedraw();
@@ -2373,7 +2380,7 @@ function main()
         resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
 
         infoText.textContent = "Lights Out  " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
-        updateBoardTexture();
+        updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
 
         requestRedraw();
     }
@@ -2410,7 +2417,7 @@ function main()
         if(flagShowSolution)
         {
             currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-            updateSolutionTexture();
+            updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
         }
         else if(flagShowInverseSolution)
         {
@@ -2423,20 +2430,20 @@ function main()
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
             }
 
-            updateSolutionTexture();
+            updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
         }
 
         if(flagShowStability)
         {
-            updateStabilityTexture();
+            updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
         }
         else if(flagShowLitStability)
         {
             calculateLitStability();
-            updateStabilityTexture();
+            updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
         }
 
-        updateBoardTexture();
+        updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
         requestRedraw();
     }
 
@@ -2641,7 +2648,7 @@ function main()
                 if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                    updateSolutionTexture();
+                    updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
     
                     currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
     
@@ -2658,7 +2665,7 @@ function main()
                 if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                    updateSolutionTexture();
+                    updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
     
                     currentTurnList = buildTurnList(currentGameSolution, currentGameSize);
     
@@ -2753,12 +2760,19 @@ function main()
             }
 
             resetStability();
-            updateStabilityTexture();
+            if(flagShowLitStability)
+            {
+                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+            }
 
             if(flagShowSolution)
             {
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                updateSolutionTexture();
+                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
             }
             else if(flagShowInverseSolution)
             {
@@ -2771,7 +2785,7 @@ function main()
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
                 }
 
-                updateSolutionTexture();
+                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
             }
         }
         else if(resetMode === resetModes.RESET_SOLUTION)
@@ -2789,11 +2803,11 @@ function main()
                 if(flagShowLitStability)
                 {
                     currentGameLitStability = calculateLitStability();
-                    updateStabilityTexture();
+                    updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
                 }
                 else if(flagShowStability)
                 {
-                    updateStabilityTexture();
+                    updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
                 }
 
                 showSolution(false);
@@ -2806,7 +2820,7 @@ function main()
                 showStability(false);
                 resetStability();
 
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
             }
             else if(flagShowLitStability)
             {
@@ -2815,7 +2829,7 @@ function main()
                 showLitStability(false);
                 resetStability();
 
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
             }
         }
         else if(resetMode === resetModes.RESET_INVERTO || resetMode === resetModes.RESET_DOMAIN_ROTATE_NONZERO)
@@ -2842,12 +2856,19 @@ function main()
             }
 
             resetStability();
-            updateStabilityTexture();
+            if(flagShowLitStability)
+            {
+                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+            }
 
             if(flagShowSolution)
             {
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-                updateSolutionTexture();
+                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
             }
             else if(flagShowInverseSolution)
             {
@@ -2860,7 +2881,7 @@ function main()
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
                 }
 
-                updateSolutionTexture();
+                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
             }
         }
         else if(resetMode === resetModes.RESET_SOLVABLE_RANDOM)
@@ -2887,7 +2908,14 @@ function main()
             }
 
             resetStability();
-            updateStabilityTexture();
+            if(flagShowLitStability)
+            {
+                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+            }
         }
         else
         {
@@ -2943,10 +2971,17 @@ function main()
             currentGameBoard = generateNewBoard(currentGameSize, currentDomainSize, modeBgen);
 
             resetStability();
-            updateStabilityTexture();
+            if(flagShowLitStability)
+            {
+                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+            }
         }
 
-        updateBoardTexture();
+        updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
         requestRedraw();
     }
 
@@ -3196,7 +3231,7 @@ function main()
 
             changeGameSize(currentClickRuleSize);
             currentGameBoard = currentGameClickRule;
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
 
             infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
 
@@ -3259,7 +3294,7 @@ function main()
             changeGameSize(currentSavedGameSize);
             currentGameBoard = currentSavedBoard.slice();
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
 
             requestRedraw();
             changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
@@ -3275,7 +3310,7 @@ function main()
             changeGameSize(currentSavedGameSize);
             currentGameBoard = currentSavedBoard.slice();
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
 
             requestRedraw();
             if(currentSavedWorkingMode === workingModes.LIT_BOARD_MATRIX)
@@ -3328,7 +3363,7 @@ function main()
             flagShowSolution = true;
 
             currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
-            updateSolutionTexture();
+            updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
         }
         else
         {
@@ -3364,7 +3399,7 @@ function main()
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
             }
             
-            updateSolutionTexture();
+            updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
         }
         else
         {
@@ -3392,7 +3427,7 @@ function main()
             flagShowStability = true;
             showSolution(false);
 
-            updateStabilityTexture();
+            updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
         }
         else
         {
@@ -3421,7 +3456,7 @@ function main()
             showSolution(false);
 
             currentGameLitStability = calculateLitStability();
-            updateStabilityTexture();
+            updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
         }
         else
         {
@@ -3621,12 +3656,35 @@ function main()
                 currentGameBoard = makeTurnMatrix(currentGameBoard, currentGameMatrix, currentGameSize, currentDomainSize, turn.cellX, turn.cellY);   
             }
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
 
             resetStability();
-            if(flagShowStability || flagShowLitStability)
+            if(flagShowLitStability)
             {
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
+            }
+            else if(flagShowStability)
+            {
+                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
+            }
+
+            if(flagShowSolution && currentSolutionMatrixCalculated)
+            {
+                currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
+                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
+            }
+            else if(flagShowInverseSolution)
+            {
+                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+                {
+                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                }
+                else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                {
+                    currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
+                }
+        
+                updateBoardLikeTexture(gl, currentGameSolution, solutionTexture);
             }
 
             if(currentTurnList.length === 0)
@@ -3651,16 +3709,16 @@ function main()
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
             }
 
             if(flagStopCountingWhenFound && equalsBoard(currentGameBoard, currentCountedBoard))
@@ -3689,16 +3747,16 @@ function main()
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
             }
 
             if(flagStopCountingWhenFound && equalsBoard(currentGameBoard, currentCountedBoard))
@@ -3738,16 +3796,16 @@ function main()
             currentGameStability = calculateNewStabilityValue(currentGameSolution);
             currentGameBoard     = currentGameSolution;
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
             }
 
             if(!flagTickLoop) //Just stopped, period is found
@@ -3787,16 +3845,16 @@ function main()
 
             currentGameBoard = domainInverseBoard(currentGameBoard, currentDomainSize);
 
-            updateBoardTexture();
+            updateBoardLikeTexture(gl, currentGameBoard, boardTexture);
 
             if(flagShowLitStability)
             {
                 currentGameLitStability = calculateLitStability();
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameLitStability, stabilityTexture);
             }
             else if(flagShowStability)
             {
-                updateStabilityTexture();
+                updateBoardLikeTexture(gl, currentGameStability, stabilityTexture);
             }
 
             if(!flagTickLoop) //Just stopped, period is found
@@ -4067,31 +4125,91 @@ function main()
     {
         const canvasMatrix = document.createElement("canvas");
         const canvasRow    = document.createElement("canvas");
-        if(showGrid)
-        {
-            canvasMatrix.width  = currentGameSize * currentGameSize * (matrixCellSize + 1) + 1;
-            canvasMatrix.height = currentGameSize * currentGameSize * (matrixCellSize + 1) + 1;
 
-            canvasRow.width  = currentGameSize * (matrixCellSize + 1) + 1;
-            canvasRow.height = currentGameSize * (matrixCellSize + 1) + 1;
-        }
-        else
-        {
-            canvasMatrix.width  = currentGameSize * currentGameSize * matrixCellSize;
-            canvasMatrix.height = currentGameSize * currentGameSize * matrixCellSize;
-
-            canvasRow.width  = currentGameSize * matrixCellSize;
-            canvasRow.height = currentGameSize * matrixCellSize;
-        }
-
-        const webglRow = canvasRow.getContext("webgl2");
-        if(!webglRow)
+        const glRow = canvasRow.getContext("webgl2");
+        if(!glRow)
         {
             alert("Unable to initialize WebGL. Your browser or machine may not support it.");
             return;
         }
 
-        //BUT HOW DO I PASS SHADER PROGRAMS? canvasRow has a different context....................
+        let matrixShaderProgram = null;
+        let paddingCanvasCells  = 0;
+        switch(renderMode)
+        {
+        case "Squares":
+        {
+            matrixShaderProgram = createSquaresShaderProgram(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 0;
+            break;
+        }
+        case "Circles":
+        {
+            matrixShaderProgram = createCirclesShaderProgam(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 1;
+            break;
+        }
+        case "Diamonds":
+        {
+            matrixShaderProgram = createDiamondsShaderProgram(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 1;
+            break;
+        }
+        case "BEAMS":
+        {
+            matrixShaderProgram = createBeamsShaderProgram(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 1;
+            break;
+        }
+        case "Raindrops":
+        {
+            matrixShaderProgram = createRaindropsShaderProgram(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 1;
+            break;
+        }
+        case "Chains":
+        {
+            matrixShaderProgram = createChainsShaderProgram(glRow, createDefaultVertexShader(glRow));
+            paddingCanvasCells  = 2;
+            break;
+        }
+        default:
+        {
+            console.error("Unknown render mode");
+            return;
+        }
+        }
+
+        let shaderVariables = obtainShaderVariables(glRow, matrixShaderProgram);
+        let vertexBuffer    = createVertexBuffer(glRow, matrixShaderProgram);
+
+        let boardTex = createBoardLikeTexture(glRow);
+
+        let drawCellSize = 0;
+        if(showGrid)
+        {
+            drawCellSize = matrixCellSize + 1;
+
+            canvasMatrix.width  = currentGameSize * currentGameSize * drawCellSize + 1;
+            canvasMatrix.height = currentGameSize * currentGameSize * drawCellSize + 1;
+
+            canvasRow.width  = (currentGameSize + 2 * paddingCanvasCells) * drawCellSize + 1;
+            canvasRow.height = (currentGameSize + 2 * paddingCanvasCells) * drawCellSize + 1;
+        }
+        else
+        {
+            drawCellSize = matrixCellSize;
+
+            canvasMatrix.width  = currentGameSize * currentGameSize * matrixCellSize;
+            canvasMatrix.height = currentGameSize * currentGameSize * matrixCellSize;
+
+            canvasRow.width  = (currentGameSize + 2 * paddingCanvasCells) * matrixCellSize;
+            canvasRow.height = (currentGameSize + 2 * paddingCanvasCells) * matrixCellSize;
+        }
+
+
+
+        glRow.getExtension('WEBGL_lose_context').loseContext();
 
         canvasRow.remove();
         canvasMatrix.remove();
@@ -5930,50 +6048,17 @@ function main()
         return shaderProgram;
     }
 
-    function updateBoardTexture()
+    function updateBoardLikeTexture(context, boardData, boardLikeTexture)
     {
-        if(currentGameBoard === null)
+        if(boardData === null)
         {
             return;
         }
 
-        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-        gl.bindTexture(gl.TEXTURE_2D, boardTexture);
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, currentGameSize, currentGameSize, gl.RED_INTEGER, gl.UNSIGNED_BYTE, currentGameBoard);
-        gl.bindTexture(gl.TEXTURE_2D, null);
-    }
-
-    function updateSolutionTexture()
-    {
-        if(currentGameSolution === null)
-        {
-            return;
-        }
-
-        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-        gl.bindTexture(gl.TEXTURE_2D, solutionTexture);
-        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, currentGameSize, currentGameSize, gl.RED_INTEGER, gl.UNSIGNED_BYTE, currentGameSolution);
-        gl.bindTexture(gl.TEXTURE_2D, null);
-    }
-
-    function updateStabilityTexture()
-    {
-        if(currentGameStability === null && currentGameLitStability === null)
-        {
-            return;
-        }
-
-        gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
-        gl.bindTexture(gl.TEXTURE_2D, stabilityTexture);
-        if(flagShowLitStability && currentGameLitStability !== null)
-        {
-            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, currentGameSize, currentGameSize, gl.RED_INTEGER, gl.UNSIGNED_BYTE, currentGameLitStability);
-        }
-        else if(currentGameStability !== null)
-        {
-            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, currentGameSize, currentGameSize, gl.RED_INTEGER, gl.UNSIGNED_BYTE, currentGameStability);
-        }
-        gl.bindTexture(gl.TEXTURE_2D, null);
+        context.pixelStorei(context.UNPACK_ALIGNMENT, 1);
+        context.bindTexture(context.TEXTURE_2D, boardLikeTexture);
+        context.texSubImage2D(context.TEXTURE_2D, 0, 0, 0, currentGameSize, currentGameSize, context.RED_INTEGER, context.UNSIGNED_BYTE, boardData);
+        context.bindTexture(context.TEXTURE_2D, null);
     }
 
     function mainDraw()
