@@ -292,6 +292,109 @@ function decodeBase64ClickRule(base64Str, domainSize, minSize, maxSize)
     return {clickrule: clickRule, clickrulesize: clickRuleSize, istoroid: isToroid};
 }
 
+function labF(t) 
+{
+    let delta = 6.0 / 29.0;
+    if(t > delta * delta * delta)
+    {
+        return Math.pow(t, 1 / 3.0);
+    }
+    else
+    {
+        return t / (3 * delta * delta) + 4.0 / 29.0;
+    }
+}
+
+function rgbToLab(R, G, B)
+{
+    let X = (0.49000 * R + 0.31000 * G + 0.20000 * B) / 0.17697;
+    let Y = (0.19697 * R + 0.81240 * G + 0.01063 * B) / 0.17697;
+    let Z = (0.00000 * R + 0.01000 * G + 0.99000 * B) / 0.17697;
+
+    let L = 116 * labF(Y / 100.0)    - 16;
+    let a = 500 * (labF(X / 95.0489) - labF(Y / 100.0));
+    let b = 200 * (labF(Y / 100.0)   - labF(Z / 108.8840));
+
+    return [L, a, b];
+}
+
+//CIEDE2000
+function ciede2000(L1, a1, b1, L2, a2, b2)
+{
+    let C1 = Math.sqrt(a1 * a1 + b1 * b1);
+    let C2 = Math.sqrt(a2 * a2 + b2 * b2);
+
+    let L_ = (L1 + L2) / 2;
+    let C_ = (C1 + C2) / 2;
+
+    let C7        = C_ * C_ * C_ * C_ * C_ * C_ * C_;
+    let twenty57_ = 25 * 25 * 25 * 25 * 25 * 25 * 25;
+
+    let a1q = a1 + (a1 / 2) * (1 - Math.sqrt(C7 / (C7 + twenty57_)));
+    let a2q = a2 + (a2 / 2) * (1 - Math.sqrt(C7 / (C7 + twenty57_)));
+
+    let C1q = Math.sqrt(a1q * a1q + b1 * b1);
+    let C2q = Math.sqrt(a2q * a2q + b2 * b2);
+
+    let h1 = (Math.atan2(b1, a1q) + Math.PI) * 180.0 / Math.PI;
+    let h2 = (Math.atan2(b2, a2q) + Math.PI) * 180.0 / Math.PI;
+
+    let deltahq = 0.0;
+    if(Math.abs(C1q) < 0.0000001 || Math.abs(C2q) < 0.0000001)
+    {
+        deltahq = 0.0;
+    }
+    else if(Math.abs(h1 - h2) <= 180)
+    {
+        deltahq = h1 - h2;
+    }
+    else if(Math.abs(h1 - h2) > 180 && h2 <= h1)
+    {
+        deltahq = h2 - h1 + 360;
+    }
+    else if(Math.abs(h1 - h2) > 180 && h2 > h1)
+    {
+        deltahq = h2 - h1 - 360;
+    }
+
+    let H_ = 0.0;
+    if(Math.abs(C1q) < 0.0000001 || Math.abs(C2q) < 0.0000001)
+    {
+        H_ = h1 + h2;
+    }
+    else if(Math.abs(h1 - h2) <= 180)
+    {
+        H_ = (h1 + h2) / 2;
+    }
+    else if(Math.abs(h1 - h2) > 180 && (h1 + h2 < 360))
+    {
+        H_ = (h1 + h2 + 360) / 2;
+    }
+    else if(Math.abs(h1 - h2) > 180 && (h1 + h2 >= 360))
+    {
+        H_ = (h1 + h2 - 360) / 2;
+    }
+
+    let deltaL = L2  - L1;
+    let deltaC = C2q - C1q;
+    let deltaH = 2 * Math.sqrt(C1q * C2q) * Math.sin(deltahq * Math.PI / 360.0);
+    
+    let T = 1 - 0.17 * Math.cos((H_ - 30) * Math.PI / 180) + 0.24 * Math.cos((2 * H_) * Math.PI / 180) + 0.32 * Math.cos((3 * H_ + 6) * Math.PI / 180) - 0.20 * Math.cos((4 * H_ - 63) * Math.PI / 180);
+
+    let SL = 1 + 0.015 * (L_ - 50) * (L_ - 50) / Math.sqrt(20 + (L_ - 50) * (L_ - 50));
+    let SC = 1 + 0.045 * C_;
+    let SH = 1 + 0.015 * C_ * T;
+
+    let RT = -2 * Math.sqrt(C7 / (C7 + twenty57_)) * Math.sin(60 * Math.exp(-(H_ - 275) * (H_ - 275) / 625) * Math.PI / 180);
+
+    let deltaLTerm = (deltaL / SL) * (deltaL / SL);
+    let deltaCTerm = (deltaC / SC) * (deltaC / SC);
+    let deltaHTerm = (deltaH / SH) * (deltaH / SH);
+    let RTTerm     = RT * (deltaC / SC) * (deltaH / SH);
+
+    return Math.sqrt(deltaLTerm + deltaCTerm + deltaHTerm + RTTerm);
+}
+
 //Returns (num % modulo) with regard to the sign of num
 function wholeMod(num, modulo)
 {
@@ -1014,6 +1117,7 @@ function main()
     const toroidalClickRuleButton              = document.getElementById("ToroidalClickRuleButton");
     const constructClickRuleButton             = document.getElementById("ConstructClickRuleButton");
     const constructToroidalClickRuleButton     = document.getElementById("ConstructToroidalClickRuleButton");
+    const clickRuleFileUploadInput             = document.getElementById("ClickRuleFileInput");
     const acceptClickRuleButton                = document.getElementById("AcceptClickRuleButton");
     const cancelClickRuleButton                = document.getElementById("CancelClickRuleButton");
     const moveBoardLeftButton                  = document.getElementById("MoveBoardLeftButton");
@@ -1794,6 +1898,14 @@ function main()
     {
         changeWorkingMode(workingModes.CONSTRUCT_CLICKRULE_TOROID);
     }  
+
+    clickRuleFileUploadInput.onchange = function()
+    {
+        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        {
+            loadClickRule(clickRuleFileUploadInput.files[0]);
+        }   
+    }
 
     borderBoardButton.onclick = function()
     {
@@ -4480,109 +4592,6 @@ function main()
                 matrixSize      = newGameSize * newGameSize;
 
                 //Calculate matrix values based on CIEDE2000 color difference in Lab color space
-                function labF(t) 
-                {
-                    let delta = 6.0 / 29.0;
-                    if(t > delta * delta * delta)
-                    {
-                        return Math.pow(t, 1 / 3.0);
-                    }
-                    else
-                    {
-                        return t / (3 * delta * delta) + 4.0 / 29.0;
-                    }
-                }
-
-                function rgbToLab(R, G, B)
-                {
-                    let X = (0.49000 * R + 0.31000 * G + 0.20000 * B) / 0.17697;
-                    let Y = (0.19697 * R + 0.81240 * G + 0.01063 * B) / 0.17697;
-                    let Z = (0.00000 * R + 0.01000 * G + 0.99000 * B) / 0.17697;
-
-                    let L = 116 * labF(Y / 100.0)    - 16;
-                    let a = 500 * (labF(X / 95.0489) - labF(Y / 100.0));
-                    let b = 200 * (labF(Y / 100.0)   - labF(Z / 108.8840));
-
-                    return [L, a, b];
-                }
-
-                //CIEDE2000
-                function ciede2000(L1, a1, b1, L2, a2, b2)
-                {
-                    let C1 = Math.sqrt(a1 * a1 + b1 * b1);
-                    let C2 = Math.sqrt(a2 * a2 + b2 * b2);
-
-                    let L_ = (L1 + L2) / 2;
-                    let C_ = (C1 + C2) / 2;
-
-                    let C7        = C_ * C_ * C_ * C_ * C_ * C_ * C_;
-                    let twenty57_ = 25 * 25 * 25 * 25 * 25 * 25 * 25;
-
-                    let a1q = a1 + (a1 / 2) * (1 - Math.sqrt(C7 / (C7 + twenty57_)));
-                    let a2q = a2 + (a2 / 2) * (1 - Math.sqrt(C7 / (C7 + twenty57_)));
-
-                    let C1q = Math.sqrt(a1q * a1q + b1 * b1);
-                    let C2q = Math.sqrt(a2q * a2q + b2 * b2);
-
-                    let h1 = (Math.atan2(b1, a1q) + Math.PI) * 180.0 / Math.PI;
-                    let h2 = (Math.atan2(b2, a2q) + Math.PI) * 180.0 / Math.PI;
-
-                    let deltahq = 0.0;
-                    if(Math.abs(C1q) < 0.0000001 || Math.abs(C2q) < 0.0000001)
-                    {
-                        deltahq = 0.0;
-                    }
-                    else if(Math.abs(h1 - h2) <= 180)
-                    {
-                        deltahq = h1 - h2;
-                    }
-                    else if(Math.abs(h1 - h2) > 180 && h2 <= h1)
-                    {
-                        deltahq = h2 - h1 + 360;
-                    }
-                    else if(Math.abs(h1 - h2) > 180 && h2 > h1)
-                    {
-                        deltahq = h2 - h1 - 360;
-                    }
-
-                    let H_ = 0.0;
-                    if(Math.abs(C1q) < 0.0000001 || Math.abs(C2q) < 0.0000001)
-                    {
-                        H_ = h1 + h2;
-                    }
-                    else if(Math.abs(h1 - h2) <= 180)
-                    {
-                        H_ = (h1 + h2) / 2;
-                    }
-                    else if(Math.abs(h1 - h2) > 180 && (h1 + h2 < 360))
-                    {
-                        H_ = (h1 + h2 + 360) / 2;
-                    }
-                    else if(Math.abs(h1 - h2) > 180 && (h1 + h2 >= 360))
-                    {
-                        H_ = (h1 + h2 - 360) / 2;
-                    }
-
-                    let deltaL = L2  - L1;
-                    let deltaC = C2q - C1q;
-                    let deltaH = 2 * Math.sqrt(C1q * C2q) * Math.sin(deltahq * Math.PI / 360.0);
-                    
-                    let T = 1 - 0.17 * Math.cos((H_ - 30) * Math.PI / 180) + 0.24 * Math.cos((2 * H_) * Math.PI / 180) + 0.32 * Math.cos((3 * H_ + 6) * Math.PI / 180) - 0.20 * Math.cos((4 * H_ - 63) * Math.PI / 180);
-
-                    let SL = 1 + 0.015 * (L_ - 50) * (L_ - 50) / Math.sqrt(20 + (L_ - 50) * (L_ - 50));
-                    let SC = 1 + 0.045 * C_;
-                    let SH = 1 + 0.015 * C_ * T;
-
-                    let RT = -2 * Math.sqrt(C7 / (C7 + twenty57_)) * Math.sin(60 * Math.exp(-(H_ - 275) * (H_ - 275) / 625) * Math.PI / 180);
-
-                    let deltaLTerm = (deltaL / SL) * (deltaL / SL);
-                    let deltaCTerm = (deltaC / SC) * (deltaC / SC);
-                    let deltaHTerm = (deltaH / SH) * (deltaH / SH);
-                    let RTTerm     = RT * (deltaC / SC) * (deltaH / SH);
-
-                    return Math.sqrt(deltaLTerm + deltaCTerm + deltaHTerm + RTTerm);
-                }
-
                 let colorUnlitLab = rgbToLab(currentColorUnlit[0], currentColorUnlit[1], currentColorUnlit[2]);
                 let colorLitLab   = rgbToLab(currentColorLit[0],   currentColorLit[1],   currentColorLit[2]);
 
@@ -4631,6 +4640,76 @@ function main()
                 enableCustomMatrix(newMatrix, newGameSize);
 
                 canvasMatrix.remove();
+            }
+
+            image.src = fileReader.result;
+        }
+
+        fileReader.readAsDataURL(imageFile);
+    }
+
+    function loadClickRule(imageFile)
+    {
+        let fileReader = new FileReader();
+        fileReader.onload = function()
+        {
+            let image    = new Image();
+            image.onload = function()
+            {
+                const canvasClickRule = document.createElement("canvas");
+                const canvasContext   = canvasClickRule.getContext('2d'); 
+
+                canvasClickRule.width  = image.width;
+                canvasClickRule.height = image.height;
+
+                canvasContext.drawImage(image, 0, 0);
+                let clickRuleData = canvasContext.getImageData(0, 0, image.width, image.height).data;
+
+                let clickRuleSize = Math.min(image.width, image.height);
+
+                clickRuleSize = clamp(clickRuleSize, minimumBoardSize, maximumBoardSize);
+
+                if(clickRuleSize % 2 == 0)
+                {
+                    clickRuleSize = clickRuleSize - 1;
+                }
+
+                if(clickRuleSize == 0)
+                {
+                    return;
+                }
+
+                //Calculate matrix values based on CIEDE2000 color difference in Lab color space
+                let colorUnlitLab = rgbToLab(currentColorUnlit[0], currentColorUnlit[1], currentColorUnlit[2]);
+                let colorLitLab   = rgbToLab(currentColorLit[0],   currentColorLit[1],   currentColorLit[2]);
+
+                let distUnlitLit = ciede2000(colorUnlitLab[0], colorUnlitLab[1], colorUnlitLab[2], colorLitLab[0], colorLitLab[1], colorLitLab[2]);
+
+                let newClickRule = new Uint8Array(clickRuleSize * clickRuleSize);
+                for(let y = 0; y < clickRuleSize; y++)
+                {
+                    for(let x = 0; x < clickRuleSize; x++)
+                    {
+                        let clickRuleIndex = flatCellIndex(clickRuleSize, x, y);
+                        let pixelPos       = 4 * (y * image.width + x);
+
+                        let r = clickRuleData[pixelPos + 0] / 255.0;
+                        let g = clickRuleData[pixelPos + 1] / 255.0;
+                        let b = clickRuleData[pixelPos + 2] / 255.0;
+
+                        let pixelColorLab  = rgbToLab(r, g, b);
+                        let distPixelUnlit = ciede2000(pixelColorLab[0], pixelColorLab[1], pixelColorLab[2], colorUnlitLab[0], colorUnlitLab[1], colorUnlitLab[2]); 
+
+                        let clickRuleValNormalized = clamp(distPixelUnlit / distUnlitLit, 0.0, 1.0);
+                        let clickRuleVal           = Math.floor(clickRuleValNormalized * (currentDomainSize - 1) + 0.5);
+
+                        newClickRule[clickRuleIndex] = clickRuleVal;
+                    }
+                }
+
+                enableCustomClickRule(newClickRule, clickRuleSize, flagToroidBoard);
+
+                canvasClickRule.remove();
             }
 
             image.src = fileReader.result;
