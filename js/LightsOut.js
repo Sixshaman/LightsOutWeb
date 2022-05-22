@@ -2,6 +2,14 @@
 /////////////////////////////////    UTIL FUNCTIONS    /////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////
 
+let Topologies = 
+{
+    SquareTopology:          0,
+    TorusTopology:           1,
+    ProjectivePlaneTopology: 2,
+    UndefinedTopology:       3
+}
+
 //Clamps the value num between min and max.
 function clamp(num, min, max)
 {
@@ -89,7 +97,7 @@ function canvasSizeFromGameSize(gameSize, cellSize, useGrid)
     return res;
 }
 
-//Gets 2-dimensional cell index from a canvas point (x, y) for the given board size gameSize and canvas size canvasWidth x canvasHeight.
+//Gets 2-dimensional cell index from a canvas point (x, y) for the given board size (gameSize x gameSize) and canvas size (canvasWidth x canvasHeight).
 //Since the actual board has dynamic size and is centered on a statically sized canvas, offsets: (canvasOffsetX, canvasOffsetY) are added.
 function boardPointFromCanvasPoint(x, y, gameSize, canvasOffsetX, canvasOffsetY, canvasWidth, canvasHeight, useGrid)
 {
@@ -155,14 +163,18 @@ function decodeBase64Char(charCode)
     return -1;
 }
 
-function encodeBase64ClickRule(clickRule, isToroid)
+function encodeBase64ClickRule(clickRule, boardTopology)
 {
     let encodeStr = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+";
 
     let base64Str = "";
-    if(isToroid) //Encode toroid flag in the first character
+    if(boardTopology == Topologies.TorusTopology) //Encode topology in the first character
     {
         base64Str += "T";
+    }
+    else if(boardTopology == Topologies.ProjectivePlaneTopology)
+    {
+        base64Str += "P";
     }
     else
     {
@@ -222,23 +234,27 @@ function encodeBase64ClickRule(clickRule, isToroid)
 function decodeBase64ClickRule(base64Str, domainSize, minSize, maxSize)
 {
     let clickRuleArray = [];
-    let isToroid       = false;
+    let boardTopology  = Topologies.SquareTopology;
     let clickRuleSize  = 0;
 
-    if(base64Str.length == 0 || (base64Str[0] != 'C' && base64Str[0] != 'T'))
+    if(base64Str.length == 0 || (base64Str[0] != 'C' && base64Str[0] != 'T' && base64Str[0] != 'P'))
     {
         //Return default values
         let defaultClickRule = new Uint8Array([0, 1, 0, 1, 1, 1, 0, 1, 0]);
-        return {clickrule: defaultClickRule, clickrulesize: 3, istoroid: false};
+        return {clickrule: defaultClickRule, clickrulesize: 3, topology: Topologies.SquareTopology};
     }
 
     if(base64Str[0] == 'C')
     {
-        isToroid = false;
+        boardTopology = Topologies.SquareTopology;
     }
     else if(base64Str[0] == 'T')
     {
-        isToroid = true;
+        boardTopology = Topologies.TorusTopology;
+    }
+    else if(base64Str[0] == 'P')
+    {
+        boardTopology = Topologies.ProjectivePlaneTopology;
     }
 
     //The remainder of the base64 string should be divisible by 4
@@ -246,7 +262,7 @@ function decodeBase64ClickRule(base64Str, domainSize, minSize, maxSize)
     {
         //Return default values
         let defaultClickRule = new Uint8Array([0, 1, 0, 1, 1, 1, 0, 1, 0]);
-        return {clickrule: defaultClickRule, clickrulesize: 3, istoroid: false};
+        return {clickrule: defaultClickRule, clickrulesize: 3, topology: boardTopology};
     }
 
     for(let i = 1; i < base64Str.length; i += 4)
@@ -274,7 +290,7 @@ function decodeBase64ClickRule(base64Str, domainSize, minSize, maxSize)
     {
         //Return default values
         let defaultClickRule = new Uint8Array([0, 1, 0, 1, 1, 1, 0, 1, 0]);
-        return {clickrule: defaultClickRule, clickrulesize: 3, istoroid: false};
+        return {clickrule: defaultClickRule, clickrulesize: 3, topology: boardTopology};
     }
 
     for(let i = 0; i < cellCount; i++)
@@ -284,12 +300,12 @@ function decodeBase64ClickRule(base64Str, domainSize, minSize, maxSize)
         {
             //Return default values
             let defaultClickRule = new Uint8Array([0, 1, 0, 1, 1, 1, 0, 1, 0]);
-            return {clickrule: defaultClickRule, clickrulesize: 3, istoroid: false};   
+            return {clickrule: defaultClickRule, clickrulesize: 3, topology: boardTopology};   
         }
     }
 
     let clickRule = new Uint8Array(clickRuleArray.slice(0, cellCount));
-    return {clickrule: clickRule, clickrulesize: clickRuleSize, istoroid: isToroid};
+    return {clickrule: clickRule, clickrulesize: clickRuleSize, topology: boardTopology};
 }
 
 function labF(t) 
@@ -406,17 +422,22 @@ function wholeMod(num, modulo)
 //////////////////////////////////////////////////////////////////////////////////////////////
 
 //Makes a turn at (cellX, cellY) cell of the board board with regard to click rule clickRule
-function makeTurn(board, clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY, isToroid)
+function makeTurn(board, clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY, boardTopology)
 {
-    if(isToroid)
+    if(boardTopology == Topologies.TorusTopology)
     {
-        let populatedClickRuleT = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cellY);
+        let populatedClickRuleT = populateClickRuleTorus(clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY);
         return addBoard(board, populatedClickRuleT, domainSize);
+    }
+    else if(boardTopology == Topologies.ProjectivePlaneTopology)
+    {
+        let populatedClickRuleP = populateClickRuleProjectivePlane(clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY);
+        return addBoard(board, populatedClickRuleP, domainSize); 
     }
     else
     {
-        let populatedClickRuleP = populateClickRulePlane(clickRule, clickRuleSize, gameSize, cellX, cellY);
-        return addBoard(board, populatedClickRuleP, domainSize);
+        let populatedClickRuleS = populateClickRuleSquare(clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY);
+        return addBoard(board, populatedClickRuleS, domainSize);
     }
 }
 
@@ -435,7 +456,7 @@ function makeConstructTurn(board, gameSize, domainSize, cellX, cellY)
 }
 
 //Fast in-place version for making turns in batch provided in turnListBoard, without populating click rules
-function makeTurns(board, clickRule, clickRuleSize, gameSize, domainSize, turnListBoard, isToroid) 
+function makeTurns(board, clickRule, clickRuleSize, gameSize, domainSize, turnListBoard, boardTopology) 
 {
     let newBoard = board.slice();
 
@@ -453,7 +474,9 @@ function makeTurns(board, clickRule, clickRuleSize, gameSize, domainSize, turnLi
             for(let yClick = 0; yClick < clickRuleSize; yClick++)
             {
                 let yBig = yClick + top;
-                if(!isToroid)
+                let yOdd = false;
+                
+                if(boardTopology == Topologies.SquareTopology)
                 {
                     if(yBig < 0 || yBig >= gameSize)
                     {
@@ -462,13 +485,20 @@ function makeTurns(board, clickRule, clickRuleSize, gameSize, domainSize, turnLi
                 }
                 else
                 {
+                    if(boardTopology == Topologies.ProjectivePlaneTopology)
+                    {
+                        yOdd = Math.floor(yBig / gameSize) % 2 != 0;
+                    }
+
                     yBig = wholeMod(yBig, gameSize);
                 }
 
                 for(let xClick = 0; xClick < clickRuleSize; xClick++)
                 {
                     let xBig = xClick + left;
-                    if(!isToroid)
+                    let xOdd = false;
+                    
+                    if(boardTopology == Topologies.SquareTopology)
                     {
                         if(xBig < 0 || xBig >= gameSize)
                         {
@@ -477,11 +507,19 @@ function makeTurns(board, clickRule, clickRuleSize, gameSize, domainSize, turnLi
                     }
                     else
                     {
+                        if(boardTopology == Topologies.ProjectivePlaneTopology)
+                        {
+                            xOdd = Math.floor(xBig / gameSize) % 2 != 0;
+                        }
+
                         xBig = wholeMod(xBig, gameSize);
                     }
 
-                    let bigClickIndex = flatCellIndex(gameSize, xBig, yBig);
-                    let smlClickIndex = flatCellIndex(clickRuleSize, xClick, yClick);
+                    let xBigClick = yOdd ? (gameSize - xBig - 1) : xBig;
+                    let yBigClick = xOdd ? (gameSize - yBig - 1) : yBig;
+
+                    let bigClickIndex = flatCellIndex(gameSize,      xBigClick, yBigClick);
+                    let smlClickIndex = flatCellIndex(clickRuleSize, xClick,    yClick);
 
                     newBoard[bigClickIndex] = (newBoard[bigClickIndex] + turnValue * clickRule[smlClickIndex]) % domainSize;
                 }
@@ -493,11 +531,11 @@ function makeTurns(board, clickRule, clickRuleSize, gameSize, domainSize, turnLi
 }
 
 //Fast in-place version for making turns in batch provided in turnListBoard, without populating click rules. Default click rule version
-function makeTurnsDefault(board, gameSize, domainSize, turnListBoard, isToroid)
+function makeTurnsDefault(board, gameSize, domainSize, turnListBoard, boardTopology)
 {
     let newBoard = board.slice();
 
-    if(isToroid)
+    if(boardTopology == Topologies.TorusTopology)
     {
         for(let y = 0; y < gameSize; y++)
         {
@@ -522,6 +560,63 @@ function makeTurnsDefault(board, gameSize, domainSize, turnListBoard, isToroid)
                 newBoard[rightCellIndex]  = (newBoard[rightCellIndex]  + turnValue) % domainSize;
                 newBoard[topCellIndex]    = (newBoard[topCellIndex]    + turnValue) % domainSize;
                 newBoard[bottomCellIndex] = (newBoard[bottomCellIndex] + turnValue) % domainSize;
+            }
+        }
+    }
+    else if(boardTopology == Topologies.ProjectivePlaneTopology)
+    {
+        for(let y = 0; y < gameSize; y++)
+        {
+            for(let x = 0; x < gameSize; x++)
+            {
+                let thisCellIndex = flatCellIndex(gameSize, x, y);
+                let turnValue     = turnListBoard[thisCellIndex];
+
+                newBoard[thisCellIndex] = (newBoard[thisCellIndex] + turnValue) % domainSize;
+
+                if(x == 0)
+                {
+                    let leftCellIndex       = flatCellIndex(gameSize, gameSize - 1, gameSize - y - 1);
+                    newBoard[leftCellIndex] = (newBoard[leftCellIndex] + turnValue) % domainSize;
+                }
+                else
+                {
+                    let leftCellIndex       = flatCellIndex(gameSize, x - 1, y);
+                    newBoard[leftCellIndex] = (newBoard[leftCellIndex] + turnValue) % domainSize;
+                }
+
+                if(x == gameSize - 1)
+                {
+                    let rightCellIndex       = flatCellIndex(gameSize, 0, gameSize - y - 1);
+                    newBoard[rightCellIndex] = (newBoard[rightCellIndex] + turnValue) % domainSize;
+                }
+                else
+                {
+                    let rightCellIndex       = flatCellIndex(gameSize, x + 1, y);
+                    newBoard[rightCellIndex] = (newBoard[rightCellIndex] + turnValue) % domainSize;
+                }
+
+                if(y == 0)
+                {
+                    let topCellIndex       = flatCellIndex(gameSize, gameSize - x - 1, gameSize - 1);
+                    newBoard[topCellIndex] = (newBoard[topCellIndex] + turnValue) % domainSize;
+                }
+                else
+                {
+                    let topCellIndex       = flatCellIndex(gameSize, x, y - 1);
+                    newBoard[topCellIndex] = (newBoard[topCellIndex] + turnValue) % domainSize;
+                }
+
+                if(y == gameSize - 1)
+                {
+                    let bottomCellIndex       = flatCellIndex(gameSize, gameSize - x - 1, 0);
+                    newBoard[bottomCellIndex] = (newBoard[bottomCellIndex] + turnValue) % domainSize;
+                }
+                else
+                {
+                    let bottomCellIndex       = flatCellIndex(gameSize, x, y + 1);
+                    newBoard[bottomCellIndex] = (newBoard[bottomCellIndex] + turnValue) % domainSize;
+                }
             }
         }
     }
@@ -579,8 +674,8 @@ function makeTurnsMatrix(board, matrix, gameSize, turnlistBoard, domainSize)
     return addBoard(board, boardToAdd, domainSize);
 }
 
-//Translates the click rule from click rule space to the board space (regular version)
-function populateClickRulePlane(clickRule, clickRuleSize, gameSize, cellX, cellY)
+//Translates the click rule from the click rule space to the board space (regular version)
+function populateClickRuleSquare(clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY)
 {
     let populatedClickRule = new Uint8Array(gameSize * gameSize);
     populatedClickRule.fill(0);
@@ -616,8 +711,8 @@ function populateClickRulePlane(clickRule, clickRuleSize, gameSize, cellX, cellY
     return populatedClickRule;
 }
 
-//Translates the click rule from click rule space to the board space (toroidal version)
-function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cellY)
+//Translates the click rule from the click rule space to the board space (torus version)
+function populateClickRuleTorus(clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY)
 {
     let populatedClickRule = new Uint8Array(gameSize * gameSize);
     populatedClickRule.fill(0);
@@ -640,7 +735,43 @@ function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cell
             let bigClickIndex = flatCellIndex(gameSize, xBigMod, yBigMod);
             let smlClickIndex = flatCellIndex(clickRuleSize, x, y);
 
-            populatedClickRule[bigClickIndex] = clickRule[smlClickIndex];
+            populatedClickRule[bigClickIndex] = (populatedClickRule[bigClickIndex] + clickRule[smlClickIndex]) % domainSize;
+        }
+    }
+
+    return populatedClickRule;
+}
+
+//Translates the click rule from the click rule space to the board space (projective plane version)
+function populateClickRuleProjectivePlane(clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY)
+{
+    let populatedClickRule = new Uint8Array(gameSize * gameSize);
+    populatedClickRule.fill(0);
+
+    let clickSizeHalf = Math.floor(clickRuleSize / 2);
+
+    let left = cellX - clickSizeHalf;
+    let top  = cellY - clickSizeHalf;
+    
+    for(let y = 0; y < clickRuleSize; y++)
+    {
+        let yBig    = y + top;
+        let yBigMod = wholeMod(yBig, gameSize);
+        let yBigOdd = Math.floor(yBig / gameSize) % 2 != 0;
+        
+        for(let x = 0; x < clickRuleSize; x++)
+        {
+            let xBig    = x + left;
+            let xBigMod = wholeMod(xBig, gameSize);
+            let xBigOdd = Math.floor(xBig / gameSize) % 2 != 0;
+
+            let yBigCorrected = xBigOdd ? (gameSize - yBigMod - 1) : yBigMod;
+            let xBigCorrected = yBigOdd ? (gameSize - xBigMod - 1) : xBigMod;
+
+            let bigClickIndex = flatCellIndex(gameSize, xBigCorrected, yBigCorrected);
+            let smlClickIndex = flatCellIndex(clickRuleSize, x, y);
+
+            populatedClickRule[bigClickIndex] = (populatedClickRule[bigClickIndex] + clickRule[smlClickIndex]) % domainSize;
         }
     }
 
@@ -648,7 +779,7 @@ function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cell
 }
 
 //Calculates the Lights Out matrix for the given click rule and game size
-function calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid)
+function calculateGameMatrix(clickRule, gameSize, clickRuleSize, domainSize, boardTopology)
 {
     //Generate a regular Lights Out matrix for the click rule
     let lightsOutMatrix = [];
@@ -657,13 +788,17 @@ function calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid)
         for(let xL = 0; xL < gameSize; xL++)
         {
             let matrixRow = {};
-            if(isToroid)
+            if(boardTopology == Topologies.TorusTopology)
             {
-                matrixRow = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, xL, yL);
+                matrixRow = populateClickRuleTorus(clickRule, clickRuleSize, gameSize, domainSize, xL, yL);
+            }
+            else if(boardTopology == Topologies.ProjectivePlaneTopology)
+            {
+                matrixRow = populateClickRuleProjectivePlane(clickRule, clickRuleSize, gameSize, domainSize, xL, yL);
             }
             else
             {
-                matrixRow = populateClickRulePlane(clickRule, clickRuleSize, gameSize, xL, yL);
+                matrixRow = populateClickRuleSquare(clickRule, clickRuleSize, gameSize, domainSize, xL, yL);
             }
 
             lightsOutMatrix.push(matrixRow);
@@ -689,18 +824,18 @@ function calculateSolution(board, gameSize, domainSize, solutionMatrix)
 }
 
 //Calculates the inverse solution
-function calculateInverseSolution(board, gameSize, domainSize, clickRule, clickRuleSize, isToroidBoard, isDefaultClickRule)
+function calculateInverseSolution(board, gameSize, domainSize, clickRule, clickRuleSize, boardTopology, isDefaultClickRule)
 {
     let invSolution = new Uint8Array(gameSize * gameSize);
     invSolution.fill(0);
 
     if(isDefaultClickRule)
     {
-        invSolution = makeTurnsDefault(invSolution, gameSize, domainSize, board, isToroidBoard);
+        invSolution = makeTurnsDefault(invSolution, gameSize, domainSize, board, boardTopology);
     }
     else
     {
-        invSolution = makeTurns(invSolution, clickRule, clickRuleSize, gameSize, domainSize, board, isToroidBoard);
+        invSolution = makeTurns(invSolution, clickRule, clickRuleSize, gameSize, domainSize, board, boardTopology);
     }
 
     invSolution = domainInverseBoard(invSolution, domainSize);
@@ -1113,11 +1248,12 @@ function main()
     const decreaseSizeButton                   = document.getElementById("DecreaseSizeButton");
     const increaseDomainButton                 = document.getElementById("IncreaseDomainButton");
     const decreaseDomainButton                 = document.getElementById("DecreaseDomainButton");
-    const regularClickRuleButton               = document.getElementById("RegularClickRuleButton");
-    const toroidalClickRuleButton              = document.getElementById("ToroidalClickRuleButton");
+    const defaultClickRuleButton               = document.getElementById("DefaultClickRuleButton");
     const constructClickRuleButton             = document.getElementById("ConstructClickRuleButton");
-    const constructToroidalClickRuleButton     = document.getElementById("ConstructToroidalClickRuleButton");
     const clickRuleFileUploadInput             = document.getElementById("ClickRuleFileInput");
+    const squareTopologyButton                 = document.getElementById("EnableSquareTopologyButton");
+    const torusTopologyButton                  = document.getElementById("EnableTorusTopologyButton");
+    const projectivePlaneTopologyButton        = document.getElementById("EnableProjectivePlaneTopologyButton");
     const acceptClickRuleButton                = document.getElementById("AcceptClickRuleButton");
     const cancelClickRuleButton                = document.getElementById("CancelClickRuleButton");
     const moveBoardLeftButton                  = document.getElementById("MoveBoardLeftButton");
@@ -1221,65 +1357,66 @@ function main()
         case "Digit0":
         {
             unlitBoardButton.className = "hotkeyenabled";
-            resetGameBoard(resetModes.RESET_ZERO, currentGameSize, currentDomainSize);
+            resetGameBoard(ResetModes.AllUnlit, currentGameSize, currentDomainSize);
             break;
         }
         case "Digit1":
         {
             litBoardButton.className = "hotkeyenabled";
-            resetGameBoard(resetModes.RESET_ONE, currentGameSize, currentDomainSize);
+            resetGameBoard(ResetModes.AllLit, currentGameSize, currentDomainSize);
             break;
         }
         case "Digit4":
         {
             cornersBoardButton.className = "hotkeyenabled";
-            resetGameBoard(resetModes.RESET_FOUR_CORNERS, currentGameSize, currentDomainSize);
+            resetGameBoard(ResetModes.FourCorners, currentGameSize, currentDomainSize);
             break;
         }
         case "KeyO":
         {
-            if(e.shiftKey)
-            {
-                constructToroidalClickRuleButton.className = "hotkeyenabled";
-                changeWorkingMode(workingModes.CONSTRUCT_CLICKRULE_TOROID);
-            }  
-            else
-            {
-                borderBoardButton.className = "hotkeyenabled";
-                resetGameBoard(resetModes.RESET_BORDER, currentGameSize, currentDomainSize);
-            }
+            borderBoardButton.className = "hotkeyenabled";
+            resetGameBoard(ResetModes.Border, currentGameSize, currentDomainSize);
             break;
         }
         case "KeyB":
         {
             chessboardBoardButton.className = "hotkeyenabled";
-            resetGameBoard(resetModes.RESET_BLATNOY, currentGameSize, currentDomainSize);
+            resetGameBoard(ResetModes.Blatnoy, currentGameSize, currentDomainSize);
             break;
         }
         case "KeyP":
         {
-            checkersBoardButton.className = "hotkeyenabled";
-            resetGameBoard(resetModes.RESET_PIETIA, currentGameSize, currentDomainSize);
+            if(e.shiftKey)
+            {
+                projectivePlaneTopologyButton.className = "hotkeyenabled";
+                setTopology(Topologies.ProjectivePlaneTopology);
+                requestRedraw();
+            }
+            else
+            {
+                checkersBoardButton.className = "hotkeyenabled";
+                resetGameBoard(ResetModes.Pietia, currentGameSize, currentDomainSize);
+            }
             break;
         }
         case "KeyF":
         {
             randomBoardButton.className = "hotkeyenabled";
-            resetGameBoard(resetModes.RESET_FULL_RANDOM, currentGameSize, currentDomainSize);
+            resetGameBoard(ResetModes.FullRandom, currentGameSize, currentDomainSize);
             break;
         }
         case "KeyR":
         {
             if(e.shiftKey)
             {
-                regularClickRuleButton.className = "hotkeyenabled";
-                enableDefaultClickRule();
+                squareTopologyButton.className = "hotkeyenabled";
+                setTopology(Topologies.SquareTopology);
                 requestRedraw();
             }
             else
             {
                 solvableRandomBoardButton.className = "hotkeyenabled";
-                resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
+                resetGameBoard(ResetModes.SolvableRandom, currentGameSize, currentDomainSize);
             }
             break;
         }
@@ -1288,52 +1425,52 @@ function main()
             if(e.shiftKey)
             {
                 domainRotateBoardButton.className = "hotkeyenabled";
-                resetGameBoard(resetModes.RESET_DOMAIN_ROTATE_NONZERO, currentGameSize, currentDomainSize);
+                resetGameBoard(ResetModes.DomainRotate, currentGameSize, currentDomainSize);
             }
             else
             {
                 invertBoardButton.className = "hotkeyenabled";
-                resetGameBoard(resetModes.RESET_INVERTO, currentGameSize, currentDomainSize);
+                resetGameBoard(ResetModes.Inverto, currentGameSize, currentDomainSize);
             }
             break;
         }
         case "KeyE":
         {
             singleInterchangeButton.className = "hotkeyenabled";
-            resetGameBoard(resetModes.RESET_SOLUTION, currentGameSize, currentDomainSize);
+            resetGameBoard(ResetModes.Solution, currentGameSize, currentDomainSize);
             break;
         }
         case "KeyQ":
         {
             quietPatternsButton.className = "hotkeyenabled";
-            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_NO_OP);
+            updateSolutionMatrixIfNeeded(AfterCalculationOperations.NoOp);
             break;
         }
         case "ArrowLeft":
         {
             moveBoardLeftButton.className = "hotkeyenabled";
-            resetGameBoard(resetModes.RESET_LEFT, currentGameSize, currentDomainSize);
+            resetGameBoard(ResetModes.MoveLeft, currentGameSize, currentDomainSize);
             e.preventDefault();
             break;
         }
         case "ArrowRight":
         {
             moveBoardRightButton.className = "hotkeyenabled";
-            resetGameBoard(resetModes.RESET_RIGHT, currentGameSize, currentDomainSize);
+            resetGameBoard(ResetModes.MoveRight, currentGameSize, currentDomainSize);
             e.preventDefault();
             break;
         }
         case "ArrowUp":
         {
             moveBoardUpButton.className = "hotkeyenabled";
-            resetGameBoard(resetModes.RESET_UP, currentGameSize, currentDomainSize);
+            resetGameBoard(ResetModes.MoveUp, currentGameSize, currentDomainSize);
             e.preventDefault();
             break;
         }
         case "ArrowDown":
         {
             moveBoardDownButton.className = "hotkeyenabled";
-            resetGameBoard(resetModes.RESET_DOWN, currentGameSize, currentDomainSize);
+            resetGameBoard(ResetModes.MoveDown, currentGameSize, currentDomainSize);
             e.preventDefault();
             break;
         }
@@ -1359,14 +1496,14 @@ function main()
         {
             if(e.shiftKey)
             {
-                toroidalClickRuleButton.className = "hotkeyenabled";
-                enableDefaultToroidClickRule();
+                torusTopologyButton.className = "hotkeyenabled";
+                setTopology(Topologies.TorusTopology);
                 requestRedraw();
             }
             else
             {
                 showSolutionButton.className = "hotkeyenabled";
-                updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SHOW_SOLUTION);
+                updateSolutionMatrixIfNeeded(AfterCalculationOperations.ShowSolution);
             }
             break;
         }
@@ -1375,7 +1512,16 @@ function main()
             if(e.shiftKey)
             {
                 constructClickRuleButton.className = "hotkeyenabled";
-                changeWorkingMode(workingModes.CONSTRUCT_CLICKRULE);
+                changeWorkingMode(WorkingModes.ConstructClickRule);
+            }
+            break;
+        }
+        case "KeyD":
+        {
+            if(e.shiftKey)
+            {
+                defaultClickRuleButton.className = "hotkeyenabled";
+                enableDefaultClickRule();
             }
             break;
         }
@@ -1396,13 +1542,13 @@ function main()
         case "KeyS":
         {
             solveRandomButton.className = "hotkeyenabled";
-            toggleSolveBoard(afterCalculationOperations.CALC_SOLVE_RANDOM);
+            toggleSolveBoard(AfterCalculationOperations.SolveWithRandomTurns);
             break;
         }
         case "KeyC":
         {
             solveSequentionalButton.className = "hotkeyenabled";
-            toggleSolveBoard(afterCalculationOperations.CALC_SOLVE_SEQUENTIAL);
+            toggleSolveBoard(AfterCalculationOperations.SolveWithSequentionalTurns);
             break;
         }
         case "KeyG":
@@ -1418,11 +1564,11 @@ function main()
 
             if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
             {
-                changeCountingMode(countingModes.COUNT_NONE, false);
+                changeCountingMode(CountingModes.CountNone, false);
             }
             else
             {
-                changeCountingMode(countingModes.COUNT_EIGENVECTOR, e.shiftKey);
+                changeCountingMode(CountingModes.CountEigenVector, e.shiftKey);
             }
             break;
         }    
@@ -1439,17 +1585,17 @@ function main()
 
             if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
             {
-                changeCountingMode(countingModes.COUNT_NONE, false);
+                changeCountingMode(CountingModes.CountNone, false);
             }
             else
             {
                 if(e.shiftKey)
                 {
-                    updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIOD_WITH_STOP);
+                    updateSolutionMatrixIfNeeded(AfterCalculationOperations.CalcSolutionPeriodAndStop);
                 }
                 else
                 {
-                    updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIOD);
+                    updateSolutionMatrixIfNeeded(AfterCalculationOperations.CalcSolutionPeriod);
                 }
             }
             break;
@@ -1467,17 +1613,17 @@ function main()
 
             if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
             {
-                changeCountingMode(countingModes.COUNT_NONE, false);
+                changeCountingMode(CountingModes.CountNone, false);
             }
             else
             {
                 if(e.shiftKey)
                 {
-                    updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIO4_WITH_STOP);
+                    updateSolutionMatrixIfNeeded(AfterCalculationOperations.CalcSolutionPeriod4xAndStop);
                 }
                 else
                 {
-                    updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIO4);
+                    updateSolutionMatrixIfNeeded(AfterCalculationOperations.CalcSolutionPeriod4x);
                 }
             }
             break;
@@ -1495,11 +1641,11 @@ function main()
 
             if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
             {
-                changeCountingMode(countingModes.COUNT_NONE, false);
+                changeCountingMode(CountingModes.CountNone, false);
             }
             else
             {
-                changeCountingMode(countingModes.COUNT_INVERSE_SOLUTION_PERIOD, e.shiftKey);
+                changeCountingMode(CountingModes.CountInverseSolutionPeriod, e.shiftKey);
             }
             break;
         }
@@ -1560,8 +1706,7 @@ function main()
         }
         case "KeyO":
         {
-            constructToroidalClickRuleButton.className = "hotkeydisabled";
-            borderBoardButton.className                = "hotkeydisabled";
+            borderBoardButton.className = "hotkeydisabled";
             break;
         }
         case "KeyB":
@@ -1571,7 +1716,8 @@ function main()
         }
         case "KeyP":
         {
-            checkersBoardButton.className = "hotkeydisabled";
+            projectivePlaneTopologyButton.className = "hotkeydisabled";
+            checkersBoardButton.className           = "hotkeydisabled";
             break;
         }
         case "KeyF":
@@ -1581,7 +1727,7 @@ function main()
         }
         case "KeyR":
         {
-            regularClickRuleButton.className    = "hotkeydisabled";
+            squareTopologyButton.className      = "hotkeydisabled";
             solvableRandomBoardButton.className = "hotkeydisabled";
             break;
         }
@@ -1638,13 +1784,18 @@ function main()
         }
         case "KeyT":
         {
-            toroidalClickRuleButton.className = "hotkeydisabled";
-            showSolutionButton.className      = "hotkeydisabled";
+            torusTopologyButton.className = "hotkeydisabled";
+            showSolutionButton.className  = "hotkeydisabled";
             break;
         }
         case "KeyM":
         {
             constructClickRuleButton.className = "hotkeydisabled";
+            break;
+        }
+        case "KeyD":
+        {
+            defaultClickRuleButton.className = "hotkeydisabled";
             break;
         }
         case "KeyA":
@@ -1691,10 +1842,11 @@ function main()
         {
             increaseDomainButton.className                 = "hotkeydisabled";
             decreaseDomainButton.className                 = "hotkeydisabled";
-            regularClickRuleButton.className               = "hotkeydisabled";
-            toroidalClickRuleButton.className              = "hotkeydisabled";
+            defaultClickRuleButton.className               = "hotkeydisabled";
             constructClickRuleButton.className             = "hotkeydisabled";
-            constructToroidalClickRuleButton.className     = "hotkeydisabled";
+            squareTopologyButton.className                 = "hotkeydisabled";
+            torusTopologyButton.className                  = "hotkeydisabled";
+            projectivePlaneTopologyButton.className        = "hotkeydisabled";
             showLitStabilityButton.className               = "hotkeydisabled";
             domainRotateBoardButton.className              = "hotkeydisabled";
             calculateSolutionPeriodButton.className        = "hotkeydisabled";
@@ -1881,23 +2033,28 @@ function main()
 
     unlitBoardButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_ZERO, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.AllUnlit, currentGameSize, currentDomainSize);
     }
 
     litBoardButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_ONE, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.AllLit, currentGameSize, currentDomainSize);
     }
 
     cornersBoardButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_FOUR_CORNERS, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.FourCorners, currentGameSize, currentDomainSize);
     }
 
-    constructToroidalClickRuleButton.onclick = function()
+    defaultClickRuleButton.onclick = function()
     {
-        changeWorkingMode(workingModes.CONSTRUCT_CLICKRULE_TOROID);
-    }  
+        enableDefaultClickRule();
+    }
+
+    constructClickRuleButton.onclick = function()
+    {
+        changeWorkingMode(WorkingModes.ConstructClickRule);
+    }
 
     clickRuleFileUploadInput.onchange = function()
     {
@@ -1909,73 +2066,67 @@ function main()
 
     borderBoardButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_BORDER, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.Border, currentGameSize, currentDomainSize);
     }
 
     chessboardBoardButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_BLATNOY, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.Blatnoy, currentGameSize, currentDomainSize);
     }
 
     checkersBoardButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_PIETIA, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.Pietia, currentGameSize, currentDomainSize);
     }
 
     randomBoardButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_FULL_RANDOM, currentGameSize, currentDomainSize);
-    }
-
-    regularClickRuleButton.onclick = function()
-    {
-        enableDefaultClickRule();
-        requestRedraw();
+        resetGameBoard(ResetModes.FullRandom, currentGameSize, currentDomainSize);
     }
 
     solvableRandomBoardButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.SolvableRandom, currentGameSize, currentDomainSize);
     }
 
     domainRotateBoardButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_DOMAIN_ROTATE_NONZERO, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.DomainRotate, currentGameSize, currentDomainSize);
     }
 
     invertBoardButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_INVERTO, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.Inverto, currentGameSize, currentDomainSize);
     }
 
     singleInterchangeButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_SOLUTION, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.Solution, currentGameSize, currentDomainSize);
     }
 
     quietPatternsButton.onclick = function()
     {
-        updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_NO_OP);
+        updateSolutionMatrixIfNeeded(AfterCalculationOperations.NoOp);
     }
 
     moveBoardLeftButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_LEFT, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.MoveLeft, currentGameSize, currentDomainSize);
     }
 
     moveBoardRightButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_RIGHT, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.MoveRight, currentGameSize, currentDomainSize);
     }
 
     moveBoardUpButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_UP, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.MoveUp, currentGameSize, currentDomainSize);
     }
 
     moveBoardDownButton.onclick = function()
     {
-        resetGameBoard(resetModes.RESET_DOWN, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.MoveDown, currentGameSize, currentDomainSize);
     }
 
     acceptClickRuleButton.onclick = function()
@@ -1993,20 +2144,27 @@ function main()
         showInverseSolution(!flagShowInverseSolution);
     }
 
-    toroidalClickRuleButton.onclick = function()
+    squareTopologyButton.onclick = function()
     {
-        enableDefaultToroidClickRule();
+        setTopology(Topologies.SquareTopology);
+        requestRedraw();
+    }
+
+    torusTopologyButton.onclick = function()
+    {
+        setTopology(Topologies.TorusTopology);
+        requestRedraw();
+    }
+
+    projectivePlaneTopologyButton.onclick = function()
+    {
+        setTopology(Topologies.ProjectivePlaneTopology);
         requestRedraw();
     }
 
     showSolutionButton.onclick = function()
     {
-        updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SHOW_SOLUTION);
-    }
-
-    constructClickRuleButton.onclick = function()
-    {
-        changeWorkingMode(workingModes.CONSTRUCT_CLICKRULE);
+        updateSolutionMatrixIfNeeded(AfterCalculationOperations.ShowSolution);
     }
 
     showLitStabilityButton.onclick = function()
@@ -2021,23 +2179,23 @@ function main()
 
     solveRandomButton.onclick = function()
     {
-        toggleSolveBoard(afterCalculationOperations.CALC_SOLVE_RANDOM);
+        toggleSolveBoard(AfterCalculationOperations.SolveWithRandomTurns);
     }
 
     solveSequentionalButton.onclick = function()
     {
-        toggleSolveBoard(afterCalculationOperations.CALC_SOLVE_SEQUENTIAL);
+        toggleSolveBoard(AfterCalculationOperations.SolveWithSequentionalTurns);
     }
 
     calculateEigenvectorButton.onclick = function()
     {
         if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
         {
-            changeCountingMode(countingModes.COUNT_NONE, false);
+            changeCountingMode(CountingModes.CountNone, false);
         }
         else
         {
-            changeCountingMode(countingModes.COUNT_EIGENVECTOR, true);
+            changeCountingMode(CountingModes.CountEigenVector, true);
         }
     }
 
@@ -2045,11 +2203,11 @@ function main()
     {
         if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
         {
-            changeCountingMode(countingModes.COUNT_NONE, false);
+            changeCountingMode(CountingModes.CountNone, false);
         }
         else
         {
-            changeCountingMode(countingModes.COUNT_EIGENVECTOR, false);
+            changeCountingMode(CountingModes.CountEigenVector, false);
         }
     }
 
@@ -2057,11 +2215,11 @@ function main()
     {
         if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
         {
-            changeCountingMode(countingModes.COUNT_NONE, false);
+            changeCountingMode(CountingModes.CountNone, false);
         }
         else
         {
-            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIOD_WITH_STOP);
+            updateSolutionMatrixIfNeeded(AfterCalculationOperations.CalcSolutionPeriodAndStop);
         }
     }
     
@@ -2069,11 +2227,11 @@ function main()
     {
         if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
         {
-            changeCountingMode(countingModes.COUNT_NONE, false);
+            changeCountingMode(CountingModes.CountNone, false);
         }
         else
         {
-            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIOD);
+            updateSolutionMatrixIfNeeded(AfterCalculationOperations.CalcSolutionPeriod);
         }
     }
     
@@ -2081,11 +2239,11 @@ function main()
     {
         if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
         {
-            changeCountingMode(countingModes.COUNT_NONE, false);
+            changeCountingMode(CountingModes.CountNone, false);
         }
         else
         {
-            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIO4_WITH_STOP);
+            updateSolutionMatrixIfNeeded(AfterCalculationOperations.CalcSolutionPeriod4xAndStop);
         }
     }
     
@@ -2093,11 +2251,11 @@ function main()
     {
         if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
         {
-            changeCountingMode(countingModes.COUNT_NONE, false);
+            changeCountingMode(CountingModes.CountNone, false);
         }
         else
         {
-            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SOULTION_PERIO4);
+            updateSolutionMatrixIfNeeded(AfterCalculationOperations.CalcSolutionPeriod4x);
         }
     }
 
@@ -2105,11 +2263,11 @@ function main()
     {
         if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
         {
-            changeCountingMode(countingModes.COUNT_NONE, false);
+            changeCountingMode(CountingModes.CountNone, false);
         }
         else
         {
-            changeCountingMode(countingModes.COUNT_INVERSE_SOLUTION_PERIOD, true);
+            changeCountingMode(CountingModes.CountInverseSolutionPeriod, true);
         }
     }
 
@@ -2117,22 +2275,22 @@ function main()
     {
         if(flagPeriodBackCounting || flagPeriodCounting || flagPerio4Counting || flagEigvecCounting)
         {
-            changeCountingMode(countingModes.COUNT_NONE, false);
+            changeCountingMode(CountingModes.CountNone, false);
         }
         else
         {
-            changeCountingMode(countingModes.COUNT_INVERSE_SOLUTION_PERIOD, false);
+            changeCountingMode(CountingModes.CountInverseSolutionPeriod, false);
         }
     }
 
     saveRegularMatrixButton.onclick = function()
     {
-        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+        if(currentWorkingMode == WorkingModes.LitBoardClickRule)
         {
-            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
+            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, currentDomainSize, currentTopology);
             saveMatrixToImage(lightsOutMatrix);
         }
-        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
             saveMatrixToImage(currentGameMatrix);
         }
@@ -2142,12 +2300,12 @@ function main()
     {
         let matrixCellSize = 5;
 
-        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+        if(currentWorkingMode == WorkingModes.LitBoardClickRule)
         {
-            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
+            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, currentDomainSize, currentTopology);
             saveMatrixWithEdgesToImage(lightsOutMatrix, matrixCellSize);
         }   
-        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
             saveMatrixWithEdgesToImage(currentGameMatrix, matrixCellSize);
         }    
@@ -2157,109 +2315,108 @@ function main()
     {
         let matrixCellSize = 15;
 
-        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+        if(currentWorkingMode == WorkingModes.LitBoardClickRule)
         {
-            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, flagToroidBoard);
-            saveMatrixWithRenderModeToImage(lightsOutMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, flagToroidBoard);
+            let lightsOutMatrix = calculateGameMatrix(currentGameClickRule, currentGameSize, currentClickRuleSize, currentDomainSize, currentTopology);
+            saveMatrixWithRenderModeToImage(lightsOutMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, currentTopology);
         }   
-        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
-            saveMatrixWithRenderModeToImage(currentGameMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, flagToroidBoard);
+            saveMatrixWithRenderModeToImage(currentGameMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, currentTopology);
         }    
     }
 
     saveInverseMatrixButton.onclick = function()
     {
-        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
-            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX);
+            updateSolutionMatrixIfNeeded(AfterCalculationOperations.SaveInverseMatrix);
         }
     }
 
     saveInverseMatrixEdgesButton.onclick = function()
     {
-        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
-            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_EDGES);
+            updateSolutionMatrixIfNeeded(AfterCalculationOperations.SaveInverseMatrixWithEdges);
         }
     }
 
     saveInverseMatrixRenderModeButton.onclick = function()
     {
-        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
-            updateSolutionMatrixIfNeeded(afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_RENDER_MODE);
+            updateSolutionMatrixIfNeeded(AfterCalculationOperations.SaveInverseMatrixWithRenderMode);
         }
     }
 
     matrixFileUploadInput.onchange = function()
     {
-        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
             loadMatrix(matrixFileUploadInput.files[0]);
         }
     }
 
-    let boardGenModes =
+    let BoardGenModes =
     {
-        BOARDGEN_FULL_RANDOM:  1, //Generate a random board
-        BOARDGEN_ZERO_ELEMENT: 2, //Generate a fully unlit board
-        BOARDGEN_ONE_ELEMENT:  3, //Generate a fully lit board
-        BOARDGEN_BLATNOY:      4, //Generate a chessboard pattern board
-        BOARDGEN_PIETIA_STYLE: 5, //Generate a checkers pattern board
-        BOARDGEN_BORDER:       6, //Generate a border board
-        BOARDGEN_4_CORNERS:    7  //Generate a four corners board
+        GenFullRandom: 1, //Generate a random board
+        GenAllUnlit:   2, //Generate a fully unlit board
+        GenAllLit:     3, //Generate a fully lit board
+        GenBlatnoy:    4, //Generate a chessboard pattern board
+        GenPietia:     5, //Generate a checkers pattern board
+        GenBorder:     6, //Generate a border board
+        Gen4Corners:   7  //Generate a four corners board
     };
 
-    let resetModes =
+    let ResetModes =
     {
-        RESET_ONE:                    1, //Fully lit board
-        RESET_ZERO:                   2, //Fully unlit board
-        RESET_BORDER:                 3, //Border board
-        RESET_PIETIA:                 4, //Checkers board
-        RESET_BLATNOY:                5, //Chessboard board
-        RESET_FOUR_CORNERS:           6, //4 lit corners
-        RESET_SOLVABLE_RANDOM:        7, //Random board, always solvable
-        RESET_FULL_RANDOM:            8, //Random board
-        RESET_SOLUTION:               9, //Current board -> Current solution/Current stability
-        RESET_INVERTO:               10, //Current board -> Inverted current board
-        RESET_DOMAIN_ROTATE_NONZERO: 11, //Current board -> Nonzero domain rotated current board
-        RESET_LEFT:                  12, //Current board -> Current board moved left
-        RESET_RIGHT:                 13, //Current board -> Current board moved right
-        RESET_UP:                    14, //Current board -> Current board moved up
-        RESET_DOWN:                  15  //Current board -> Current board moved down
+        AllLit:         1,  //Fully lit board
+        AllUnlit:       2,  //Fully unlit board
+        Border:         3,  //Border board
+        Pietia:         4,  //Checkers board
+        Blatnoy:        5,  //Chessboard board
+        FourCorners:    6,  //4 lit corners
+        SolvableRandom: 7,  //Random board, always solvable
+        FullRandom:     8,  //Random board
+        Solution:       9,  //Current board -> Current solution/Current stability
+        Inverto:        10, //Current board -> Inverted current board
+        DomainRotate:   11, //Current board -> Nonzero domain rotated current board
+        MoveLeft:       12, //Current board -> Current board moved left
+        MoveRight:      13, //Current board -> Current board moved right
+        MoveUp:         14, //Current board -> Current board moved up
+        MoveDown:       15  //Current board -> Current board moved down
     };
 
-    let workingModes =
+    let WorkingModes =
     {
-        LIT_BOARD_CLICKRULE:        1,
-        LIT_BOARD_MATRIX:           2,
-        CONSTRUCT_CLICKRULE:        3,
-        CONSTRUCT_CLICKRULE_TOROID: 4,
+        LitBoardClickRule:  0,
+        LitBoardMatrix:     1,
+        ConstructClickRule: 2
     };
 
-    let countingModes =
+    let CountingModes =
     {
-        COUNT_NONE:                    1,
-        COUNT_SOLUTION_PERIOD:         2,
-        COUNT_INVERSE_SOLUTION_PERIOD: 3,
-        COUNT_SOLUTION_PERIOD_4X:      4,
-        COUNT_EIGENVECTOR:             5
+        CountNone:                  1,
+        CountSolutionPeriod:        2,
+        CountInverseSolutionPeriod: 3,
+        CountSolutionPeriod4x:      4,
+        CountEigenVector:           5
     };
 
-    let afterCalculationOperations =
+    let AfterCalculationOperations =
     {
-        CALC_NO_OP:                           1,
-        CALC_SHOW_SOLUTION:                   2,
-        CALC_SOULTION_PERIOD:                 3,
-        CALC_SOULTION_PERIOD_WITH_STOP:       4,
-        CALC_SOULTION_PERIO4:                 5,
-        CALC_SOULTION_PERIO4_WITH_STOP:       6,
-        CALC_SOLVE_RANDOM:                    7,
-        CALC_SOLVE_SEQUENTIAL:                8,
-        CALC_SAVE_INVERSE_MATRIX:             9,
-        CALC_SAVE_INVERSE_MATRIX_EDGES:       10,
-        CALC_SAVE_INVERSE_MATRIX_RENDER_MODE: 11
+        NoOp:                            1,
+        ShowSolution:                    2,
+        CalcSolutionPeriod:              3,
+        CalcSolutionPeriodAndStop:       4,
+        CalcSolutionPeriod4x:            5,
+        CalcSolutionPeriod4xAndStop:     6,
+        SolveWithRandomTurns:            7,
+        SolveWithSequentionalTurns:      8,
+        SaveInverseMatrix:               9,
+        SaveInverseMatrixWithEdges:      10,
+        SaveInverseMatrixWithRenderMode: 11
     }
 
     const minimumBoardSize = 1;
@@ -2291,7 +2448,6 @@ function main()
     let flagPerio4Counting          = false;
     let flagPeriodBackCounting      = false;
     let flagStopCountingWhenFound   = false;
-    let flagToroidBoard             = false;
     let flagTickLoop                = false;
     let flagDefaultClickRule        = false;
     let flagConstructClicks         = false;
@@ -2320,7 +2476,8 @@ function main()
     let currentColorSolved  = [0.0, 0.0, 1.0, 1.0];
     let currentColorBetween = [0.0, 0.0, 0.0, 1.0];
 
-    let currentWorkingMode  = workingModes.LIT_BOARD_CLICKRULE;
+    let currentTopology    = Topologies.SquareTopology;
+    let currentWorkingMode = WorkingModes.LitBoardClickRule;
 
     let currentSolutionMatrix = [];
 
@@ -2369,12 +2526,12 @@ function main()
 
     function incrementGameSize()
     {
-        //Can't change sizes with custom matrix, so no branch for LIT_BOARD_MATRIX
-        if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
+        //Can't change sizes with custom matrix, so no branch for LitBoardMatrix
+        if(currentWorkingMode === WorkingModes.LitBoardClickRule)
         {
             changeGameSize(currentGameSize + 1);
         }
-        else if(currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
+        else if(currentWorkingMode == WorkingModes.ConstructClickRule)
         {
             changeGameSize(currentGameSize + 2);
         }
@@ -2382,12 +2539,12 @@ function main()
 
     function decrementGameSize()
     {
-        //Can't change sizes with custom matrix, so no branch for LIT_BOARD_MATRIX
-        if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
+        //Can't change sizes with custom matrix, so no branch for LitBoardMatrix
+        if(currentWorkingMode === WorkingModes.LitBoardClickRule)
         {
             changeGameSize(currentGameSize - 1);
         }
-        else if(currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
+        else if(currentWorkingMode == WorkingModes.ConstructClickRule)
         {
             changeGameSize(currentGameSize - 2);
         }
@@ -2400,13 +2557,13 @@ function main()
         showSolution(false);
         showInverseSolution(false);
 
-        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
             recreateSolutionMatrixWorker();
             currentSolutionMatrixCalculated = false;
         }
 
-        changeCountingMode(countingModes.COUNT_NONE, false);
+        changeCountingMode(CountingModes.CountNone, false);
         currentTurnList.length = 0;
         flagRandomSolving = false;
         
@@ -2414,16 +2571,16 @@ function main()
 
         qpText.textContent = "Quiet patterns: ";
 
-        if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode === WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
-            resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
+            resetGameBoard(ResetModes.SolvableRandom, currentGameSize, currentDomainSize);
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
 
             updateAddressBar(500); //Update the address bar with 1000ms delay
         }
         else
         {
-            currentGameBoard = generateNewBoard(currentGameSize, currentDomainSize, boardGenModes.BOARDGEN_ZERO_ELEMENT);
+            currentGameBoard = generateNewBoard(currentGameSize, currentDomainSize, BoardGenModes.GenAllUnlit);
 
             resetStability();
             if(flagShowLitStability)
@@ -2435,7 +2592,7 @@ function main()
                 updateBoardLikeTexture(gl, currentGameStability, currentGameSize, stabilityTexture);
             }
 
-            currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, Math.floor(currentGameSize / 2), Math.floor(currentGameSize / 2), false);
+            currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, Math.floor(currentGameSize / 2), Math.floor(currentGameSize / 2), currentTopology);
             infoText.textContent = "Lights Out click rule " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         }
 
@@ -2458,7 +2615,7 @@ function main()
 
     function changeDomainSize(newSize)
     {
-        if(currentWorkingMode != workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode != WorkingModes.LitBoardClickRule && currentWorkingMode !== WorkingModes.LitBoardMatrix)
         {
             return;
         }
@@ -2471,7 +2628,7 @@ function main()
         recreateSolutionMatrixWorker();
         currentSolutionMatrixCalculated = false;
 
-        changeCountingMode(countingModes.COUNT_NONE, false);
+        changeCountingMode(CountingModes.CountNone, false);
         currentTurnList.length = 0;
         flagRandomSolving = false;
 
@@ -2480,16 +2637,16 @@ function main()
         updateAddressBar(500); //Update the address bar with 1000ms delay
 
         //Click rule/matrix invalidation
-        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+        if(currentWorkingMode == WorkingModes.LitBoardClickRule)
         {
             invalidateBoardDomainInPlace(currentGameClickRule, currentDomainSize);
         }
-        else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
             invalidateMatrixDomainInPlace(currentGameMatrix, currentDomainSize);
         }
 
-        resetGameBoard(resetModes.RESET_SOLVABLE_RANDOM, currentGameSize, currentDomainSize);
+        resetGameBoard(ResetModes.SolvableRandom, currentGameSize, currentDomainSize);
 
         infoText.textContent = "Lights Out  " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
@@ -2510,15 +2667,15 @@ function main()
         }
         else
         {
-            if(currentWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
+            if(currentWorkingMode === WorkingModes.LitBoardClickRule)
             {
-                currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, modX, modY, flagToroidBoard);
+                currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, modX, modY, currentTopology);
             }
-            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
             {
                 currentGameBoard = makeTurnMatrix(currentGameBoard, currentGameMatrix, currentGameSize, currentDomainSize, modX, modY);
             }
-            else if(currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE_TOROID)
+            else if(currentWorkingMode === WorkingModes.ConstructClickRule)
             {
                 makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
             }
@@ -2533,11 +2690,11 @@ function main()
         }
         else if(flagShowInverseSolution)
         {
-            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            if(currentWorkingMode == WorkingModes.LitBoardClickRule)
             {
-                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, currentTopology, flagDefaultClickRule);
             }
-            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
             {
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
             }
@@ -2561,9 +2718,9 @@ function main()
 
     function enableDefaultClickRule()
     {   
-        if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
-            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
+            changeWorkingMode(WorkingModes.LitBoardClickRule);
         }
 
         recreateSolutionMatrixWorker();
@@ -2576,42 +2733,29 @@ function main()
         currentClickRuleSize = 3;
         currentGameClickRule = new Uint8Array(clickRuleValues);
 
-        flagToroidBoard      = false;
         flagDefaultClickRule = true;
 
-        currentEncodedClickRule = "Default";
-        updateAddressBar(50);
-    }
-
-    function enableDefaultToroidClickRule()
-    {   
-        if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        if(currentTopology == Topologies.SquareTopology)
         {
-            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
+            currentEncodedClickRule = "Default";
+        }
+        else if(currentTopology == Topologies.TorusTopology)
+        {
+            currentEncodedClickRule = "Torus";
+        }
+        else if(currentTopology == Topologies.ProjectivePlaneTopology)
+        {
+            currentEncodedClickRule = "ProjectivePlane";
         }
 
-        recreateSolutionMatrixWorker();
-        currentSolutionMatrixCalculated = false;
-
-        let clickRuleValues = [0, 1, 0, // eslint-disable-next-line indent
-                               1, 1, 1, // eslint-disable-next-line indent
-                               0, 1, 0];
-
-        currentClickRuleSize = 3;
-        currentGameClickRule = new Uint8Array(clickRuleValues);
-
-        flagToroidBoard      = true;
-        flagDefaultClickRule = true;
-
-        currentEncodedClickRule = "Toroid";
         updateAddressBar(50);
     }
 
-    function enableCustomClickRule(clickRule, clickRuleSize, isToroid)
+    function enableCustomClickRule(clickRule, clickRuleSize)
     {
-        if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
-            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
+            changeWorkingMode(WorkingModes.LitBoardClickRule);
         }
 
         recreateSolutionMatrixWorker();
@@ -2620,16 +2764,15 @@ function main()
         currentGameClickRule = clickRule;
         currentClickRuleSize = clickRuleSize;
 
-        flagToroidBoard      = isToroid;
         flagDefaultClickRule = false;
 
-        currentEncodedClickRule = encodeBase64ClickRule(clickRule, isToroid);
+        currentEncodedClickRule = encodeBase64ClickRule(clickRule, currentTopology);
         updateAddressBar(50);
     }
 
     function enableCustomMatrix(lightsOutMatrix, gameSize)
     {
-        changeWorkingMode(workingModes.LIT_BOARD_MATRIX);
+        changeWorkingMode(WorkingModes.LitBoardMatrix);
 
         currentGameClickRule = null;
         currentClickRuleSize = 0;
@@ -2638,11 +2781,41 @@ function main()
         currentSolutionMatrixCalculated = false;
 
         flagDefaultClickRule = false;
-        flagToroidBoard      = false;
+        currentTopology      = Topologies.UndefinedTopology;
 
         currentGameMatrix = lightsOutMatrix;
 
         changeGameSize(gameSize);
+    }
+
+    function setTopology(boardTopology)
+    {
+        if(currentWorkingMode == WorkingModes.LitBoardMatrix)
+        {
+            changeWorkingMode(WorkingModes.LitBoardClickRule);
+        }
+
+        recreateSolutionMatrixWorker();
+        currentSolutionMatrixCalculated = false;
+
+        currentTopology = boardTopology;
+        if(flagDefaultClickRule)
+        {
+            if(currentTopology == Topologies.SquareTopology)
+            {
+                currentEncodedClickRule = "Default";
+            }
+            else if(currentTopology == Topologies.TorusTopology)
+            {
+                currentEncodedClickRule = "Torus";
+            }
+            else if(currentTopology == Topologies.ProjectivePlaneTopology)
+            {
+                currentEncodedClickRule = "ProjectivePlane";
+            }
+        }
+
+        updateAddressBar(50);
     }
 
     function resetStability()
@@ -2659,11 +2832,11 @@ function main()
             currentSolutionMatrixCalculating = true;
             solutionMatrixBlock.hidden       = false;
 
-            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            if(currentWorkingMode == WorkingModes.LitBoardClickRule)
             {
-                solutionMatrixWorker.postMessage({command: "CalcSolutionMatrixFromClickRule", params: {clickRule: currentGameClickRule, gameSize: currentGameSize, domainSize: currentDomainSize, clickRuleSize: currentClickRuleSize, isToroid: flagToroidBoard, opAfter: operationAfter}});
+                solutionMatrixWorker.postMessage({command: "CalcSolutionMatrixFromClickRule", params: {clickRule: currentGameClickRule, gameSize: currentGameSize, domainSize: currentDomainSize, clickRuleSize: currentClickRuleSize, topology: currentTopology, opAfter: operationAfter}});
             }
-            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
             {
                 solutionMatrixWorker.postMessage({command: "CalcSolutionMatrixFromMatrix", params: {matrix: currentGameMatrix, gameSize: currentGameSize, domainSize: currentDomainSize, opAfter: operationAfter}});
             }
@@ -2726,38 +2899,38 @@ function main()
     {
         switch(operationAfter)
         {
-            case afterCalculationOperations.CALC_NO_OP:
+            case AfterCalculationOperations.NoOp:
             {
                 break;
             }
-            case afterCalculationOperations.CALC_SHOW_SOLUTION:
+            case AfterCalculationOperations.ShowSolution:
             {
                 showSolution(!flagShowSolution);
                 break;
             }
-            case afterCalculationOperations.CALC_SOULTION_PERIOD:
+            case AfterCalculationOperations.CalcSolutionPeriod:
             {
-                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD, false);
+                changeCountingMode(CountingModes.CountSolutionPeriod, false);
                 break;
             }
-            case afterCalculationOperations.CALC_SOULTION_PERIOD_WITH_STOP:
+            case AfterCalculationOperations.CalcSolutionPeriodAndStop:
             {
-                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD, true);
+                changeCountingMode(CountingModes.CountSolutionPeriod, true);
                 break;
             }
-            case afterCalculationOperations.CALC_SOULTION_PERIO4:
+            case AfterCalculationOperations.CalcSolutionPeriod4x:
             {
-                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD_4X, false);
+                changeCountingMode(CountingModes.CountSolutionPeriod4x, false);
                 break;
             }
-            case afterCalculationOperations.CALC_SOULTION_PERIO4_WITH_STOP:
+            case AfterCalculationOperations.CalcSolutionPeriod4xAndStop:
             {
-                changeCountingMode(countingModes.COUNT_SOLUTION_PERIOD_4X, true);
+                changeCountingMode(CountingModes.CountSolutionPeriod4x, true);
                 break;
             }
-            case afterCalculationOperations.CALC_SOLVE_RANDOM:
+            case AfterCalculationOperations.SolveWithRandomTurns:
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
                     updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
@@ -2772,9 +2945,9 @@ function main()
 
                 break;
             }
-            case afterCalculationOperations.CALC_SOLVE_SEQUENTIAL:
+            case AfterCalculationOperations.SolveWithSequentionalTurns:
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentSolutionMatrix);
                     updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
@@ -2789,18 +2962,18 @@ function main()
 
                 break;
             }
-            case afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX:
+            case AfterCalculationOperations.SaveInverseMatrix:
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
                 {
                     saveMatrixToImage(currentSolutionMatrix);
                 }
 
                 break;
             }
-            case afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_EDGES:
+            case AfterCalculationOperations.SaveInverseMatrixWithEdges:
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
                 {
                     const matrixCellSize = 5;
 
@@ -2809,13 +2982,13 @@ function main()
 
                 break;
             }
-            case afterCalculationOperations.CALC_SAVE_INVERSE_MATRIX_RENDER_MODE:
+            case AfterCalculationOperations.SaveInverseMatrixWithRenderMode:
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
                 {
                     const matrixCellSize = 15;
 
-                    saveMatrixWithRenderModeToImage(currentSolutionMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, flagToroidBoard);
+                    saveMatrixWithRenderModeToImage(currentSolutionMatrix, matrixCellSize, renderModeSelect.value, gridCheckBox.checked, currentTopology);
                 }
 
                 break;
@@ -2838,29 +3011,29 @@ function main()
         currentTurnList.length = 0;
         flagRandomSolving = false;
 
-        if(resetMode === resetModes.RESET_LEFT || resetMode === resetModes.RESET_RIGHT || resetMode === resetModes.RESET_UP || resetMode === resetModes.RESET_DOWN)
+        if(resetMode === ResetModes.MoveLeft || resetMode === ResetModes.MoveRight || resetMode === ResetModes.MoveUp || resetMode === ResetModes.MoveDown)
         {
             showStability(false);
             showLitStability(false);
 
             switch(resetMode)
             {
-            case resetModes.RESET_LEFT:
+            case ResetModes.MoveLeft:
             {
                 currentGameBoard = moveBoardLeft(currentGameBoard, currentGameSize);
                 break;
             }
-            case resetModes.RESET_RIGHT:
+            case ResetModes.MoveRight:
             {
                 currentGameBoard = moveBoardRight(currentGameBoard, currentGameSize);
                 break;
             }
-            case resetModes.RESET_UP:
+            case ResetModes.MoveUp:
             {
                 currentGameBoard = moveBoardUp(currentGameBoard, currentGameSize);
                 break;
             }
-            case resetModes.RESET_DOWN:
+            case ResetModes.MoveDown:
             {
                 currentGameBoard = moveBoardDown(currentGameBoard, currentGameSize);
                 break;
@@ -2888,11 +3061,11 @@ function main()
             }
             else if(flagShowInverseSolution)
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+                if(currentWorkingMode == WorkingModes.LitBoardClickRule)
                 {
-                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, currentTopology, flagDefaultClickRule);
                 }
-                else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
                 }
@@ -2900,9 +3073,9 @@ function main()
                 updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
         }
-        else if(resetMode === resetModes.RESET_SOLUTION)
+        else if(resetMode === ResetModes.Solution)
         {
-            if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
+            if(currentWorkingMode !== WorkingModes.LitBoardClickRule && currentWorkingMode !== WorkingModes.LitBoardMatrix)
             {
                 return;
             }
@@ -2944,19 +3117,19 @@ function main()
                 updateBoardLikeTexture(gl, currentGameLitStability, currentGameSize, stabilityTexture);
             }
         }
-        else if(resetMode === resetModes.RESET_INVERTO || resetMode === resetModes.RESET_DOMAIN_ROTATE_NONZERO)
+        else if(resetMode === ResetModes.Inverto || resetMode === ResetModes.DomainRotate)
         {
             showStability(false);
             showLitStability(false);
 
             switch(resetMode)
             {
-            case resetModes.RESET_INVERTO:
+            case ResetModes.Inverto:
             {
                 currentGameBoard = domainShiftBoard(currentGameBoard, currentDomainSize);
                 break;
             }
-            case resetModes.RESET_DOMAIN_ROTATE_NONZERO:
+            case ResetModes.DomainRotate:
             {
                 currentGameBoard = domainRotateNonZeroBoard(currentGameBoard, currentDomainSize);
                 break;
@@ -2984,11 +3157,11 @@ function main()
             }
             else if(flagShowInverseSolution)
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+                if(currentWorkingMode == WorkingModes.LitBoardClickRule)
                 {
-                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, currentTopology, flagDefaultClickRule);
                 }
-                else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
                 }
@@ -2996,9 +3169,9 @@ function main()
                 updateBoardLikeTexture(gl, currentGameSolution, currentGameSize, solutionTexture);
             }
         }
-        else if(resetMode === resetModes.RESET_SOLVABLE_RANDOM)
+        else if(resetMode === ResetModes.SolvableRandom)
         {
-            if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
+            if(currentWorkingMode !== WorkingModes.LitBoardClickRule && currentWorkingMode !== WorkingModes.LitBoardMatrix)
             {
                 return;
             }
@@ -3008,13 +3181,13 @@ function main()
             showSolution(false);
             showInverseSolution(false);
 
-            currentGameBoard = generateNewBoard(currentGameSize, currentDomainSize, boardGenModes.BOARDGEN_FULL_RANDOM);
+            currentGameBoard = generateNewBoard(currentGameSize, currentDomainSize, BoardGenModes.GenFullRandom);
  
-            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            if(currentWorkingMode == WorkingModes.LitBoardClickRule)
             {
-                currentGameBoard = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                currentGameBoard = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, currentTopology, flagDefaultClickRule);
             }
-            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
             {
                 currentGameBoard = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
             }
@@ -3036,42 +3209,42 @@ function main()
             showSolution(false);
             showInverseSolution(false);
 
-            let modeBgen = boardGenModes.BOARDGEN_ONE_ELEMENT;
+            let modeBgen = BoardGenModes.GenAllLit;
             switch(resetMode)
             {
-            case resetModes.RESET_ONE:
+            case ResetModes.AllLit:
             {
-                modeBgen = boardGenModes.BOARDGEN_ONE_ELEMENT;
+                modeBgen = BoardGenModes.GenAllLit;
                 break;
             }
-            case resetModes.RESET_ZERO:
+            case ResetModes.AllUnlit:
             {
-                modeBgen = boardGenModes.BOARDGEN_ZERO_ELEMENT; 
+                modeBgen = BoardGenModes.GenAllUnlit; 
                 break;
             }
-            case resetModes.RESET_FOUR_CORNERS:
+            case ResetModes.FourCorners:
             {
-                modeBgen = boardGenModes.BOARDGEN_4_CORNERS;
+                modeBgen = BoardGenModes.Gen4Corners;
                 break;
             }
-            case resetModes.RESET_BORDER:
+            case ResetModes.Border:
             {
-                modeBgen = boardGenModes.BOARDGEN_BORDER;
+                modeBgen = BoardGenModes.GenBorder;
                 break;
             }
-            case resetModes.RESET_PIETIA:
+            case ResetModes.Pietia:
             {
-                modeBgen = boardGenModes.BOARDGEN_PIETIA_STYLE;
+                modeBgen = BoardGenModes.GenPietia;
                 break;
             }
-            case resetModes.RESET_BLATNOY:
+            case ResetModes.Blatnoy:
             {
-                modeBgen = boardGenModes.BOARDGEN_BLATNOY;
+                modeBgen = BoardGenModes.GenBlatnoy;
                 break;
             }
-            case resetModes.RESET_FULL_RANDOM:
+            case ResetModes.FullRandom:
             {
-                modeBgen = boardGenModes.BOARDGEN_FULL_RANDOM;
+                modeBgen = BoardGenModes.GenFullRandom;
                 break;
             }
             default:
@@ -3112,23 +3285,23 @@ function main()
 
                 switch (bgenMode)
                 {
-                case boardGenModes.BOARDGEN_FULL_RANDOM:
+                case BoardGenModes.GenFullRandom:
                 {
                     let randomCellValue = minVal + Math.floor(Math.random() * (maxVal - minVal + 1));
                     generatedBoard[cellNumber] = randomCellValue;
                     break;
                 }
-                case boardGenModes.BOARDGEN_ZERO_ELEMENT:
+                case BoardGenModes.GenAllUnlit:
                 {
                     generatedBoard[cellNumber] = minVal;
                     break;
                 }
-                case boardGenModes.BOARDGEN_ONE_ELEMENT:
+                case BoardGenModes.GenAllLit:
                 {
                     generatedBoard[cellNumber] = maxVal;
                     break;
                 }
-                case boardGenModes.BOARDGEN_BLATNOY:
+                case BoardGenModes.GenBlatnoy:
                 {
                     if(x % 2 === y % 2)
                     {
@@ -3140,7 +3313,7 @@ function main()
                     }
                     break;
                 }
-                case boardGenModes.BOARDGEN_PIETIA_STYLE:
+                case BoardGenModes.GenPietia:
                 {
                     if(y % 2 !== 0)
                     {
@@ -3159,7 +3332,7 @@ function main()
                     }
                     break;
                 }
-                case boardGenModes.BOARDGEN_BORDER:
+                case BoardGenModes.GenBorder:
                 {
                     if(y === 0 || y === (gameSize - 1) || x === 0 || x === (gameSize - 1))
                     {
@@ -3171,7 +3344,7 @@ function main()
                     }
                     break;
                 }
-                case boardGenModes.BOARDGEN_4_CORNERS:
+                case BoardGenModes.Gen4Corners:
                 {
                     if((y === 0 && x === 0) || (y === (gameSize - 1) && x === 0) || (y === 0 && x === (gameSize - 1)) || (y === (gameSize - 1) && x === (gameSize - 1)))
                     {
@@ -3206,12 +3379,12 @@ function main()
 
     function changeCountingMode(newCountingMode, stopWhenReturned)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode !== WorkingModes.LitBoardClickRule && currentWorkingMode !== WorkingModes.LitBoardMatrix)
         {
             return;
         }
 
-        if(!currentSolutionMatrixCalculated && (newCountingMode == countingModes.COUNT_SOLUTION_PERIOD || newCountingMode == countingModes.COUNT_SOLUTION_PERIOD_4X))
+        if(!currentSolutionMatrixCalculated && (newCountingMode == CountingModes.CountSolutionPeriod || newCountingMode == CountingModes.CountSolutionPeriod4x))
         {
             return;
         }
@@ -3229,7 +3402,7 @@ function main()
 
         switch(newCountingMode)
         {
-        case countingModes.COUNT_NONE:
+        case CountingModes.CountNone:
         {
             if(currentPeriodCount !== 0 && flagStopCountingWhenFound)
             {
@@ -3237,7 +3410,7 @@ function main()
             }
             break;
         }
-        case countingModes.COUNT_SOLUTION_PERIOD:
+        case CountingModes.CountSolutionPeriod:
         {
             if(currentSolutionMatrixCalculated)
             {
@@ -3245,7 +3418,7 @@ function main()
             }
             break;
         }
-        case countingModes.COUNT_SOLUTION_PERIOD_4X:
+        case CountingModes.CountSolutionPeriod4x:
         {
             if(currentSolutionMatrixCalculated)
             {
@@ -3253,12 +3426,12 @@ function main()
             }
             break;
         }
-        case countingModes.COUNT_INVERSE_SOLUTION_PERIOD:
+        case CountingModes.CountInverseSolutionPeriod:
         {
             flagPeriodBackCounting = true;
             break;
         }
-        case countingModes.COUNT_EIGENVECTOR:
+        case CountingModes.CountEigenVector:
         {
             flagEigvecCounting = true;
             break;
@@ -3280,11 +3453,11 @@ function main()
             currentPeriodCount = 0;
             currentCountedBoard = currentGameBoard.slice();
 
-            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            if(currentWorkingMode == WorkingModes.LitBoardClickRule)
             {
-                currentGameBoard = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                currentGameBoard = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, currentTopology, flagDefaultClickRule);
             }
-            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
             {
                 currentGameBoard = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
             }
@@ -3321,13 +3494,13 @@ function main()
         currentSavedWorkingMode = currentWorkingMode;
         currentWorkingMode      = workingMode;
         
-        if(workingMode == workingModes.CONSTRUCT_CLICKRULE || workingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
+        if(workingMode == WorkingModes.ConstructClickRule)
         {
-            if(currentSavedWorkingMode === workingModes.LIT_BOARD_CLICKRULE)
+            if(currentSavedWorkingMode === WorkingModes.LitBoardClickRule)
             {
                 currentSavedMatrix = null;
             }
-            else if(currentSavedWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            else if(currentSavedWorkingMode == WorkingModes.LitBoardMatrix)
             {
                 currentSavedMatrix = currentGameMatrix;
                 currentGameMatrix  = null;
@@ -3358,7 +3531,7 @@ function main()
             miscellaneousHints.hidden       = true;
             saveMatrixHints.hidden          = true;
         }
-        else if(workingMode == workingModes.LIT_BOARD_MATRIX)
+        else if(workingMode == WorkingModes.LitBoardMatrix)
         {
             acceptClickRuleHints.hidden     = true;
             increaseSizeHints.hidden        = true;
@@ -3371,7 +3544,7 @@ function main()
             miscellaneousHints.hidden       = false;
             saveMatrixHints.hidden          = false;
         }
-        else if(workingMode == workingModes.LIT_BOARD_CLICKRULE)
+        else if(workingMode == WorkingModes.LitBoardClickRule)
         {
             currentSavedMatrix = null;
             currentGameMatrix  = null;
@@ -3393,15 +3566,9 @@ function main()
 
     function acceptClickRule()
     {
-        if(currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE_TOROID)
+        if(currentWorkingMode === WorkingModes.ConstructClickRule)
         {
-            let isToroid = false;
-            if(currentWorkingMode == workingModes.CONSTRUCT_CLICKRULE_TOROID)
-            {
-                isToroid = true;
-            }
-
-            enableCustomClickRule(currentGameBoard.slice(), currentGameSize, isToroid);
+            enableCustomClickRule(currentGameBoard.slice(), currentGameSize);
 
             changeGameSize(currentSavedGameSize);
             currentGameBoard = currentSavedBoard.slice();
@@ -3409,7 +3576,7 @@ function main()
             updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             requestRedraw();
-            changeWorkingMode(workingModes.LIT_BOARD_CLICKRULE);
+            changeWorkingMode(WorkingModes.LitBoardClickRule);
 
             infoText.textContent = "Lights Out " + currentGameSize + "x" + currentGameSize + " DOMAIN " + currentDomainSize;
         }
@@ -3417,7 +3584,7 @@ function main()
 
     function rejectClickRule()
     {
-        if(currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE || currentWorkingMode === workingModes.CONSTRUCT_CLICKRULE_TOROID)
+        if(currentWorkingMode === WorkingModes.ConstructClickRule)
         {
             changeGameSize(currentSavedGameSize);
             currentGameBoard = currentSavedBoard.slice();
@@ -3425,7 +3592,7 @@ function main()
             updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
             requestRedraw();
-            if(currentSavedWorkingMode === workingModes.LIT_BOARD_MATRIX)
+            if(currentSavedWorkingMode === WorkingModes.LitBoardMatrix)
             {
                 enableCustomMatrix(currentSavedMatrix, currentSavedGameSize);
             }
@@ -3459,7 +3626,7 @@ function main()
 
     function showSolution(showFlag)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode !== WorkingModes.LitBoardClickRule && currentWorkingMode !== WorkingModes.LitBoardMatrix)
         {
             flagShowSolution        = false;
             flagShowInverseSolution = false;
@@ -3487,7 +3654,7 @@ function main()
 
     function showInverseSolution(showFlag)
     {
-        if(currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode !== WorkingModes.LitBoardClickRule && currentWorkingMode !== WorkingModes.LitBoardMatrix)
         {
             flagShowSolution        = false;
             flagShowInverseSolution = false;
@@ -3502,11 +3669,11 @@ function main()
         {
             flagShowInverseSolution = true;
 
-            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            if(currentWorkingMode == WorkingModes.LitBoardClickRule)
             {
-                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, currentTopology, flagDefaultClickRule);
             }
-            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
             {
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
             }
@@ -3523,7 +3690,7 @@ function main()
 
     function showStability(showFlag)
     {
-        if((currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX) || currentDomainSize > 2)
+        if((currentWorkingMode !== WorkingModes.LitBoardClickRule && currentWorkingMode !== WorkingModes.LitBoardMatrix) || currentDomainSize > 2)
         {
             flagShowStability    = false;
             flagShowLitStability = false;
@@ -3551,7 +3718,7 @@ function main()
 
     function showLitStability(showFlag)
     {
-        if((currentWorkingMode !== workingModes.LIT_BOARD_CLICKRULE && currentWorkingMode !== workingModes.LIT_BOARD_MATRIX) || currentDomainSize > 2)
+        if((currentWorkingMode !== WorkingModes.LitBoardClickRule && currentWorkingMode !== WorkingModes.LitBoardMatrix) || currentDomainSize > 2)
         {
             flagShowStability    = false;
             flagShowLitStability = false;
@@ -3759,11 +3926,11 @@ function main()
                 turn = currentTurnList.pop();
             }
 
-            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            if(currentWorkingMode == WorkingModes.LitBoardClickRule)
             {
-                currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, turn.cellX, turn.cellY, flagToroidBoard);
+                currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, turn.cellX, turn.cellY, currentTopology);
             }
-            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
             {
                 currentGameBoard = makeTurnMatrix(currentGameBoard, currentGameMatrix, currentGameSize, currentDomainSize, turn.cellX, turn.cellY);   
             }
@@ -3787,11 +3954,11 @@ function main()
             }
             else if(flagShowInverseSolution)
             {
-                if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+                if(currentWorkingMode == WorkingModes.LitBoardClickRule)
                 {
-                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                    currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, currentTopology, flagDefaultClickRule);
                 }
-                else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+                else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
                 {
                     currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
                 }
@@ -3809,11 +3976,11 @@ function main()
         {
             currentPeriodCount++;
 
-            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            if(currentWorkingMode == WorkingModes.LitBoardClickRule)
             {
-                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                currentGameSolution = calculateInverseSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, currentTopology, flagDefaultClickRule);
             }
-            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
             {
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
             }
@@ -3836,7 +4003,7 @@ function main()
             if(flagStopCountingWhenFound && equalsBoard(currentGameBoard, currentCountedBoard))
             {
                 flagStopCountingWhenFound = false;
-                changeCountingMode(countingModes.COUNT_NONE, false);
+                changeCountingMode(CountingModes.CountNone, false);
                 flagTickLoop = false;
             }
 
@@ -3874,7 +4041,7 @@ function main()
             if(flagStopCountingWhenFound && equalsBoard(currentGameBoard, currentCountedBoard))
             {
                 flagStopCountingWhenFound = false;
-                changeCountingMode(countingModes.COUNT_NONE, false);
+                changeCountingMode(CountingModes.CountNone, false);
                 flagTickLoop = false;
             }
 
@@ -3898,7 +4065,7 @@ function main()
                 if(flagStopCountingWhenFound && equalsBoard(currentGameSolution, currentCountedBoard))
                 {
                     flagStopCountingWhenFound = false;
-                    changeCountingMode(countingModes.COUNT_NONE, false);
+                    changeCountingMode(CountingModes.CountNone, false);
                     flagTickLoop = false;
                     
                     break;
@@ -3936,11 +4103,11 @@ function main()
 
             let citybuilderBoard = addBoard(currentGameBoard, currentCountedBoard, currentDomainSize);
 
-            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE)
+            if(currentWorkingMode == WorkingModes.LitBoardClickRule)
             {
-                currentGameSolution = calculateInverseSolution(citybuilderBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, flagToroidBoard, flagDefaultClickRule);
+                currentGameSolution = calculateInverseSolution(citybuilderBoard, currentGameSize, currentDomainSize, currentGameClickRule, currentClickRuleSize, currentTopology, flagDefaultClickRule);
             }
-            else if(currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
             {
                 currentGameSolution = calculateSolution(currentGameBoard, currentGameSize, currentDomainSize, currentGameMatrix);
             }
@@ -3948,7 +4115,7 @@ function main()
             if(flagStopCountingWhenFound && equalsMultipliedBoard(currentGameSolution, citybuilderBoard, currentDomainSize)) //Solution is the current board multiplied by a number => we found an eigenvector
             {
                 flagStopCountingWhenFound = false;
-                changeCountingMode(countingModes.COUNT_NONE, false);
+                changeCountingMode(CountingModes.CountNone, false);
                 flagTickLoop = false;
             }
 
@@ -4233,7 +4400,7 @@ function main()
         canvasMatrix.remove();
     }
 
-    function saveMatrixWithRenderModeToImage(matrix, matrixCellSize, renderMode, showGrid, isToroid)
+    function saveMatrixWithRenderModeToImage(matrix, matrixCellSize, renderMode, showGrid, boardTopology)
     {
         const canvasMatrix = document.createElement("canvas");
         const canvasRow    = document.createElement("canvas");
@@ -4337,6 +4504,7 @@ function main()
 
         glRow.viewport(0, 0, canvasRow.width, canvasRow.height);
 
+        //Draw row by row
         for(let yBig = 0; yBig < currentGameSize; yBig++)
         {
             for(let xBig = 0; xBig < currentGameSize; xBig++)
@@ -4366,13 +4534,22 @@ function main()
                     let bigY   = yBig - Math.ceil((paddingCanvasCells - padY) / currentGameSize);
                     let smallY = wholeMod((currentGameSize - (paddingCanvasCells - padY)), currentGameSize);
 
-                    if(isToroid && bigY < 0)
+                    let yOdd = false;
+                    if(bigY < 0)
                     {
-                        bigY = wholeMod(bigY, currentGameSize);
-                    }
-                    else if(bigY < 0)
-                    {
-                        continue;
+                        if(boardTopology == Topologies.ProjectivePlaneTopology)
+                        {
+                            yOdd = Math.floor(bigY / currentGameSize) % 2 != 0;
+                        }
+
+                        if(boardTopology == Topologies.SquareTopology)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            bigY = wholeMod(bigY, currentGameSize);
+                        }
                     }
 
                     for(let x = 0; x < boardSize; x++)
@@ -4397,18 +4574,33 @@ function main()
                             smallX = x - paddingCanvasCells;
                         }
 
-                        if(isToroid && (bigX < 0 || bigX >= currentGameSize))
+                        let xOdd = false;
+                        if(bigX < 0 || bigX >= currentGameSize)
                         {
-                            bigX = wholeMod(bigX, currentGameSize);
-                        }
-                        else if(bigX < 0 || bigX >= currentGameSize)
-                        {
-                            continue;
+                            if(boardTopology == Topologies.ProjectivePlaneTopology)
+                            {
+                                xOdd = Math.floor(bigX / currentGameSize) % 2 != 0;
+                            }
+    
+                            if(boardTopology == Topologies.SquareTopology)
+                            {
+                                continue;
+                            }
+                            else
+                            {
+                                bigX = wholeMod(bigX, currentGameSize);
+                            }
                         }
 
-                        let matrixRowIndex    = flatCellIndex(currentGameSize, bigX,   bigY);
-                        let matrixColumnIndex = flatCellIndex(currentGameSize, smallX, smallY); 
-                        let boardIndex        = flatCellIndex(boardSize,       x,      y);
+                        let matrixRowX = yOdd ? (currentGameSize - bigX - 1) : bigX;
+                        let matrixRowY = xOdd ? (currentGameSize - bigY - 1) : bigY;
+
+                        let matrixColumnX = yOdd ? (currentGameSize - smallX - 1) : smallX;
+                        let matrixColumnY = xOdd ? (currentGameSize - smallY - 1) : smallY;
+
+                        let matrixRowIndex    = flatCellIndex(currentGameSize, matrixRowX,    matrixRowY);
+                        let matrixColumnIndex = flatCellIndex(currentGameSize, matrixColumnX, matrixColumnY); 
+                        let boardIndex        = flatCellIndex(boardSize,       x,             y);
 
                         rowBoard[boardIndex] = matrix[matrixRowIndex][matrixColumnIndex];
                     }
@@ -4422,34 +4614,53 @@ function main()
 
                     for(let padX = 0; padX < paddingCanvasCells; padX++)
                     {
-                        let bigXLeft   = xBig - Math.ceil((paddingCanvasCells - padX) / currentGameSize);
-                        let smallXLeft = wholeMod((currentGameSize - (paddingCanvasCells - padX)), currentGameSize);
-                        let xLeft      = padX;
+                        let rowXLeft    = xBig - Math.ceil((paddingCanvasCells - padX) / currentGameSize);
+                        let columnXLeft = wholeMod((currentGameSize - (paddingCanvasCells - padX)), currentGameSize);
+                        let xLeft       = padX;
 
-                        let bigXRight   = xBig + Math.ceil((padX + 1) / currentGameSize);
-                        let smallXRight = wholeMod(padX, currentGameSize);
-                        let xRight      = padX + currentGameSize + paddingCanvasCells;
+                        let rowXRight    = xBig + Math.ceil((padX + 1) / currentGameSize);
+                        let columnXRight = wholeMod(padX, currentGameSize);
+                        let xRight       = padX + currentGameSize + paddingCanvasCells;
 
-                        if(isToroid && (bigXLeft < 0 || bigXRight >= currentGameSize))
+                        let rowYLeft     = bigY;
+                        let rowYRight    = bigY;
+                        let columnYLeft  = smallY;
+                        let columnYRight = smallY;
+
+                        if(rowXLeft < 0 || rowXRight >= currentGameSize)
                         {
-                            bigXLeft  = wholeMod(bigXLeft, currentGameSize);
-                            bigXRight = wholeMod(bigXRight, currentGameSize);
+                            if(boardTopology == Topologies.TorusTopology)
+                            {
+                                rowXLeft  = wholeMod(rowXLeft, currentGameSize);
+                                rowXRight = wholeMod(rowXRight, currentGameSize);
+                            }
+                            else if(boardTopology == Topologies.ProjectivePlaneTopology)
+                            {
+                                rowYLeft  = Math.floor(rowXLeft  / currentCellSize) % 2 != 0 ? (currentGameSize - bigY - 1) : bigY;
+                                rowYRight = Math.floor(rowXRight / currentCellSize) % 2 != 0 ? (currentGameSize - bigY - 1) : bigY;
+
+                                columnYLeft  = Math.floor(rowXLeft  / currentCellSize) % 2 != 0 ? (currentGameSize - smallY - 1) : smallY;
+                                columnYRight = Math.floor(rowXRight / currentCellSize) % 2 != 0 ? (currentGameSize - smallY - 1) : smallY;
+
+                                rowXLeft  = wholeMod(rowXLeft, currentGameSize);
+                                rowXRight = wholeMod(rowXRight, currentGameSize);
+                            }
                         }
 
-                        if(bigXLeft >= 0) //Can be if !isToroid 
+                        if(rowXLeft >= 0) //Can be if topology is square 
                         {
-                            let matrixRowIndexLeft    = flatCellIndex(currentGameSize, bigXLeft,   bigY);
-                            let matrixColumnIndexLeft = flatCellIndex(currentGameSize, smallXLeft, smallY); 
-                            let boardIndexLeft        = flatCellIndex(boardSize,       xLeft,      y);
+                            let matrixRowIndexLeft    = flatCellIndex(currentGameSize, rowXLeft,    rowYLeft);
+                            let matrixColumnIndexLeft = flatCellIndex(currentGameSize, columnXLeft, columnYLeft); 
+                            let boardIndexLeft        = flatCellIndex(boardSize,       xLeft,       y);
 
                             rowBoard[boardIndexLeft] = matrix[matrixRowIndexLeft][matrixColumnIndexLeft];
                         }
 
-                        if(bigXRight < currentGameSize) //Can be if !isToroid 
+                        if(rowXRight < currentGameSize) //Can be if topology is square 
                         {
-                            let matrixRowIndexRight    = flatCellIndex(currentGameSize, bigXRight,   bigY);
-                            let matrixColumnIndexRight = flatCellIndex(currentGameSize, smallXRight, smallY); 
-                            let boardIndexRight        = flatCellIndex(boardSize,       xRight,      y);
+                            let matrixRowIndexRight    = flatCellIndex(currentGameSize, rowXRight,    rowYRight);
+                            let matrixColumnIndexRight = flatCellIndex(currentGameSize, columnXRight, columnYRight); 
+                            let boardIndexRight        = flatCellIndex(boardSize,       xRight,       y);
 
                             rowBoard[boardIndexRight] = matrix[matrixRowIndexRight][matrixColumnIndexRight];
                         }
@@ -4464,13 +4675,22 @@ function main()
                     let bigY   = yBig + Math.ceil((padY + 1) / currentGameSize);
                     let smallY = wholeMod(padY, currentGameSize);
 
-                    if(isToroid && bigY >= currentGameSize)
+                    let yOdd = false;
+                    if(bigY >= currentGameSize)
                     {
-                        bigY = wholeMod(bigY, currentGameSize);
-                    }
-                    else if(bigY >= currentGameSize)
-                    {
-                        continue;
+                        if(boardTopology == Topologies.ProjectivePlaneTopology)
+                        {
+                            yOdd = Math.floor(bigY / currentGameSize) % 2 != 0;
+                        }
+
+                        if(boardTopology == Topologies.SquareTopology)
+                        {
+                            continue;
+                        }
+                        else
+                        {
+                            bigY = wholeMod(bigY, currentGameSize);
+                        }
                     }
 
                     for(let x = 0; x < boardSize; x++)
@@ -4495,18 +4715,33 @@ function main()
                             smallX = x - paddingCanvasCells;
                         }
 
-                        if(isToroid && (bigX < 0 || bigX >= currentGameSize))
+                        let xOdd = false;
+                        if(bigX < 0 || bigX >= currentGameSize)
                         {
-                            bigX = wholeMod(bigX, currentGameSize);
-                        }
-                        else if(bigX < 0 || bigX >= currentGameSize)
-                        {
-                            continue;
+                            if(boardTopology == Topologies.ProjectivePlaneTopology)
+                            {
+                                xOdd = Math.floor(bigX / currentGameSize) % 2 != 0;
+                            }
+    
+                            if(boardTopology == Topologies.SquareTopology)
+                            {
+                                continue;
+                            }
+                            else
+                            {
+                                bigX = wholeMod(bigX, currentGameSize);
+                            }
                         }
 
-                        let matrixRowIndex    = flatCellIndex(currentGameSize, bigX,   bigY);
-                        let matrixColumnIndex = flatCellIndex(currentGameSize, smallX, smallY); 
-                        let boardIndex        = flatCellIndex(boardSize,       x,      y);
+                        let matrixRowX = yOdd ? (currentGameSize - bigX - 1) : bigX;
+                        let matrixRowY = xOdd ? (currentGameSize - bigY - 1) : bigY;
+
+                        let matrixColumnX = yOdd ? (currentGameSize - smallX - 1) : smallX;
+                        let matrixColumnY = xOdd ? (currentGameSize - smallY - 1) : smallY;
+
+                        let matrixRowIndex    = flatCellIndex(currentGameSize, matrixRowX,    matrixRowY);
+                        let matrixColumnIndex = flatCellIndex(currentGameSize, matrixColumnX, matrixColumnY); 
+                        let boardIndex        = flatCellIndex(boardSize,       x,             y);
 
                         rowBoard[boardIndex] = matrix[matrixRowIndex][matrixColumnIndex];
                     }
@@ -4520,7 +4755,7 @@ function main()
                 let drawFlags = 0;
                 if(!gridCheckBox.checked)
                 {
-                    drawFlags = drawFlags | 8;
+                    drawFlags = drawFlags | 4;
                 }
 
                 glRow.bindVertexArray(rowVertexArray);
@@ -4779,16 +5014,25 @@ function main()
 
         if(encodedClickRule === "" || encodedClickRule.toUpperCase() === "Default".toUpperCase())
         {
-            enableDefaultClickRule(); //For initialization we should already have a click rule
+            setTopology(Topologies.SquareTopology);
+            enableDefaultClickRule(); //We need a defined click rule for initialization
         }
-        else if(encodedClickRule.toUpperCase() === "Toroid".toUpperCase())
+        else if(encodedClickRule.toUpperCase() === "Torus".toUpperCase())
         {
-            enableDefaultToroidClickRule();
+            setTopology(Topologies.TorusTopology);
+            enableDefaultClickRule();
+        }
+        else if(encodedClickRule.toUpperCase() === "ProjectivePlane".toUpperCase())
+        {
+            setTopology(Topologies.ProjectivePlaneTopology);
+            enableDefaultClickRule();
         }
         else
         {
             let decodedClickRuleData = decodeBase64ClickRule(encodedClickRule, domainSize, minimumBoardSize, maximumBoardSize);
-            enableCustomClickRule(decodedClickRuleData.clickrule, decodedClickRuleData.clickrulesize, decodedClickRuleData.istoroid);
+
+            setTopology(decodedClickRuleData.topology);
+            enableCustomClickRule(decodedClickRuleData.clickrule, decodedClickRuleData.clickrulesize);            
         }
 
         setRenderMode(renderMode);
@@ -4810,7 +5054,7 @@ function main()
         updateAddressBarTimeout = setTimeout(function()
         {
             let gameSize = 0;
-            if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+            if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
             {
                 gameSize = currentGameSize;
             }
@@ -4957,8 +5201,8 @@ function main()
 
         #define FLAG_SHOW_SOLUTION  0x01
         #define FLAG_SHOW_STABILITY 0x02
-        #define FLAG_TOROID_RENDER  0x04
-        #define FLAG_NO_GRID        0x08
+        #define FLAG_NO_GRID        0x04
+        #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
 
         uniform int gBoardSize;
         uniform int gCellSize;
@@ -4980,6 +5224,15 @@ function main()
         uniform highp usampler2D gStability;
 
         layout(location = 0) out lowp vec4 outColor;
+
+        const uint SquareTopology          = 0u;
+        const uint TorusTopology           = 1u;
+        const uint ProjectivePlaneTopology = 2u;
+
+        uint GetTopology()
+        {
+            return uint((gFlags & MASK_TOPOLOGY) >> 3);
+        }
 
         void main(void)
         {
@@ -5029,8 +5282,8 @@ function main()
 
         #define FLAG_SHOW_SOLUTION  0x01
         #define FLAG_SHOW_STABILITY 0x02
-        #define FLAG_TOROID_RENDER  0x04
-        #define FLAG_NO_GRID        0x08
+        #define FLAG_NO_GRID        0x04
+        #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
 
         uniform int gBoardSize;
         uniform int gCellSize;
@@ -5052,6 +5305,15 @@ function main()
         uniform highp usampler2D gStability;
 
         layout(location = 0) out lowp vec4 outColor;
+
+        const uint SquareTopology          = 0u;
+        const uint TorusTopology           = 1u;
+        const uint ProjectivePlaneTopology = 2u;
+
+        uint GetTopology()
+        {
+            return uint((gFlags & MASK_TOPOLOGY) >> 3);
+        }
 
         void main(void)
         {
@@ -5081,7 +5343,7 @@ function main()
                 bool nonTopEdge    = cellNumber.y > 0;
                 bool nonBottomEdge = cellNumber.y < gBoardSize - 1;
 
-                if((gFlags & FLAG_TOROID_RENDER) != 0)
+                if(GetTopology() != SquareTopology)
                 {
                     nonLeftEdge   = true;
                     nonRightEdge  = true;
@@ -5090,15 +5352,45 @@ function main()
 
                     const uint maxCheckDistance = 1u; //Different for different render modes
 
-                    uvec2 leftCellU   = uvec2(leftCell)   + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightCellU  = uvec2(rightCell)  + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 topCellU    = uvec2(topCell)    + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 bottomCellU = uvec2(bottomCell) + uvec2(gBoardSize) * maxCheckDistance;
+                    ivec2 boardSizeWrap = ivec2(gBoardSize) * int(maxCheckDistance);
 
-                    leftCell   = ivec2(leftCellU   % uvec2(gBoardSize));
-                    rightCell  = ivec2(rightCellU  % uvec2(gBoardSize));
-                    topCell    = ivec2(topCellU    % uvec2(gBoardSize));
-                    bottomCell = ivec2(bottomCellU % uvec2(gBoardSize));
+                    uvec2 leftCellWrapped   = uvec2(leftCell   + boardSizeWrap);
+                    uvec2 rightCellWrapped  = uvec2(rightCell  + boardSizeWrap);
+                    uvec2 topCellWrapped    = uvec2(topCell    + boardSizeWrap);
+                    uvec2 bottomCellWrapped = uvec2(bottomCell + boardSizeWrap);
+
+                    leftCell   = ivec2(leftCellWrapped   % uvec2(gBoardSize));
+                    rightCell  = ivec2(rightCellWrapped  % uvec2(gBoardSize));
+                    topCell    = ivec2(topCellWrapped    % uvec2(gBoardSize));
+                    bottomCell = ivec2(bottomCellWrapped % uvec2(gBoardSize));
+
+                    if(GetTopology() == ProjectivePlaneTopology)
+                    {
+                        bool leftCellFlipped   = (leftCellWrapped.x   / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
+                        bool rightCellFlipped  = (rightCellWrapped.x  / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
+                        bool topCellFlipped    = (topCellWrapped.y    / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
+                        bool bottomCellFlipped = (bottomCellWrapped.y / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
+
+                        if(leftCellFlipped)
+                        {
+                            leftCell.y = gBoardSize - leftCell.y - 1;
+                        }
+
+                        if(rightCellFlipped)
+                        {
+                            rightCell.y = gBoardSize - rightCell.y - 1;
+                        }
+
+                        if(topCellFlipped)
+                        {
+                            topCell.x = gBoardSize - topCell.x - 1;
+                        }
+
+                        if(bottomCellFlipped)
+                        {
+                            bottomCell.x = gBoardSize - bottomCell.x - 1;
+                        }
+                    }
                 }
 
                 uint leftPartValue   = uint(nonLeftEdge)   * texelFetch(gBoard, leftCell,   0).x;
@@ -5107,9 +5399,9 @@ function main()
                 uint bottomPartValue = uint(nonBottomEdge) * texelFetch(gBoard, bottomCell, 0).x;
 
                 bool circleRuleColored = insideCircle || ((leftPartValue   == cellValue && cellCoord.x <= 0.0f) 
-                                                        ||  (topPartValue    == cellValue && cellCoord.y <= 0.0f) 
-                                                        ||  (rightPartValue  == cellValue && cellCoord.x >= 0.0f) 
-                                                        ||  (bottomPartValue == cellValue && cellCoord.y >= 0.0f));
+                                                      ||  (topPartValue    == cellValue && cellCoord.y <= 0.0f) 
+                                                      ||  (rightPartValue  == cellValue && cellCoord.x >= 0.0f) 
+                                                      ||  (bottomPartValue == cellValue && cellCoord.y >= 0.0f));
 
                 cellPower = cellPower * float(circleRuleColored);
                 outColor  = mix(gColorNone, gColorEnabled, cellPower);
@@ -5125,9 +5417,9 @@ function main()
                     uint bottomPartSolvedValue = uint(nonBottomEdge) * texelFetch(gSolution, bottomCell, 0).x;
 
                     bool circleRuleSolved = insideCircle || ((leftPartSolvedValue   == solutionValue && cellCoord.x <= 0.0f) 
-                                                            ||  (topPartSolvedValue    == solutionValue && cellCoord.y <= 0.0f) 
-                                                            ||  (rightPartSolvedValue  == solutionValue && cellCoord.x >= 0.0f) 
-                                                            ||  (bottomPartSolvedValue == solutionValue && cellCoord.y >= 0.0f));
+                                                         ||  (topPartSolvedValue    == solutionValue && cellCoord.y <= 0.0f) 
+                                                         ||  (rightPartSolvedValue  == solutionValue && cellCoord.x >= 0.0f) 
+                                                         ||  (bottomPartSolvedValue == solutionValue && cellCoord.y >= 0.0f));
 
                     solutionPower = solutionPower * float(circleRuleSolved);
                     outColor      = mix(outColor, gColorSolved, solutionPower);
@@ -5146,9 +5438,9 @@ function main()
                     uint bottomPartStableValue = uint(nonBottomEdge) * texelFetch(gStability, bottomCell, 0).x;
 
                     bool circleRuleStable = insideCircle || ((leftPartStableValue  == stableValue && cellCoord.x <= 0.0f) 
-                                                            || (topPartStableValue    == stableValue && cellCoord.y <= 0.0f) 
-                                                            || (rightPartStableValue  == stableValue && cellCoord.x >= 0.0f) 
-                                                            || (bottomPartStableValue == stableValue && cellCoord.y >= 0.0f));
+                                                         || (topPartStableValue    == stableValue && cellCoord.y <= 0.0f) 
+                                                         || (rightPartStableValue  == stableValue && cellCoord.x >= 0.0f) 
+                                                         || (bottomPartStableValue == stableValue && cellCoord.y >= 0.0f));
 
                     stablePower = stablePower * float(circleRuleStable);
                     outColor    = mix(outColor, colorStable, stablePower);
@@ -5165,220 +5457,14 @@ function main()
 
     function createDiamondsShaderProgram(context, vertexShader)
     {
-         //http://lightstrout.com/blog/2019/12/09/diamonds-render-mode/
-         const diamondsFSSource = 
-         `#version 300 es
- 
-         #define FLAG_SHOW_SOLUTION  0x01
-         #define FLAG_SHOW_STABILITY 0x02
-         #define FLAG_TOROID_RENDER  0x04
-         #define FLAG_NO_GRID        0x08
- 
-         uniform int gBoardSize;
-         uniform int gCellSize;
-         uniform int gDomainSize;
-         uniform int gFlags;
- 
-         uniform int gImageWidth;
-         uniform int gImageHeight;
-         uniform int gViewportOffsetX;
-         uniform int gViewportOffsetY;
- 
-         uniform lowp vec4 gColorNone;
-         uniform lowp vec4 gColorEnabled;
-         uniform lowp vec4 gColorSolved;
-         uniform lowp vec4 gColorBetween;
- 
-         uniform highp usampler2D gBoard;
-         uniform highp usampler2D gSolution;
-         uniform highp usampler2D gStability;
- 
-         layout(location = 0) out lowp vec4 outColor;
- 
-         bvec4 emptyCornerRule(uvec4 edgeValue)
-         {
-             return equal(edgeValue.xyzw, edgeValue.yzwx);
-         }
- 
-         bvec4 cornerRule(uint cellValue, uvec4 cornerValue)
-         {
-             return equal(uvec4(cellValue), cornerValue.xyzw);
-         }
- 
-         void main(void)
-         {
-             ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
- 
-             if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
-             {
-                 highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
-                 uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
- 
-                 int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
- 
-                 mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-                 mediump float diamondRadius = float(cellSizeCorrected - 1) / 2.0f;
-                 
-                 mediump float domainFactor = 1.0f / float(gDomainSize - 1);
- 
-                 bool insideDiamond     = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
-                 bool insideTopLeft     = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
-                 bool insideTopRight    = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-                 bool insideBottomRight = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
-                 bool insideBottomLeft  = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
- 
-                 bvec4 insideCorner = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
- 
-                 ivec2 leftCell        = cellNumber + ivec2(-1,  0);
-                 ivec2 rightCell       = cellNumber + ivec2( 1,  0);
-                 ivec2 topCell         = cellNumber + ivec2( 0, -1);
-                 ivec2 bottomCell      = cellNumber + ivec2( 0,  1);
-                 ivec2 leftTopCell     = cellNumber + ivec2(-1, -1);
-                 ivec2 rightTopCell    = cellNumber + ivec2( 1, -1);
-                 ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
-                 ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
-         
-                 bool nonLeftEdge        = cellNumber.x > 0;
-                 bool nonRightEdge       = cellNumber.x < gBoardSize - 1;
-                 bool nonTopEdge         =                                  cellNumber.y > 0;
-                 bool nonBottomEdge      =                                  cellNumber.y < gBoardSize - 1;
-                 bool nonLeftTopEdge     = cellNumber.x > 0              && cellNumber.y > 0;
-                 bool nonRightTopEdge    = cellNumber.x < gBoardSize - 1 && cellNumber.y > 0;
-                 bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
-                 bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
- 
-                 if((gFlags & FLAG_TOROID_RENDER) != 0)
-                 {
-                     nonLeftEdge        = true;
-                     nonRightEdge       = true;
-                     nonTopEdge         = true;
-                     nonBottomEdge      = true;
-                     nonLeftTopEdge     = true;
-                     nonRightTopEdge    = true;
-                     nonLeftBottomEdge  = true;
-                     nonRightBottomEdge = true;
-         
-                     const uint maxCheckDistance = 1u; //Different for different render modes
- 
-                     uvec2 leftCellU        = uvec2(leftCell)        + uvec2(gBoardSize) * maxCheckDistance;
-                     uvec2 rightCellU       = uvec2(rightCell)       + uvec2(gBoardSize) * maxCheckDistance;
-                     uvec2 topCellU         = uvec2(topCell)         + uvec2(gBoardSize) * maxCheckDistance;
-                     uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(gBoardSize) * maxCheckDistance;
-                     uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(gBoardSize) * maxCheckDistance;
-                     uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(gBoardSize) * maxCheckDistance;
-                     uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(gBoardSize) * maxCheckDistance;
-                     uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(gBoardSize) * maxCheckDistance;
- 
-                     leftCell        = ivec2(leftCellU        % uvec2(gBoardSize));
-                     rightCell       = ivec2(rightCellU       % uvec2(gBoardSize));
-                     topCell         = ivec2(topCellU         % uvec2(gBoardSize));
-                     bottomCell      = ivec2(bottomCellU      % uvec2(gBoardSize));
-                     leftTopCell     = ivec2(leftTopCellU     % uvec2(gBoardSize));
-                     rightTopCell    = ivec2(rightTopCellU    % uvec2(gBoardSize));
-                     leftBottomCell  = ivec2(leftBottomCellU  % uvec2(gBoardSize));
-                     rightBottomCell = ivec2(rightBottomCellU % uvec2(gBoardSize));
-                 }
- 
-                 uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
-                 uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCell,       0).x;
-                 uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCell,         0).x;
-                 uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCell,      0).x;
-                 uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCell,     0).x;
-                 uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCell,    0).x;
-                 uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCell,  0).x;
-                 uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCell, 0).x;
- 
-                 uvec4 edgeValue   = uvec4(leftPartValue,    topPartValue,      rightPartValue,       bottomPartValue);
-                 uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
- 
-                 uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)        ) * edgeValue;
-                 uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, cornerValue)) * cellValue;
- 
-                 uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
- 
-                 mediump float  cellPower = float(cellValue) * domainFactor;		
-                 mediump vec4 cornerPower =  vec4(resCorner) * domainFactor;
- 
-                 mediump float enablePower = cellPower * float(insideDiamond) + dot(cornerPower, vec4(insideCorner));
-                 outColor                  = mix(gColorNone, gColorEnabled, enablePower);
- 
-                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
-                 {
-                     uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
-         
-                     uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
-                     uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
-                     uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCell,         0).x;
-                     uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCell,      0).x;
-                     uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCell,     0).x;
-                     uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCell,    0).x;
-                     uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCell,  0).x;
-                     uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCell, 0).x;
- 
-                     uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
-                     uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
- 
-                     uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(edgeSolved)            ) * edgeSolved;
-                     uvec4 cornerSolutionCandidate      = uvec4(cornerRule(solutionValue, cornerSolved)) * solutionValue;
- 
-                     uvec4 resCornerSolved = max(emptyCornerSolutionCandidate, cornerSolutionCandidate);
-         
-                     mediump float      solutionPower =  float(solutionValue) * domainFactor;		
-                     mediump vec4 cornerSolutionPower = vec4(resCornerSolved) * domainFactor;
- 
-                     mediump float solvedPower = solutionPower * float(insideDiamond) + dot(cornerSolutionPower, vec4(insideCorner));
-                     outColor                  = mix(outColor, gColorSolved, solvedPower);
-                 }
-                 else if((gFlags & FLAG_SHOW_STABILITY) != 0)
-                 {
-                     uint stableValue = texelFetch(gStability, cellNumber, 0).x;
- 
-                     lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
-                     colorStable.a = 1.0f;
- 
-                     uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
-                     uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCell,       0).x;
-                     uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCell,         0).x;
-                     uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCell,      0).x;
-                     uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCell,     0).x;
-                     uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCell,    0).x;
-                     uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCell,  0).x;
-                     uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCell, 0).x;
- 
-                     uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
-                     uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
-         
-                     uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(edgeStable)          ) * edgeStable;
-                     uvec4 cornerStabilityCandidate      = uvec4(cornerRule(stableValue, cornerStable)) * stableValue;
-         
-                     uvec4 resCornerStable = max(emptyCornerStabilityCandidate, cornerStabilityCandidate);
-         
-                     mediump float      stabilityPower =    float(stableValue) * domainFactor;		
-                     mediump vec4 cornerStabilityPower = vec4(resCornerStable) * domainFactor;
-         
-                     mediump float stablePower = stabilityPower * float(insideDiamond) + dot(cornerStabilityPower, vec4(insideCorner));
-                     outColor                  = mix(outColor, colorStable, stablePower);
-                 }
-             }
-             else
-             {
-                 outColor = gColorBetween;
-             }
-         }`;
- 
-         return createShaderProgram(context, diamondsFSSource, vertexShader);
-    }
-
-    function createBeamsShaderProgram(context, vertexShader)
-    {
-        //https://lightstrout.com/blog/2019/12/18/beams-render-mode/
-        const beamsFSSource = 
+        //http://lightstrout.com/blog/2019/12/09/diamonds-render-mode/
+        const diamondsFSSource = 
         `#version 300 es
 
         #define FLAG_SHOW_SOLUTION  0x01
         #define FLAG_SHOW_STABILITY 0x02
-        #define FLAG_TOROID_RENDER  0x04
-        #define FLAG_NO_GRID        0x08
+        #define FLAG_NO_GRID        0x04
+        #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
 
         uniform int gBoardSize;
         uniform int gCellSize;
@@ -5400,6 +5486,304 @@ function main()
         uniform highp usampler2D gStability;
 
         layout(location = 0) out lowp vec4 outColor;
+
+        const uint SquareTopology          = 0u;
+        const uint TorusTopology           = 1u;
+        const uint ProjectivePlaneTopology = 2u;
+
+        uint GetTopology()
+        {
+            return uint((gFlags & MASK_TOPOLOGY) >> 3);
+        }
+
+        bvec4 emptyCornerRule(uvec4 edgeValue)
+        {
+            return equal(edgeValue.xyzw, edgeValue.yzwx);
+        }
+
+        bvec4 cornerRule(uint cellValue, uvec4 cornerValue)
+        {
+            return equal(uvec4(cellValue), cornerValue.xyzw);
+        }
+
+        void main(void)
+        {
+            ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
+
+            if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
+            {
+                highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
+                uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
+
+                int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+
+                mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+                mediump float diamondRadius = float(cellSizeCorrected - 1) / 2.0f;
+                
+                mediump float domainFactor = 1.0f / float(gDomainSize - 1);
+
+                bool insideDiamond     = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
+                bool insideTopLeft     = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
+                bool insideTopRight    = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
+                bool insideBottomRight = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
+                bool insideBottomLeft  = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
+
+                bvec4 insideCorner = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
+
+                ivec2 leftCell        = cellNumber + ivec2(-1,  0);
+                ivec2 rightCell       = cellNumber + ivec2( 1,  0);
+                ivec2 topCell         = cellNumber + ivec2( 0, -1);
+                ivec2 bottomCell      = cellNumber + ivec2( 0,  1);
+                ivec2 leftTopCell     = cellNumber + ivec2(-1, -1);
+                ivec2 rightTopCell    = cellNumber + ivec2( 1, -1);
+                ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
+                ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
+        
+                bool nonLeftEdge        = cellNumber.x > 0;
+                bool nonRightEdge       = cellNumber.x < gBoardSize - 1;
+                bool nonTopEdge         =                                  cellNumber.y > 0;
+                bool nonBottomEdge      =                                  cellNumber.y < gBoardSize - 1;
+                bool nonLeftTopEdge     = cellNumber.x > 0              && cellNumber.y > 0;
+                bool nonRightTopEdge    = cellNumber.x < gBoardSize - 1 && cellNumber.y > 0;
+                bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
+                bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
+
+                if(GetTopology() != SquareTopology)
+                {
+                    nonLeftEdge        = true;
+                    nonRightEdge       = true;
+                    nonTopEdge         = true;
+                    nonBottomEdge      = true;
+                    nonLeftTopEdge     = true;
+                    nonRightTopEdge    = true;
+                    nonLeftBottomEdge  = true;
+                    nonRightBottomEdge = true;
+        
+                    const uint maxCheckDistance = 1u; //Different for different render modes
+
+                    ivec2 boardSizeWrap = ivec2(gBoardSize) * int(maxCheckDistance);
+
+                    uvec2 leftCellWrapped        = uvec2(leftCell        + boardSizeWrap);
+                    uvec2 rightCellWrapped       = uvec2(rightCell       + boardSizeWrap);
+                    uvec2 topCellWrapped         = uvec2(topCell         + boardSizeWrap);
+                    uvec2 bottomCellWrapped      = uvec2(bottomCell      + boardSizeWrap);
+                    uvec2 leftTopCellWrapped     = uvec2(leftTopCell     + boardSizeWrap);
+                    uvec2 rightTopCellWrapped    = uvec2(rightTopCell    + boardSizeWrap);
+                    uvec2 leftBottomCellWrapped  = uvec2(leftBottomCell  + boardSizeWrap);
+                    uvec2 rightBottomCellWrapped = uvec2(rightBottomCell + boardSizeWrap);
+
+                    leftCell        = ivec2(leftCellWrapped        % uvec2(gBoardSize));
+                    rightCell       = ivec2(rightCellWrapped       % uvec2(gBoardSize));
+                    topCell         = ivec2(topCellWrapped         % uvec2(gBoardSize));
+                    bottomCell      = ivec2(bottomCellWrapped      % uvec2(gBoardSize));
+                    leftTopCell     = ivec2(leftTopCellWrapped     % uvec2(gBoardSize));
+                    rightTopCell    = ivec2(rightTopCellWrapped    % uvec2(gBoardSize));
+                    leftBottomCell  = ivec2(leftBottomCellWrapped  % uvec2(gBoardSize));
+                    rightBottomCell = ivec2(rightBottomCellWrapped % uvec2(gBoardSize));
+
+                    if(GetTopology() == ProjectivePlaneTopology)
+                    {
+                        bool  leftCellFlipped        =          (leftCellWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  rightCellFlipped       =          (rightCellWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  topCellFlipped         =          (topCellWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  bottomCellFlipped      =          (bottomCellWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bvec2 leftTopCellFlipped     = notEqual((leftTopCellWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 rightTopCellFlipped    = notEqual((rightTopCellWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 rightBottomCellFlipped = notEqual((rightBottomCellWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+
+                        if(leftCellFlipped)
+                        {
+                            leftCell.y = gBoardSize - leftCell.y - 1;
+                        }
+
+                        if(rightCellFlipped)
+                        {
+                            rightCell.y = gBoardSize - rightCell.y - 1;
+                        }
+
+                        if(topCellFlipped)
+                        {
+                            topCell.x = gBoardSize - topCell.x - 1;
+                        }
+
+                        if(bottomCellFlipped)
+                        {
+                            bottomCell.x = gBoardSize - bottomCell.x - 1;
+                        }
+
+                        if(leftTopCellFlipped.x)
+                        {
+                            leftTopCell.y = gBoardSize - leftTopCell.y - 1;
+                        }
+
+                        if(leftTopCellFlipped.y)
+                        {
+                            leftTopCell.x = gBoardSize - leftTopCell.x - 1;
+                        }
+
+                        if(rightTopCellFlipped.x)
+                        {
+                            rightTopCell.y = gBoardSize - rightTopCell.y - 1;
+                        }
+
+                        if(rightTopCellFlipped.y)
+                        {
+                            rightTopCell.x = gBoardSize - rightTopCell.x - 1;
+                        }
+
+                        if(leftBottomCellFlipped.x)
+                        {
+                            leftBottomCell.y = gBoardSize - leftBottomCell.y - 1;
+                        }
+
+                        if(leftBottomCellFlipped.y)
+                        {
+                            leftBottomCell.x = gBoardSize - leftBottomCell.x - 1;
+                        }
+
+                        if(rightBottomCellFlipped.x)
+                        {
+                            rightBottomCell.y = gBoardSize - rightBottomCell.y - 1;
+                        }
+
+                        if(rightBottomCellFlipped.y)
+                        {
+                            rightBottomCell.x = gBoardSize - rightBottomCell.x - 1;
+                        }
+                    }
+                }
+
+                uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
+                uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCell,       0).x;
+                uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCell,         0).x;
+                uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCell,      0).x;
+                uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCell,     0).x;
+                uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCell,    0).x;
+                uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCell,  0).x;
+                uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCell, 0).x;
+
+                uvec4 edgeValue   = uvec4(leftPartValue,    topPartValue,      rightPartValue,       bottomPartValue);
+                uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
+
+                uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)        ) * edgeValue;
+                uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, cornerValue)) * cellValue;
+
+                uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
+
+                mediump float  cellPower = float(cellValue) * domainFactor;		
+                mediump vec4 cornerPower =  vec4(resCorner) * domainFactor;
+
+                mediump float enablePower = cellPower * float(insideDiamond) + dot(cornerPower, vec4(insideCorner));
+                outColor                  = mix(gColorNone, gColorEnabled, enablePower);
+
+                if((gFlags & FLAG_SHOW_SOLUTION) != 0)
+                {
+                    uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+        
+                    uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
+                    uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
+                    uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCell,         0).x;
+                    uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCell,      0).x;
+                    uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCell,     0).x;
+                    uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCell,    0).x;
+                    uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCell,  0).x;
+                    uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCell, 0).x;
+
+                    uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
+                    uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
+
+                    uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(edgeSolved)            ) * edgeSolved;
+                    uvec4 cornerSolutionCandidate      = uvec4(cornerRule(solutionValue, cornerSolved)) * solutionValue;
+
+                    uvec4 resCornerSolved = max(emptyCornerSolutionCandidate, cornerSolutionCandidate);
+        
+                    mediump float      solutionPower =  float(solutionValue) * domainFactor;		
+                    mediump vec4 cornerSolutionPower = vec4(resCornerSolved) * domainFactor;
+
+                    mediump float solvedPower = solutionPower * float(insideDiamond) + dot(cornerSolutionPower, vec4(insideCorner));
+                    outColor                  = mix(outColor, gColorSolved, solvedPower);
+                }
+                else if((gFlags & FLAG_SHOW_STABILITY) != 0)
+                {
+                    uint stableValue = texelFetch(gStability, cellNumber, 0).x;
+
+                    lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+                    colorStable.a = 1.0f;
+
+                    uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
+                    uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCell,       0).x;
+                    uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCell,         0).x;
+                    uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCell,      0).x;
+                    uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCell,     0).x;
+                    uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCell,    0).x;
+                    uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCell,  0).x;
+                    uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCell, 0).x;
+
+                    uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
+                    uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
+        
+                    uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(edgeStable)          ) * edgeStable;
+                    uvec4 cornerStabilityCandidate      = uvec4(cornerRule(stableValue, cornerStable)) * stableValue;
+        
+                    uvec4 resCornerStable = max(emptyCornerStabilityCandidate, cornerStabilityCandidate);
+        
+                    mediump float      stabilityPower =    float(stableValue) * domainFactor;		
+                    mediump vec4 cornerStabilityPower = vec4(resCornerStable) * domainFactor;
+        
+                    mediump float stablePower = stabilityPower * float(insideDiamond) + dot(cornerStabilityPower, vec4(insideCorner));
+                    outColor                  = mix(outColor, colorStable, stablePower);
+                }
+            }
+            else
+            {
+                outColor = gColorBetween;
+            }
+        }`;
+ 
+        return createShaderProgram(context, diamondsFSSource, vertexShader);
+    }
+
+    function createBeamsShaderProgram(context, vertexShader)
+    {
+        //https://lightstrout.com/blog/2019/12/18/beams-render-mode/
+        const beamsFSSource = 
+        `#version 300 es
+
+        #define FLAG_SHOW_SOLUTION  0x01
+        #define FLAG_SHOW_STABILITY 0x02
+        #define FLAG_NO_GRID        0x04
+        #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
+
+        uniform int gBoardSize;
+        uniform int gCellSize;
+        uniform int gDomainSize;
+        uniform int gFlags;
+
+        uniform int gImageWidth;
+        uniform int gImageHeight;
+        uniform int gViewportOffsetX;
+        uniform int gViewportOffsetY;
+
+        uniform lowp vec4 gColorNone;
+        uniform lowp vec4 gColorEnabled;
+        uniform lowp vec4 gColorSolved;
+        uniform lowp vec4 gColorBetween;
+
+        uniform highp usampler2D gBoard;
+        uniform highp usampler2D gSolution;
+        uniform highp usampler2D gStability;
+
+        layout(location = 0) out lowp vec4 outColor;
+
+        const uint SquareTopology          = 0u;
+        const uint TorusTopology           = 1u;
+        const uint ProjectivePlaneTopology = 2u;
+
+        uint GetTopology()
+        {
+            return uint((gFlags & MASK_TOPOLOGY) >> 3);
+        }
 
         //GLSL operator && doesn't work on per-component basis :(
         bvec4 b4nd(bvec4 a, bvec4 b)
@@ -5561,7 +5945,7 @@ function main()
                 bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
                 bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
 
-                if((gFlags & FLAG_TOROID_RENDER) != 0)
+                if(GetTopology() != SquareTopology)
                 {
                     nonLeftEdge        = true;
                     nonRightEdge       = true;
@@ -5574,23 +5958,97 @@ function main()
         
                     const uint maxCheckDistance = 1u; //Different for different render modes
 
-                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 topCellU         = uvec2(topCell)         + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(gBoardSize) * maxCheckDistance;
+                    ivec2 boardSizeWrap = ivec2(gBoardSize) * int(maxCheckDistance);
 
-                    leftCell        = ivec2(leftCellU        % uvec2(gBoardSize));
-                    rightCell       = ivec2(rightCellU       % uvec2(gBoardSize));
-                    topCell         = ivec2(topCellU         % uvec2(gBoardSize));
-                    bottomCell      = ivec2(bottomCellU      % uvec2(gBoardSize));
-                    leftTopCell     = ivec2(leftTopCellU     % uvec2(gBoardSize));
-                    rightTopCell    = ivec2(rightTopCellU    % uvec2(gBoardSize));
-                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(gBoardSize));
-                    rightBottomCell = ivec2(rightBottomCellU % uvec2(gBoardSize));
+                    uvec2 leftCellWrapped        = uvec2(leftCell        + boardSizeWrap);
+                    uvec2 rightCellWrapped       = uvec2(rightCell       + boardSizeWrap);
+                    uvec2 topCellWrapped         = uvec2(topCell         + boardSizeWrap);
+                    uvec2 bottomCellWrapped      = uvec2(bottomCell      + boardSizeWrap);
+                    uvec2 leftTopCellWrapped     = uvec2(leftTopCell     + boardSizeWrap);
+                    uvec2 rightTopCellWrapped    = uvec2(rightTopCell    + boardSizeWrap);
+                    uvec2 leftBottomCellWrapped  = uvec2(leftBottomCell  + boardSizeWrap);
+                    uvec2 rightBottomCellWrapped = uvec2(rightBottomCell + boardSizeWrap);
+
+                    leftCell        = ivec2(leftCellWrapped        % uvec2(gBoardSize));
+                    rightCell       = ivec2(rightCellWrapped       % uvec2(gBoardSize));
+                    topCell         = ivec2(topCellWrapped         % uvec2(gBoardSize));
+                    bottomCell      = ivec2(bottomCellWrapped      % uvec2(gBoardSize));
+                    leftTopCell     = ivec2(leftTopCellWrapped     % uvec2(gBoardSize));
+                    rightTopCell    = ivec2(rightTopCellWrapped    % uvec2(gBoardSize));
+                    leftBottomCell  = ivec2(leftBottomCellWrapped  % uvec2(gBoardSize));
+                    rightBottomCell = ivec2(rightBottomCellWrapped % uvec2(gBoardSize));
+
+                    if(GetTopology() == ProjectivePlaneTopology)
+                    {
+                        bool  leftCellFlipped        =          (leftCellWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  rightCellFlipped       =          (rightCellWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  topCellFlipped         =          (topCellWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  bottomCellFlipped      =          (bottomCellWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bvec2 leftTopCellFlipped     = notEqual((leftTopCellWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 rightTopCellFlipped    = notEqual((rightTopCellWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 rightBottomCellFlipped = notEqual((rightBottomCellWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+
+                        if(leftCellFlipped)
+                        {
+                            leftCell.y = gBoardSize - leftCell.y - 1;
+                        }
+
+                        if(rightCellFlipped)
+                        {
+                            rightCell.y = gBoardSize - rightCell.y - 1;
+                        }
+
+                        if(topCellFlipped)
+                        {
+                            topCell.x = gBoardSize - topCell.x - 1;
+                        }
+
+                        if(bottomCellFlipped)
+                        {
+                            bottomCell.x = gBoardSize - bottomCell.x - 1;
+                        }
+
+                        if(leftTopCellFlipped.x)
+                        {
+                            leftTopCell.y = gBoardSize - leftTopCell.y - 1;
+                        }
+
+                        if(leftTopCellFlipped.y)
+                        {
+                            leftTopCell.x = gBoardSize - leftTopCell.x - 1;
+                        }
+
+                        if(rightTopCellFlipped.x)
+                        {
+                            rightTopCell.y = gBoardSize - rightTopCell.y - 1;
+                        }
+
+                        if(rightTopCellFlipped.y)
+                        {
+                            rightTopCell.x = gBoardSize - rightTopCell.x - 1;
+                        }
+
+                        if(leftBottomCellFlipped.x)
+                        {
+                            leftBottomCell.y = gBoardSize - leftBottomCell.y - 1;
+                        }
+
+                        if(leftBottomCellFlipped.y)
+                        {
+                            leftBottomCell.x = gBoardSize - leftBottomCell.x - 1;
+                        }
+
+                        if(rightBottomCellFlipped.x)
+                        {
+                            rightBottomCell.y = gBoardSize - rightBottomCell.y - 1;
+                        }
+
+                        if(rightBottomCellFlipped.y)
+                        {
+                            rightBottomCell.x = gBoardSize - rightBottomCell.x - 1;
+                        }
+                    }
                 }
 
                 uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
@@ -5636,8 +6094,6 @@ function main()
                 enablePower              += dot(vec4(insideV),           regVPower);
 
                 outColor = mix(gColorNone, gColorEnabled, enablePower);
-
-                //outColor += vec4(float(insideCentralDiamond), 0.0f, float(outsideCentralDiamond), 0.0f);
 
                 if((gFlags & FLAG_SHOW_SOLUTION) != 0)
                 {
@@ -5754,8 +6210,8 @@ function main()
 
         #define FLAG_SHOW_SOLUTION  0x01
         #define FLAG_SHOW_STABILITY 0x02
-        #define FLAG_TOROID_RENDER  0x04
-        #define FLAG_NO_GRID        0x08
+        #define FLAG_NO_GRID        0x04
+        #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
 
         uniform int gBoardSize;
         uniform int gCellSize;
@@ -5777,6 +6233,15 @@ function main()
         uniform highp usampler2D gStability;
 
         layout(location = 0) out lowp vec4 outColor;
+
+        const uint SquareTopology          = 0u;
+        const uint TorusTopology           = 1u;
+        const uint ProjectivePlaneTopology = 2u;
+
+        uint GetTopology()
+        {
+            return uint((gFlags & MASK_TOPOLOGY) >> 3);
+        }
 
         bvec4 b4or(bvec4 a, bvec4 b) //Yet another thing that doesn't require writing functions in hlsl
         {
@@ -5845,7 +6310,7 @@ function main()
                 bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
                 bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
 
-                if((gFlags & FLAG_TOROID_RENDER) != 0)
+                if(GetTopology() != SquareTopology)
                 {
                     nonLeftEdge        = true;
                     nonRightEdge       = true;
@@ -5858,23 +6323,97 @@ function main()
         
                     const uint maxCheckDistance = 1u; //Different for different render modes
 
-                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 topCellU         = uvec2(topCell)         + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(gBoardSize) * maxCheckDistance;
+                    ivec2 boardSizeWrap = ivec2(gBoardSize) * int(maxCheckDistance);
 
-                    leftCell        = ivec2(leftCellU        % uvec2(gBoardSize));
-                    rightCell       = ivec2(rightCellU       % uvec2(gBoardSize));
-                    topCell         = ivec2(topCellU         % uvec2(gBoardSize));
-                    bottomCell      = ivec2(bottomCellU      % uvec2(gBoardSize));
-                    leftTopCell     = ivec2(leftTopCellU     % uvec2(gBoardSize));
-                    rightTopCell    = ivec2(rightTopCellU    % uvec2(gBoardSize));
-                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(gBoardSize));
-                    rightBottomCell = ivec2(rightBottomCellU % uvec2(gBoardSize));
+                    uvec2 leftCellWrapped        = uvec2(leftCell        + boardSizeWrap);
+                    uvec2 rightCellWrapped       = uvec2(rightCell       + boardSizeWrap);
+                    uvec2 topCellWrapped         = uvec2(topCell         + boardSizeWrap);
+                    uvec2 bottomCellWrapped      = uvec2(bottomCell      + boardSizeWrap);
+                    uvec2 leftTopCellWrapped     = uvec2(leftTopCell     + boardSizeWrap);
+                    uvec2 rightTopCellWrapped    = uvec2(rightTopCell    + boardSizeWrap);
+                    uvec2 leftBottomCellWrapped  = uvec2(leftBottomCell  + boardSizeWrap);
+                    uvec2 rightBottomCellWrapped = uvec2(rightBottomCell + boardSizeWrap);
+
+                    leftCell        = ivec2(leftCellWrapped        % uvec2(gBoardSize));
+                    rightCell       = ivec2(rightCellWrapped       % uvec2(gBoardSize));
+                    topCell         = ivec2(topCellWrapped         % uvec2(gBoardSize));
+                    bottomCell      = ivec2(bottomCellWrapped      % uvec2(gBoardSize));
+                    leftTopCell     = ivec2(leftTopCellWrapped     % uvec2(gBoardSize));
+                    rightTopCell    = ivec2(rightTopCellWrapped    % uvec2(gBoardSize));
+                    leftBottomCell  = ivec2(leftBottomCellWrapped  % uvec2(gBoardSize));
+                    rightBottomCell = ivec2(rightBottomCellWrapped % uvec2(gBoardSize));
+
+                    if(GetTopology() == ProjectivePlaneTopology)
+                    {
+                        bool  leftCellFlipped        =          (leftCellWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  rightCellFlipped       =          (rightCellWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  topCellFlipped         =          (topCellWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  bottomCellFlipped      =          (bottomCellWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bvec2 leftTopCellFlipped     = notEqual((leftTopCellWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 rightTopCellFlipped    = notEqual((rightTopCellWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 rightBottomCellFlipped = notEqual((rightBottomCellWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+
+                        if(leftCellFlipped)
+                        {
+                            leftCell.y = gBoardSize - leftCell.y - 1;
+                        }
+
+                        if(rightCellFlipped)
+                        {
+                            rightCell.y = gBoardSize - rightCell.y - 1;
+                        }
+
+                        if(topCellFlipped)
+                        {
+                            topCell.x = gBoardSize - topCell.x - 1;
+                        }
+
+                        if(bottomCellFlipped)
+                        {
+                            bottomCell.x = gBoardSize - bottomCell.x - 1;
+                        }
+
+                        if(leftTopCellFlipped.x)
+                        {
+                            leftTopCell.y = gBoardSize - leftTopCell.y - 1;
+                        }
+
+                        if(leftTopCellFlipped.y)
+                        {
+                            leftTopCell.x = gBoardSize - leftTopCell.x - 1;
+                        }
+
+                        if(rightTopCellFlipped.x)
+                        {
+                            rightTopCell.y = gBoardSize - rightTopCell.y - 1;
+                        }
+
+                        if(rightTopCellFlipped.y)
+                        {
+                            rightTopCell.x = gBoardSize - rightTopCell.x - 1;
+                        }
+
+                        if(leftBottomCellFlipped.x)
+                        {
+                            leftBottomCell.y = gBoardSize - leftBottomCell.y - 1;
+                        }
+
+                        if(leftBottomCellFlipped.y)
+                        {
+                            leftBottomCell.x = gBoardSize - leftBottomCell.x - 1;
+                        }
+
+                        if(rightBottomCellFlipped.x)
+                        {
+                            rightBottomCell.y = gBoardSize - rightBottomCell.y - 1;
+                        }
+
+                        if(rightBottomCellFlipped.y)
+                        {
+                            rightBottomCell.x = gBoardSize - rightBottomCell.x - 1;
+                        }
+                    }
                 }
 
                 uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
@@ -5977,8 +6516,8 @@ function main()
 
         #define FLAG_SHOW_SOLUTION  0x01
         #define FLAG_SHOW_STABILITY 0x02
-        #define FLAG_TOROID_RENDER  0x04
-        #define FLAG_NO_GRID        0x08
+        #define FLAG_NO_GRID        0x04
+        #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
 
         uniform int gBoardSize;
         uniform int gCellSize;
@@ -6000,6 +6539,15 @@ function main()
         uniform highp usampler2D gStability;
 
         layout(location = 0) out lowp vec4 outColor;
+
+        const uint SquareTopology          = 0u;
+        const uint TorusTopology           = 1u;
+        const uint ProjectivePlaneTopology = 2u;
+
+        uint GetTopology()
+        {
+            return uint((gFlags & MASK_TOPOLOGY) >> 3);
+        }
 
         bvec4 b4or(bvec4 a, bvec4 b) //Yet another thing that doesn't require writing functions in hlsl
         {
@@ -6135,7 +6683,7 @@ function main()
                 bool nonTop2Edge        =                                  cellNumber.y > 1;
                 bool nonBottom2Edge     =                                  cellNumber.y < gBoardSize - 2;
 
-                if((gFlags & FLAG_TOROID_RENDER) != 0)
+                if(GetTopology() != SquareTopology)
                 {
                     nonLeftEdge        = true;
                     nonRightEdge       = true;
@@ -6152,31 +6700,129 @@ function main()
         
                     const uint maxCheckDistance = 2u; //Different for different render modes
 
-                    uvec2 leftCellU        = uvec2(leftCell)        + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightCellU       = uvec2(rightCell)       + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 topCellU         = uvec2(topCell)         + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 bottomCellU      = uvec2(bottomCell)      + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 leftTopCellU     = uvec2(leftTopCell)     + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightTopCellU    = uvec2(rightTopCell)    + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 leftBottomCellU  = uvec2(leftBottomCell)  + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 rightBottomCellU = uvec2(rightBottomCell) + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 left2CellU       = uvec2(left2Cell)       + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 right2CellU      = uvec2(right2Cell)      + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 top2CellU        = uvec2(top2Cell)        + uvec2(gBoardSize) * maxCheckDistance;
-                    uvec2 bottom2CellU     = uvec2(bottom2Cell)     + uvec2(gBoardSize) * maxCheckDistance;
+                    ivec2 boardSizeWrap = ivec2(gBoardSize) * int(maxCheckDistance);
 
-                    leftCell        = ivec2(leftCellU        % uvec2(gBoardSize));
-                    rightCell       = ivec2(rightCellU       % uvec2(gBoardSize));
-                    topCell         = ivec2(topCellU         % uvec2(gBoardSize));
-                    bottomCell      = ivec2(bottomCellU      % uvec2(gBoardSize));
-                    leftTopCell     = ivec2(leftTopCellU     % uvec2(gBoardSize));
-                    rightTopCell    = ivec2(rightTopCellU    % uvec2(gBoardSize));
-                    leftBottomCell  = ivec2(leftBottomCellU  % uvec2(gBoardSize));
-                    rightBottomCell = ivec2(rightBottomCellU % uvec2(gBoardSize));
-                    left2Cell       = ivec2(left2CellU       % uvec2(gBoardSize));
-                    right2Cell      = ivec2(right2CellU      % uvec2(gBoardSize));
-                    top2Cell        = ivec2(top2CellU        % uvec2(gBoardSize));
-                    bottom2Cell     = ivec2(bottom2CellU     % uvec2(gBoardSize));
+                    uvec2 leftCellWrapped        = uvec2(leftCell        + boardSizeWrap);
+                    uvec2 rightCellWrapped       = uvec2(rightCell       + boardSizeWrap);
+                    uvec2 topCellWrapped         = uvec2(topCell         + boardSizeWrap);
+                    uvec2 bottomCellWrapped      = uvec2(bottomCell      + boardSizeWrap);
+                    uvec2 leftTopCellWrapped     = uvec2(leftTopCell     + boardSizeWrap);
+                    uvec2 rightTopCellWrapped    = uvec2(rightTopCell    + boardSizeWrap);
+                    uvec2 leftBottomCellWrapped  = uvec2(leftBottomCell  + boardSizeWrap);
+                    uvec2 rightBottomCellWrapped = uvec2(rightBottomCell + boardSizeWrap);
+                    uvec2 left2CellWrapped       = uvec2(left2Cell       + boardSizeWrap);
+                    uvec2 right2CellWrapped      = uvec2(right2Cell      + boardSizeWrap);
+                    uvec2 top2CellWrapped        = uvec2(top2Cell        + boardSizeWrap);
+                    uvec2 bottom2CellWrapped     = uvec2(bottom2Cell     + boardSizeWrap);
+
+                    leftCell        = ivec2(leftCellWrapped        % uvec2(gBoardSize));
+                    rightCell       = ivec2(rightCellWrapped       % uvec2(gBoardSize));
+                    topCell         = ivec2(topCellWrapped         % uvec2(gBoardSize));
+                    bottomCell      = ivec2(bottomCellWrapped      % uvec2(gBoardSize));
+                    leftTopCell     = ivec2(leftTopCellWrapped     % uvec2(gBoardSize));
+                    rightTopCell    = ivec2(rightTopCellWrapped    % uvec2(gBoardSize));
+                    leftBottomCell  = ivec2(leftBottomCellWrapped  % uvec2(gBoardSize));
+                    rightBottomCell = ivec2(rightBottomCellWrapped % uvec2(gBoardSize));
+                    left2Cell       = ivec2(left2CellWrapped       % uvec2(gBoardSize));
+                    right2Cell      = ivec2(right2CellWrapped      % uvec2(gBoardSize));
+                    top2Cell        = ivec2(top2CellWrapped        % uvec2(gBoardSize));
+                    bottom2Cell     = ivec2(bottom2CellWrapped     % uvec2(gBoardSize));
+
+                    if(GetTopology() == ProjectivePlaneTopology)
+                    {
+                        bool  leftCellFlipped        =          (leftCellWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  rightCellFlipped       =          (rightCellWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  topCellFlipped         =          (topCellWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool  bottomCellFlipped      =          (bottomCellWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bvec2 leftTopCellFlipped     = notEqual((leftTopCellWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 rightTopCellFlipped    = notEqual((rightTopCellWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bvec2 rightBottomCellFlipped = notEqual((rightBottomCellWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                        bool left2CellFlipped        =          (left2CellWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool right2CellFlipped       =          (right2CellWrapped.x    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool top2CellFlipped         =          (top2CellWrapped.y      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                        bool bottom2CellFlipped      =          (bottom2CellWrapped.y   /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+
+                        if(leftCellFlipped)
+                        {
+                            leftCell.y = gBoardSize - leftCell.y - 1;
+                        }
+
+                        if(rightCellFlipped)
+                        {
+                            rightCell.y = gBoardSize - rightCell.y - 1;
+                        }
+
+                        if(topCellFlipped)
+                        {
+                            topCell.x = gBoardSize - topCell.x - 1;
+                        }
+
+                        if(bottomCellFlipped)
+                        {
+                            bottomCell.x = gBoardSize - bottomCell.x - 1;
+                        }
+
+                        if(leftTopCellFlipped.x)
+                        {
+                            leftTopCell.y = gBoardSize - leftTopCell.y - 1;
+                        }
+
+                        if(leftTopCellFlipped.y)
+                        {
+                            leftTopCell.x = gBoardSize - leftTopCell.x - 1;
+                        }
+
+                        if(rightTopCellFlipped.x)
+                        {
+                            rightTopCell.y = gBoardSize - rightTopCell.y - 1;
+                        }
+
+                        if(rightTopCellFlipped.y)
+                        {
+                            rightTopCell.x = gBoardSize - rightTopCell.x - 1;
+                        }
+
+                        if(leftBottomCellFlipped.x)
+                        {
+                            leftBottomCell.y = gBoardSize - leftBottomCell.y - 1;
+                        }
+
+                        if(leftBottomCellFlipped.y)
+                        {
+                            leftBottomCell.x = gBoardSize - leftBottomCell.x - 1;
+                        }
+
+                        if(rightBottomCellFlipped.x)
+                        {
+                            rightBottomCell.y = gBoardSize - rightBottomCell.y - 1;
+                        }
+
+                        if(rightBottomCellFlipped.y)
+                        {
+                            rightBottomCell.x = gBoardSize - rightBottomCell.x - 1;
+                        }
+
+                        if(left2CellFlipped)
+                        {
+                            left2Cell.y = gBoardSize - left2Cell.y - 1;
+                        }
+
+                        if(right2CellFlipped)
+                        {
+                            right2Cell.y = gBoardSize - right2Cell.y - 1;
+                        }
+
+                        if(top2CellFlipped)
+                        {
+                            top2Cell.x = gBoardSize - top2Cell.x - 1;
+                        }
+
+                        if(bottom2CellFlipped)
+                        {
+                            bottom2Cell.x = gBoardSize - bottom2Cell.x - 1;
+                        }
+                    }
                 }
 
                 uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
@@ -6397,14 +7043,12 @@ function main()
         {
             drawFlags = drawFlags | 2;
         }
-        if(flagToroidBoard)
+        if(!gridCheckBox.checked)
         {
             drawFlags = drawFlags | 4;
         }
-        if(!gridCheckBox.checked)
-        {
-            drawFlags = drawFlags | 8;
-        }
+
+        drawFlags = drawFlags | (currentTopology << 3);
 
         gl.bindVertexArray(drawVertexArray);
 

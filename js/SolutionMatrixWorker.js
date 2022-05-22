@@ -2,6 +2,14 @@
 //You're awesome, Tomáš Zato!
 function solutionMatrixWorkerFunction()
 {
+    let Topologies = 
+    {
+        SquareTopology:          0,
+        TorusTopology:           1,
+        ProjectivePlaneTopology: 2,
+        UndefinedTopology:       3
+    }
+    
     ////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////    UTIL FUNCTIONS    /////////////////////////////////
     ////////////////////////////////////////////////////////////////////////////////////////
@@ -68,7 +76,7 @@ function solutionMatrixWorkerFunction()
     //////////////////////////////////////////////////////////////////////////////////////////////
 
     //Translates the click rule from click rule space to the board space (regular version)
-    function populateClickRulePlane(clickRule, clickRuleSize, gameSize, cellX, cellY)
+    function populateClickRuleSquare(clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY)
     {
         let populatedClickRule = new Uint8Array(gameSize * gameSize);
         populatedClickRule.fill(0);
@@ -104,8 +112,8 @@ function solutionMatrixWorkerFunction()
         return populatedClickRule;
     }
 
-    //Translates the click rule from click rule space to the board space (toroidal version)
-    function populateClickRuleToroid(clickRule, clickRuleSize, gameSize, cellX, cellY)
+    //Translates the click rule from click rule space to the board space (torus version)
+    function populateClickRuleTorus(clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY)
     {
         let populatedClickRule = new Uint8Array(gameSize * gameSize);
         populatedClickRule.fill(0);
@@ -128,10 +136,46 @@ function solutionMatrixWorkerFunction()
                 let bigClickIndex = flatCellIndex(gameSize, xBigMod, yBigMod);
                 let smlClickIndex = flatCellIndex(clickRuleSize, x, y);
 
-                populatedClickRule[bigClickIndex] = clickRule[smlClickIndex];
+                populatedClickRule[bigClickIndex] = (populatedClickRule[bigClickIndex] + clickRule[smlClickIndex]) % domainSize;
             }
         }
 
+        return populatedClickRule;
+    }
+
+    //Translates the click rule from the click rule space to the board space (projective plane version)
+    function populateClickRuleProjectivePlane(clickRule, clickRuleSize, gameSize, domainSize, cellX, cellY)
+    {
+        let populatedClickRule = new Uint8Array(gameSize * gameSize);
+        populatedClickRule.fill(0);
+    
+        let clickSizeHalf = Math.floor(clickRuleSize / 2);
+    
+        let left = cellX - clickSizeHalf;
+        let top  = cellY - clickSizeHalf;
+        
+        for(let y = 0; y < clickRuleSize; y++)
+        {
+            let yBig    = y + top;
+            let yBigMod = wholeMod(yBig, gameSize);
+            let yBigOdd = Math.floor(yBig / gameSize) % 2 != 0;
+            
+            for(let x = 0; x < clickRuleSize; x++)
+            {
+                let xBig    = x + left;
+                let xBigMod = wholeMod(xBig, gameSize);
+                let xBigOdd = Math.floor(xBig / gameSize) % 2 != 0;
+    
+                let yBigCorrected = xBigOdd ? (gameSize - yBigMod - 1) : yBigMod;
+                let xBigCorrected = yBigOdd ? (gameSize - xBigMod - 1) : xBigMod;
+    
+                let bigClickIndex = flatCellIndex(gameSize, xBigCorrected, yBigCorrected);
+                let smlClickIndex = flatCellIndex(clickRuleSize, x, y);
+    
+                populatedClickRule[bigClickIndex] = (populatedClickRule[bigClickIndex] + clickRule[smlClickIndex]) % domainSize;
+            }
+        }
+    
         return populatedClickRule;
     }
 
@@ -177,7 +221,7 @@ function solutionMatrixWorkerFunction()
     //////////////////////////////////////////////////////////////////////////////////////////
 
     //Calculates the Lights Out matrix for the given click rule and game size. Lights Out matrix helps to calculate inverse solutions
-    function calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid)
+    function calculateGameMatrix(clickRule, gameSize, clickRuleSize, domainSize, topology)
     {
         //Generate a regular Lights Out matrix for the click rule
         let lightsOutMatrix = [];
@@ -186,13 +230,17 @@ function solutionMatrixWorkerFunction()
             for(let xL = 0; xL < gameSize; xL++)
             {
                 let matrixRow = {};
-                if(isToroid)
+                if(topology == Topologies.TorusTopology)
                 {
-                    matrixRow = populateClickRuleToroid(clickRule, clickRuleSize, gameSize, xL, yL);
+                    matrixRow = populateClickRuleTorus(clickRule, clickRuleSize, gameSize, domainSize, xL, yL);
+                }
+                else if(topology == Topologies.ProjectivePlaneTopology)
+                {
+                    matrixRow = populateClickRuleProjectivePlane(clickRule, clickRuleSize, gameSize, domainSize, xL, yL);
                 }
                 else
                 {
-                    matrixRow = populateClickRulePlane(clickRule, clickRuleSize, gameSize, xL, yL);
+                    matrixRow = populateClickRuleSquare(clickRule, clickRuleSize, gameSize, domainSize, xL, yL);
                 }
 
                 lightsOutMatrix.push(matrixRow);
@@ -204,11 +252,11 @@ function solutionMatrixWorkerFunction()
     
     //Calculates the inverse Lights Out matrix for the given click rule and game size. Lights Out matrix helps to calculate solutions
     //Single-execute version
-    function calculateSolutionMatrixFromClickRule(clickRule, gameSize, domainSize, clickRuleSize, isToroid)
+    function calculateSolutionMatrixFromClickRule(clickRule, gameSize, domainSize, clickRuleSize, topology)
     {
         postProgressMessage(0.0);
 
-        let lightsOutMatrix = calculateGameMatrix(clickRule, gameSize, clickRuleSize, isToroid);
+        let lightsOutMatrix = calculateGameMatrix(clickRule, gameSize, clickRuleSize, domainSize, topology);
         return calculateSolutionMatrixFromMatrix(lightsOutMatrix, gameSize, domainSize);
     }
 
@@ -351,7 +399,7 @@ function solutionMatrixWorkerFunction()
             {
                 let operationAfter = e.data.params.opAfter;
                 
-                let calcResult = calculateSolutionMatrixFromClickRule(e.data.params.clickRule, e.data.params.gameSize, e.data.params.domainSize, e.data.params.clickRuleSize, e.data.params.isToroid);
+                let calcResult = calculateSolutionMatrixFromClickRule(e.data.params.clickRule, e.data.params.gameSize, e.data.params.domainSize, e.data.params.clickRuleSize, e.data.params.topology);
                 postMessage({command: "Finish", params: {matrix: calcResult.invM, qp: calcResult.quietP, opAfter: operationAfter}});
 
                 break;
