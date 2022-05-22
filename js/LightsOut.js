@@ -2058,9 +2058,9 @@ function main()
 
     clickRuleFileUploadInput.onchange = function()
     {
-        if(currentWorkingMode == workingModes.LIT_BOARD_CLICKRULE || currentWorkingMode == workingModes.LIT_BOARD_MATRIX)
+        if(currentWorkingMode == WorkingModes.LitBoardClickRule || currentWorkingMode == WorkingModes.LitBoardMatrix)
         {
-            loadClickRule(clickRuleFileUploadInput.files[0]);
+            uploadClickRule(clickRuleFileUploadInput.files[0]);
         }   
     }
 
@@ -4883,7 +4883,7 @@ function main()
         fileReader.readAsDataURL(imageFile);
     }
 
-    function loadClickRule(imageFile)
+    function uploadClickRule(imageFile)
     {
         let fileReader = new FileReader();
         fileReader.onload = function()
@@ -4942,7 +4942,7 @@ function main()
                     }
                 }
 
-                enableCustomClickRule(newClickRule, clickRuleSize, flagToroidBoard);
+                enableCustomClickRule(newClickRule, clickRuleSize);
 
                 canvasClickRule.remove();
             }
