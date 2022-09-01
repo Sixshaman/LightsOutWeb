@@ -37,7 +37,10 @@ jobs:
         args: zip -qq -r LightsOut.zip LightsOut
     - name: Get release name
       id: release_name
-      run: echo "::set-output name=relname::$(date +'Build %Y-%m-%d %H:%M:%S')"
+      run: echo "::set-output name=relname::$('Build %Y-%m-%d %H:%M:%S')"
+    - name: Get tag name
+      id: tag_name
+      run: echo "::set-output name=tagname::$('%Y-%m-%d-%H-%M-%S')"
     - name: Create release
       id: create_release
       uses: ncipollo/release-action@v1
@@ -45,5 +48,5 @@ jobs:
         artifacts: "LightsOut.zip"
         token: ${{secrets.GITHUB_TOKEN}}
         name: ${{steps.release_name.outputs.relname}}
-        tag: ${{steps.release_name.outputs.relname}}
+        tag: ${{steps.tag_name.outputs.tagname}}
         commit: ${{github.sha}}
