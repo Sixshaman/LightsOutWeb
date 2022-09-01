@@ -37,10 +37,10 @@ jobs:
         args: zip -qq -r LightsOut.zip LightsOut
     - name: Get release name
       id: release_name
-      run: echo "::set-output name=relname::$(date + 'Build %Y-%m-%d %H:%M:%S')"
+      run: echo "::set-output name=relname::$(date +'Build %Y-%m-%d %H:%M:%S')"
     - name: Get tag name
       id: tag_name
-      run: echo "::set-output name=tagname::$(date + '%Y-%m-%d-%H-%M-%S')"
+      run: echo "::set-output name=tagname::$(date +'%Y-%m-%d-%H-%M-%S')"
     - name: Create release
       id: create_release
       uses: ncipollo/release-action@v1
