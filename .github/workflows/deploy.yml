@@ -1,6 +1,4 @@
-# This is a basic workflow to help you get started with Actions
-
-name: CI
+name: Publish release
 
 on:
   push:
@@ -44,7 +42,8 @@ jobs:
       id: create_release
       uses: ncipollo/release-action@v1
       with:
-        artifacts: "stafra_wgpu.zip"
+        artifacts: "LightsOut.zip"
         token: ${{secrets.GITHUB_TOKEN}}
         name: ${{steps.release_name.outputs.relname}}
+        tag: ${{steps.release_name.outputs.relname}}
         commit: ${{github.sha}}
