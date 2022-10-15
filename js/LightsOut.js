@@ -1208,6 +1208,88 @@ function equalsMultipliedBoard(boardLeft, boardRight, domainSize)
 /////////////////////////////////    SHADER FUNCTIONS    /////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////////////////
 
+//Common start for all render mode fragment shaders.
+//Contains basic declarations and helper functions.
+const ShaderCommonStart = 
+`#version 300 es
+
+#define FLAG_SHOW_SOLUTION  0x01
+#define FLAG_SHOW_STABILITY 0x02
+#define FLAG_NO_GRID        0x04
+#define MASK_TOPOLOGY       0x38 //3 bits for topology mask
+
+uniform highp usampler2D gBoard;
+uniform highp usampler2D gSolution;
+uniform highp usampler2D gStability;
+
+uniform lowp vec4 gColorNone;
+uniform lowp vec4 gColorEnabled;
+uniform lowp vec4 gColorSolved;
+uniform lowp vec4 gColorBetween;
+
+uniform int gImageWidth;
+uniform int gImageHeight;
+uniform int gViewportOffsetX;
+uniform int gViewportOffsetY;
+
+uniform int gBoardSize;
+uniform int gCellSize;
+uniform int gDomainSize;
+uniform int gFlags;
+
+layout(location = 0) out lowp vec4 outColor;
+
+const uint SquareTopology          = 0u;
+const uint TorusTopology           = 1u;
+const uint ProjectivePlaneTopology = 2u;
+
+uint GetTopology()
+{
+    return uint((gFlags & MASK_TOPOLOGY) >> 3);
+}
+
+//GLSL operator && doesn't work on per-component basis :(
+bvec4 b4nd(bvec4 a, bvec4 b)
+{
+    return bvec4(a.x && b.x, a.y && b.y, a.z && b.z, a.w && b.w);
+}
+
+bvec4 b4or(bvec4 a, bvec4 b) //Yet another thing that doesn't require writing functions in hlsl
+{
+    return bvec4(a.x || b.x, a.y || b.y, a.z || b.z, a.w || b.w);
+}
+
+bvec2 b2nd(bvec2 a, bvec2 b) //Yet another thing that doesn't require writing functions in hlsl
+{
+    return bvec2(a.x && b.x, a.y && b.y);
+}
+
+bvec4 b4nd(bvec4 a, bvec4 b, bvec4 c) //No, they are not kidding
+{
+    return bvec4(a.x && b.x && c.x, a.y && b.y && c.y, a.z && b.z && c.z, a.w && b.w && c.w);
+}
+
+bvec4 b4nd(bvec4 a, bvec4 b, bvec4 c, bvec4 d)
+{
+    return bvec4(a.x && b.x && c.x && d.x, a.y && b.y && c.y && d.y, a.z && b.z && c.z && d.z, a.w && b.w && c.w && d.w);
+}
+
+bvec4 b4nd(bvec4 a, bvec4 b, bvec4 c, bvec4 d, bvec4 e)
+{
+    return bvec4(a.x && b.x && c.x && d.x && e.x, a.y && b.y && c.y && d.y && e.y, a.z && b.z && c.z && d.z && e.z, a.w && b.w && c.w && d.w && e.w);
+}
+
+bvec2 b2nd(bvec2 a, bvec2 b, bvec2 c) //For Christ's sake
+{
+    return bvec2(a.x && b.x && c.x, a.y && b.y && c.y);
+}
+
+bool b1nd(bool a, bool b, bool c) //And that's what happens when you want the code which is both uniform-looking and working
+{
+    return a && b && c;
+}
+`;
+
 function createDefaultVertexShader(context)
 {
     let defaultVSSource = 
@@ -1234,44 +1316,8 @@ function createDefaultVertexShader(context)
 
 function createSquaresShaderProgram(context, vertexShader)
 {
-    const squaresFSSource = 
-    `#version 300 es
-
-    #define FLAG_SHOW_SOLUTION  0x01
-    #define FLAG_SHOW_STABILITY 0x02
-    #define FLAG_NO_GRID        0x04
-    #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
-
-    uniform int gBoardSize;
-    uniform int gCellSize;
-    uniform int gDomainSize;
-    uniform int gFlags;
-
-    uniform int gImageWidth;
-    uniform int gImageHeight;
-    uniform int gViewportOffsetX;
-    uniform int gViewportOffsetY;
-
-    uniform lowp vec4 gColorNone;
-    uniform lowp vec4 gColorEnabled;
-    uniform lowp vec4 gColorSolved;
-    uniform lowp vec4 gColorBetween;
-
-    uniform highp usampler2D gBoard;
-    uniform highp usampler2D gSolution;
-    uniform highp usampler2D gStability;
-
-    layout(location = 0) out lowp vec4 outColor;
-
-    const uint SquareTopology          = 0u;
-    const uint TorusTopology           = 1u;
-    const uint ProjectivePlaneTopology = 2u;
-
-    uint GetTopology()
-    {
-        return uint((gFlags & MASK_TOPOLOGY) >> 3);
-    }
-
+    const squaresFSSource = ShaderCommonStart +
+    `
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
@@ -1315,44 +1361,8 @@ function createSquaresShaderProgram(context, vertexShader)
 function createCirclesShaderProgam(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/05/21/circles-render-mode/
-    const circlesFSSource = 
-    `#version 300 es
-
-    #define FLAG_SHOW_SOLUTION  0x01
-    #define FLAG_SHOW_STABILITY 0x02
-    #define FLAG_NO_GRID        0x04
-    #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
-
-    uniform int gBoardSize;
-    uniform int gCellSize;
-    uniform int gDomainSize;
-    uniform int gFlags;
-
-    uniform int gImageWidth;
-    uniform int gImageHeight;
-    uniform int gViewportOffsetX;
-    uniform int gViewportOffsetY;
-
-    uniform lowp vec4 gColorNone;
-    uniform lowp vec4 gColorEnabled;
-    uniform lowp vec4 gColorSolved;
-    uniform lowp vec4 gColorBetween;
-
-    uniform highp usampler2D gBoard;
-    uniform highp usampler2D gSolution;
-    uniform highp usampler2D gStability;
-
-    layout(location = 0) out lowp vec4 outColor;
-
-    const uint SquareTopology          = 0u;
-    const uint TorusTopology           = 1u;
-    const uint ProjectivePlaneTopology = 2u;
-
-    uint GetTopology()
-    {
-        return uint((gFlags & MASK_TOPOLOGY) >> 3);
-    }
-
+    const circlesFSSource = ShaderCommonStart +
+    `
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
@@ -1496,44 +1506,8 @@ function createCirclesShaderProgam(context, vertexShader)
 function createDiamondsShaderProgram(context, vertexShader)
 {
     //http://lightstrout.com/blog/2019/12/09/diamonds-render-mode/
-    const diamondsFSSource = 
-    `#version 300 es
-
-    #define FLAG_SHOW_SOLUTION  0x01
-    #define FLAG_SHOW_STABILITY 0x02
-    #define FLAG_NO_GRID        0x04
-    #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
-
-    uniform int gBoardSize;
-    uniform int gCellSize;
-    uniform int gDomainSize;
-    uniform int gFlags;
-
-    uniform int gImageWidth;
-    uniform int gImageHeight;
-    uniform int gViewportOffsetX;
-    uniform int gViewportOffsetY;
-
-    uniform lowp vec4 gColorNone;
-    uniform lowp vec4 gColorEnabled;
-    uniform lowp vec4 gColorSolved;
-    uniform lowp vec4 gColorBetween;
-
-    uniform highp usampler2D gBoard;
-    uniform highp usampler2D gSolution;
-    uniform highp usampler2D gStability;
-
-    layout(location = 0) out lowp vec4 outColor;
-
-    const uint SquareTopology          = 0u;
-    const uint TorusTopology           = 1u;
-    const uint ProjectivePlaneTopology = 2u;
-
-    uint GetTopology()
-    {
-        return uint((gFlags & MASK_TOPOLOGY) >> 3);
-    }
-
+    const diamondsFSSource = ShaderCommonStart +
+    `
     bvec4 emptyCornerRule(uvec4 edgeValue)
     {
         return equal(edgeValue.xyzw, edgeValue.yzwx);
@@ -1785,70 +1759,8 @@ function createDiamondsShaderProgram(context, vertexShader)
 function createBeamsShaderProgram(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/12/18/beams-render-mode/
-    const beamsFSSource = 
-    `#version 300 es
-
-    #define FLAG_SHOW_SOLUTION  0x01
-    #define FLAG_SHOW_STABILITY 0x02
-    #define FLAG_NO_GRID        0x04
-    #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
-
-    uniform int gBoardSize;
-    uniform int gCellSize;
-    uniform int gDomainSize;
-    uniform int gFlags;
-
-    uniform int gImageWidth;
-    uniform int gImageHeight;
-    uniform int gViewportOffsetX;
-    uniform int gViewportOffsetY;
-
-    uniform lowp vec4 gColorNone;
-    uniform lowp vec4 gColorEnabled;
-    uniform lowp vec4 gColorSolved;
-    uniform lowp vec4 gColorBetween;
-
-    uniform highp usampler2D gBoard;
-    uniform highp usampler2D gSolution;
-    uniform highp usampler2D gStability;
-
-    layout(location = 0) out lowp vec4 outColor;
-
-    const uint SquareTopology          = 0u;
-    const uint TorusTopology           = 1u;
-    const uint ProjectivePlaneTopology = 2u;
-
-    uint GetTopology()
-    {
-        return uint((gFlags & MASK_TOPOLOGY) >> 3);
-    }
-
-    //GLSL operator && doesn't work on per-component basis :(
-    bvec4 b4nd(bvec4 a, bvec4 b)
-    {
-        return bvec4(a.x && b.x, a.y && b.y, a.z && b.z, a.w && b.w);
-    }
-
-    bvec4 b4nd(bvec4 a, bvec4 b, bvec4 c)
-    {
-        return bvec4(a.x && b.x && c.x, a.y && b.y && c.y, a.z && b.z && c.z, a.w && b.w && c.w);
-    }
-
-    bvec4 b4nd(bvec4 a, bvec4 b, bvec4 c, bvec4 d)
-    {
-        return bvec4(a.x && b.x && c.x && d.x, a.y && b.y && c.y && d.y, a.z && b.z && c.z && d.z, a.w && b.w && c.w && d.w);
-    }
-
-    bvec4 b4nd(bvec4 a, bvec4 b, bvec4 c, bvec4 d, bvec4 e)
-    {
-        return bvec4(a.x && b.x && c.x && d.x && e.x, a.y && b.y && c.y && d.y && e.y, a.z && b.z && c.z && d.z && e.z, a.w && b.w && c.w && d.w && e.w);
-    }
-
-    bvec4 b4or(bvec4 a, bvec4 b)
-    {
-        return bvec4(a.x || b.x, a.y || b.y, a.z || b.z, a.w || b.w);
-    }
-
+    const beamsFSSource = ShaderCommonStart +
+    `
     bvec4 emptyCornerRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
     {
         bvec4 res = bvec4(true);
@@ -2243,49 +2155,8 @@ function createBeamsShaderProgram(context, vertexShader)
 function createRaindropsShaderProgram(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/05/21/raindrops-render-mode/
-    const raindropsFSSource = 
-    `#version 300 es
-
-    #define FLAG_SHOW_SOLUTION  0x01
-    #define FLAG_SHOW_STABILITY 0x02
-    #define FLAG_NO_GRID        0x04
-    #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
-
-    uniform int gBoardSize;
-    uniform int gCellSize;
-    uniform int gDomainSize;
-    uniform int gFlags;
-
-    uniform int gImageWidth;
-    uniform int gImageHeight;
-    uniform int gViewportOffsetX;
-    uniform int gViewportOffsetY;
-
-    uniform lowp vec4 gColorNone;
-    uniform lowp vec4 gColorEnabled;
-    uniform lowp vec4 gColorSolved;
-    uniform lowp vec4 gColorBetween;
-
-    uniform highp usampler2D gBoard;
-    uniform highp usampler2D gSolution;
-    uniform highp usampler2D gStability;
-
-    layout(location = 0) out lowp vec4 outColor;
-
-    const uint SquareTopology          = 0u;
-    const uint TorusTopology           = 1u;
-    const uint ProjectivePlaneTopology = 2u;
-
-    uint GetTopology()
-    {
-        return uint((gFlags & MASK_TOPOLOGY) >> 3);
-    }
-
-    bvec4 b4or(bvec4 a, bvec4 b) //Yet another thing that doesn't require writing functions in hlsl
-    {
-        return bvec4(a.x || b.x, a.y || b.y, a.z || b.z, a.w || b.w);
-    }
-
+    const raindropsFSSource = ShaderCommonStart +
+    `
     bvec4 emptyCornerRule(uvec4 edgeValue)
     {
         return equal(edgeValue.xyzw, edgeValue.yzwx);
@@ -2549,74 +2420,8 @@ function createRaindropsShaderProgram(context, vertexShader)
 function createChainsShaderProgram(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/05/21/chains-render-mode/
-    const chainsFSSource = 
-    `#version 300 es
-
-    #define FLAG_SHOW_SOLUTION  0x01
-    #define FLAG_SHOW_STABILITY 0x02
-    #define FLAG_NO_GRID        0x04
-    #define MASK_TOPOLOGY       0x38 //3 bits for topology mask
-
-    uniform int gBoardSize;
-    uniform int gCellSize;
-    uniform int gDomainSize;
-    uniform int gFlags;
-
-    uniform int gImageWidth;
-    uniform int gImageHeight;
-    uniform int gViewportOffsetX;
-    uniform int gViewportOffsetY;
-
-    uniform lowp vec4 gColorNone;
-    uniform lowp vec4 gColorEnabled;
-    uniform lowp vec4 gColorSolved;
-    uniform lowp vec4 gColorBetween;
-
-    uniform highp usampler2D gBoard;
-    uniform highp usampler2D gSolution;
-    uniform highp usampler2D gStability;
-
-    layout(location = 0) out lowp vec4 outColor;
-
-    const uint SquareTopology          = 0u;
-    const uint TorusTopology           = 1u;
-    const uint ProjectivePlaneTopology = 2u;
-
-    uint GetTopology()
-    {
-        return uint((gFlags & MASK_TOPOLOGY) >> 3);
-    }
-
-    bvec4 b4or(bvec4 a, bvec4 b) //Yet another thing that doesn't require writing functions in hlsl
-    {
-        return bvec4(a.x || b.x, a.y || b.y, a.z || b.z, a.w || b.w);
-    }
-
-    bvec4 b4nd(bvec4 a, bvec4 b) //Yet another thing that doesn't require writing functions in hlsl
-    {
-        return bvec4(a.x && b.x, a.y && b.y, a.z && b.z, a.w && b.w);
-    }
-
-    bvec2 b2nd(bvec2 a, bvec2 b) //Yet another thing that doesn't require writing functions in hlsl
-    {
-        return bvec2(a.x && b.x, a.y && b.y);
-    }
-
-    bvec4 b4nd(bvec4 a, bvec4 b, bvec4 c) //No, they are not kidding
-    {
-        return bvec4(a.x && b.x && c.x, a.y && b.y && c.y, a.z && b.z && c.z, a.w && b.w && c.w);
-    }
-
-    bvec2 b2nd(bvec2 a, bvec2 b, bvec2 c) //For Christ's sake
-    {
-        return bvec2(a.x && b.x && c.x, a.y && b.y && c.y);
-    }
-
-    bool b1nd(bool a, bool b, bool c) //And that's what happens when you want the code which is both uniform-looking and working
-    {
-        return a && b && c;
-    }
-
+    const chainsFSSource = ShaderCommonStart +
+    `
     bvec4 emptyCornerRule(uvec4 edgeValue)
     {
         return equal(edgeValue.xyzw, edgeValue.yzwx);
