@@ -1324,23 +1324,23 @@ function createSquaresShaderProgram(context, vertexShader)
 
         if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
         {
-            highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize, gCellSize);
+            highp ivec2 cellId = screenPos.xy / ivec2(gCellSize, gCellSize);
 
-            uint          cellValue = texelFetch(gBoard, cellNumber, 0).x;
+            uint          cellValue = texelFetch(gBoard, cellId, 0).x;
             mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
 
             outColor = mix(gColorNone, gColorEnabled, cellPower);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                uint          solutionValue = texelFetch(gSolution, cellId, 0).x;
                 mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
 
                 outColor = mix(outColor, gColorSolved, solutionPower);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
+                uint          stableValue = texelFetch(gStability, cellId, 0).x;
                 mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
 
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
@@ -1369,27 +1369,27 @@ function createCirclesShaderProgam(context, vertexShader)
 
         if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
         {
-            highp ivec2 cellNumber = screenPos / ivec2(gCellSize);
+            highp ivec2 cellId = screenPos / ivec2(gCellSize);
 
-            uint          cellValue = texelFetch(gBoard, cellNumber, 0).x;
+            uint          cellValue = texelFetch(gBoard, cellId, 0).x;
             mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
 
             int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
 
-            mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+            mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
             mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
             
-            ivec2 leftCell   = cellNumber + ivec2(-1,  0);
-            ivec2 rightCell  = cellNumber + ivec2( 1,  0);
-            ivec2 topCell    = cellNumber + ivec2( 0, -1);
-            ivec2 bottomCell = cellNumber + ivec2( 0,  1);
+            ivec2 leftCellId   = cellId + ivec2(-1,  0);
+            ivec2 rightCellId  = cellId + ivec2( 1,  0);
+            ivec2 topCellId    = cellId + ivec2( 0, -1);
+            ivec2 bottomCellId = cellId + ivec2( 0,  1);
 
             bool insideCircle = (dot(cellCoord, cellCoord) <= circleRadius * circleRadius);
 
-            bool nonLeftEdge   = cellNumber.x > 0;
-            bool nonRightEdge  = cellNumber.x < gBoardSize - 1;
-            bool nonTopEdge    = cellNumber.y > 0;
-            bool nonBottomEdge = cellNumber.y < gBoardSize - 1;
+            bool nonLeftEdge   = cellId.x > 0;
+            bool nonRightEdge  = cellId.x < gBoardSize - 1;
+            bool nonTopEdge    = cellId.y > 0;
+            bool nonBottomEdge = cellId.y < gBoardSize - 1;
 
             if(GetTopology() != SquareTopology)
             {
@@ -1402,49 +1402,49 @@ function createCirclesShaderProgam(context, vertexShader)
 
                 ivec2 boardSizeWrap = ivec2(gBoardSize) * int(maxCheckDistance);
 
-                uvec2 leftCellWrapped   = uvec2(leftCell   + boardSizeWrap);
-                uvec2 rightCellWrapped  = uvec2(rightCell  + boardSizeWrap);
-                uvec2 topCellWrapped    = uvec2(topCell    + boardSizeWrap);
-                uvec2 bottomCellWrapped = uvec2(bottomCell + boardSizeWrap);
+                uvec2 leftCellIdWrapped   = uvec2(leftCellId   + boardSizeWrap);
+                uvec2 rightCellIdWrapped  = uvec2(rightCellId  + boardSizeWrap);
+                uvec2 topCellIdWrapped    = uvec2(topCellId    + boardSizeWrap);
+                uvec2 bottomCellIdWrapped = uvec2(bottomCellId + boardSizeWrap);
 
-                leftCell   = ivec2(leftCellWrapped   % uvec2(gBoardSize));
-                rightCell  = ivec2(rightCellWrapped  % uvec2(gBoardSize));
-                topCell    = ivec2(topCellWrapped    % uvec2(gBoardSize));
-                bottomCell = ivec2(bottomCellWrapped % uvec2(gBoardSize));
+                leftCellId   = ivec2(leftCellIdWrapped   % uvec2(gBoardSize));
+                rightCellId  = ivec2(rightCellIdWrapped  % uvec2(gBoardSize));
+                topCellId    = ivec2(topCellIdWrapped    % uvec2(gBoardSize));
+                bottomCellId = ivec2(bottomCellIdWrapped % uvec2(gBoardSize));
 
                 if(GetTopology() == ProjectivePlaneTopology)
                 {
-                    bool leftCellFlipped   = (leftCellWrapped.x   / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
-                    bool rightCellFlipped  = (rightCellWrapped.x  / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
-                    bool topCellFlipped    = (topCellWrapped.y    / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
-                    bool bottomCellFlipped = (bottomCellWrapped.y / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
+                    bool leftCellFlipped   = (leftCellIdWrapped.x   / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
+                    bool rightCellFlipped  = (rightCellIdWrapped.x  / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
+                    bool topCellFlipped    = (topCellIdWrapped.y    / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
+                    bool bottomCellFlipped = (bottomCellIdWrapped.y / uint(gBoardSize) + maxCheckDistance) % 2u != 0u;
 
                     if(leftCellFlipped)
                     {
-                        leftCell.y = gBoardSize - leftCell.y - 1;
+                        leftCellId.y = gBoardSize - leftCellId.y - 1;
                     }
 
                     if(rightCellFlipped)
                     {
-                        rightCell.y = gBoardSize - rightCell.y - 1;
+                        rightCellId.y = gBoardSize - rightCellId.y - 1;
                     }
 
                     if(topCellFlipped)
                     {
-                        topCell.x = gBoardSize - topCell.x - 1;
+                        topCellId.x = gBoardSize - topCellId.x - 1;
                     }
 
                     if(bottomCellFlipped)
                     {
-                        bottomCell.x = gBoardSize - bottomCell.x - 1;
+                        bottomCellId.x = gBoardSize - bottomCellId.x - 1;
                     }
                 }
             }
 
-            uint leftPartValue   = uint(nonLeftEdge)   * texelFetch(gBoard, leftCell,   0).x;
-            uint rightPartValue  = uint(nonRightEdge)  * texelFetch(gBoard, rightCell,  0).x;
-            uint topPartValue    = uint(nonTopEdge)    * texelFetch(gBoard, topCell,    0).x;
-            uint bottomPartValue = uint(nonBottomEdge) * texelFetch(gBoard, bottomCell, 0).x;
+            uint leftPartValue   = uint(nonLeftEdge)   * texelFetch(gBoard, leftCellId,   0).x;
+            uint rightPartValue  = uint(nonRightEdge)  * texelFetch(gBoard, rightCellId,  0).x;
+            uint topPartValue    = uint(nonTopEdge)    * texelFetch(gBoard, topCellId,    0).x;
+            uint bottomPartValue = uint(nonBottomEdge) * texelFetch(gBoard, bottomCellId, 0).x;
 
             bool circleRuleColored = insideCircle || ((leftPartValue   == cellValue && cellCoord.x <= 0.0f) 
                                                     ||  (topPartValue    == cellValue && cellCoord.y <= 0.0f) 
@@ -1456,13 +1456,13 @@ function createCirclesShaderProgam(context, vertexShader)
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint          solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                uint          solutionValue = texelFetch(gSolution, cellId, 0).x;
                 mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
 
-                uint leftPartSolvedValue   = uint(nonLeftEdge)   * texelFetch(gSolution, leftCell,   0).x;
-                uint rightPartSolvedValue  = uint(nonRightEdge)  * texelFetch(gSolution, rightCell,  0).x;
-                uint topPartSolvedValue    = uint(nonTopEdge)    * texelFetch(gSolution, topCell,    0).x;
-                uint bottomPartSolvedValue = uint(nonBottomEdge) * texelFetch(gSolution, bottomCell, 0).x;
+                uint leftPartSolvedValue   = uint(nonLeftEdge)   * texelFetch(gSolution, leftCellId,   0).x;
+                uint rightPartSolvedValue  = uint(nonRightEdge)  * texelFetch(gSolution, rightCellId,  0).x;
+                uint topPartSolvedValue    = uint(nonTopEdge)    * texelFetch(gSolution, topCellId,    0).x;
+                uint bottomPartSolvedValue = uint(nonBottomEdge) * texelFetch(gSolution, bottomCellId, 0).x;
 
                 bool circleRuleSolved = insideCircle || ((leftPartSolvedValue   == solutionValue && cellCoord.x <= 0.0f) 
                                                         ||  (topPartSolvedValue    == solutionValue && cellCoord.y <= 0.0f) 
@@ -1474,16 +1474,16 @@ function createCirclesShaderProgam(context, vertexShader)
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint          stableValue = texelFetch(gStability, cellNumber, 0).x;
+                uint          stableValue = texelFetch(gStability, cellId, 0).x;
                 mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
 
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uint leftPartStableValue   = uint(nonLeftEdge)   * texelFetch(gStability, leftCell,   0).x;
-                uint rightPartStableValue  = uint(nonRightEdge)  * texelFetch(gStability, rightCell,  0).x;
-                uint topPartStableValue    = uint(nonTopEdge)    * texelFetch(gStability, topCell,    0).x;
-                uint bottomPartStableValue = uint(nonBottomEdge) * texelFetch(gStability, bottomCell, 0).x;
+                uint leftPartStableValue   = uint(nonLeftEdge)   * texelFetch(gStability, leftCellId,   0).x;
+                uint rightPartStableValue  = uint(nonRightEdge)  * texelFetch(gStability, rightCellId,  0).x;
+                uint topPartStableValue    = uint(nonTopEdge)    * texelFetch(gStability, topCellId,    0).x;
+                uint bottomPartStableValue = uint(nonBottomEdge) * texelFetch(gStability, bottomCellId, 0).x;
 
                 bool circleRuleStable = insideCircle || ((leftPartStableValue  == stableValue && cellCoord.x <= 0.0f) 
                                                         || (topPartStableValue    == stableValue && cellCoord.y <= 0.0f) 
@@ -1524,12 +1524,12 @@ function createDiamondsShaderProgram(context, vertexShader)
 
         if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
         {
-            highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
-            uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
+            highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
+            uint        cellValue  = texelFetch(gBoard, cellId, 0).x;
 
             int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
 
-            mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+            mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
             mediump float diamondRadius = float(cellSizeCorrected - 1) / 2.0f;
             
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
@@ -1542,23 +1542,23 @@ function createDiamondsShaderProgram(context, vertexShader)
 
             bvec4 insideCorner = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
 
-            ivec2 leftCell        = cellNumber + ivec2(-1,  0);
-            ivec2 rightCell       = cellNumber + ivec2( 1,  0);
-            ivec2 topCell         = cellNumber + ivec2( 0, -1);
-            ivec2 bottomCell      = cellNumber + ivec2( 0,  1);
-            ivec2 leftTopCell     = cellNumber + ivec2(-1, -1);
-            ivec2 rightTopCell    = cellNumber + ivec2( 1, -1);
-            ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
-            ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
+            ivec2 leftCellId        = cellId + ivec2(-1,  0);
+            ivec2 rightCellId       = cellId + ivec2( 1,  0);
+            ivec2 topCellId         = cellId + ivec2( 0, -1);
+            ivec2 bottomCellId      = cellId + ivec2( 0,  1);
+            ivec2 leftTopCellId     = cellId + ivec2(-1, -1);
+            ivec2 rightTopCellId    = cellId + ivec2( 1, -1);
+            ivec2 leftBottomCellId  = cellId + ivec2(-1,  1);
+            ivec2 rightBottomCellId = cellId + ivec2( 1,  1);
     
-            bool nonLeftEdge        = cellNumber.x > 0;
-            bool nonRightEdge       = cellNumber.x < gBoardSize - 1;
-            bool nonTopEdge         =                                  cellNumber.y > 0;
-            bool nonBottomEdge      =                                  cellNumber.y < gBoardSize - 1;
-            bool nonLeftTopEdge     = cellNumber.x > 0              && cellNumber.y > 0;
-            bool nonRightTopEdge    = cellNumber.x < gBoardSize - 1 && cellNumber.y > 0;
-            bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
-            bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
+            bool nonLeftEdge        = cellId.x > 0;
+            bool nonRightEdge       = cellId.x < gBoardSize - 1;
+            bool nonTopEdge         =                              cellId.y > 0;
+            bool nonBottomEdge      =                              cellId.y < gBoardSize - 1;
+            bool nonLeftTopEdge     = cellId.x > 0              && cellId.y > 0;
+            bool nonRightTopEdge    = cellId.x < gBoardSize - 1 && cellId.y > 0;
+            bool nonLeftBottomEdge  = cellId.x > 0              && cellId.y < gBoardSize - 1;
+            bool nonRightBottomEdge = cellId.x < gBoardSize - 1 && cellId.y < gBoardSize - 1;
 
             if(GetTopology() != SquareTopology)
             {
@@ -1575,105 +1575,105 @@ function createDiamondsShaderProgram(context, vertexShader)
 
                 ivec2 boardSizeWrap = ivec2(gBoardSize) * int(maxCheckDistance);
 
-                uvec2 leftCellWrapped        = uvec2(leftCell        + boardSizeWrap);
-                uvec2 rightCellWrapped       = uvec2(rightCell       + boardSizeWrap);
-                uvec2 topCellWrapped         = uvec2(topCell         + boardSizeWrap);
-                uvec2 bottomCellWrapped      = uvec2(bottomCell      + boardSizeWrap);
-                uvec2 leftTopCellWrapped     = uvec2(leftTopCell     + boardSizeWrap);
-                uvec2 rightTopCellWrapped    = uvec2(rightTopCell    + boardSizeWrap);
-                uvec2 leftBottomCellWrapped  = uvec2(leftBottomCell  + boardSizeWrap);
-                uvec2 rightBottomCellWrapped = uvec2(rightBottomCell + boardSizeWrap);
+                uvec2 leftCellIdWrapped        = uvec2(leftCellId        + boardSizeWrap);
+                uvec2 rightCellIdWrapped       = uvec2(rightCellId       + boardSizeWrap);
+                uvec2 topCellIdWrapped         = uvec2(topCellId         + boardSizeWrap);
+                uvec2 bottomCellIdWrapped      = uvec2(bottomCellId      + boardSizeWrap);
+                uvec2 leftTopCellIdWrapped     = uvec2(leftTopCellId     + boardSizeWrap);
+                uvec2 rightTopCellIdWrapped    = uvec2(rightTopCellId    + boardSizeWrap);
+                uvec2 leftBottomCellIdWrapped  = uvec2(leftBottomCellId  + boardSizeWrap);
+                uvec2 rightBottomCellIdWrapped = uvec2(rightBottomCellId + boardSizeWrap);
 
-                leftCell        = ivec2(leftCellWrapped        % uvec2(gBoardSize));
-                rightCell       = ivec2(rightCellWrapped       % uvec2(gBoardSize));
-                topCell         = ivec2(topCellWrapped         % uvec2(gBoardSize));
-                bottomCell      = ivec2(bottomCellWrapped      % uvec2(gBoardSize));
-                leftTopCell     = ivec2(leftTopCellWrapped     % uvec2(gBoardSize));
-                rightTopCell    = ivec2(rightTopCellWrapped    % uvec2(gBoardSize));
-                leftBottomCell  = ivec2(leftBottomCellWrapped  % uvec2(gBoardSize));
-                rightBottomCell = ivec2(rightBottomCellWrapped % uvec2(gBoardSize));
+                leftCellId        = ivec2(leftCellIdWrapped        % uvec2(gBoardSize));
+                rightCellId       = ivec2(rightCellIdWrapped       % uvec2(gBoardSize));
+                topCellId         = ivec2(topCellIdWrapped         % uvec2(gBoardSize));
+                bottomCellId      = ivec2(bottomCellIdWrapped      % uvec2(gBoardSize));
+                leftTopCellId     = ivec2(leftTopCellIdWrapped     % uvec2(gBoardSize));
+                rightTopCellId    = ivec2(rightTopCellIdWrapped    % uvec2(gBoardSize));
+                leftBottomCellId  = ivec2(leftBottomCellIdWrapped  % uvec2(gBoardSize));
+                rightBottomCellId = ivec2(rightBottomCellIdWrapped % uvec2(gBoardSize));
 
                 if(GetTopology() == ProjectivePlaneTopology)
                 {
-                    bool  leftCellFlipped        =          (leftCellWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  rightCellFlipped       =          (rightCellWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  topCellFlipped         =          (topCellWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  bottomCellFlipped      =          (bottomCellWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bvec2 leftTopCellFlipped     = notEqual((leftTopCellWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 rightTopCellFlipped    = notEqual((rightTopCellWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 rightBottomCellFlipped = notEqual((rightBottomCellWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bool  leftCellFlipped        =          (leftCellIdWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  rightCellFlipped       =          (rightCellIdWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  topCellFlipped         =          (topCellIdWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  bottomCellFlipped      =          (bottomCellIdWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bvec2 leftTopCellFlipped     = notEqual((leftTopCellIdWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 rightTopCellFlipped    = notEqual((rightTopCellIdWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellIdWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 rightBottomCellFlipped = notEqual((rightBottomCellIdWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
 
                     if(leftCellFlipped)
                     {
-                        leftCell.y = gBoardSize - leftCell.y - 1;
+                        leftCellId.y = gBoardSize - leftCellId.y - 1;
                     }
 
                     if(rightCellFlipped)
                     {
-                        rightCell.y = gBoardSize - rightCell.y - 1;
+                        rightCellId.y = gBoardSize - rightCellId.y - 1;
                     }
 
                     if(topCellFlipped)
                     {
-                        topCell.x = gBoardSize - topCell.x - 1;
+                        topCellId.x = gBoardSize - topCellId.x - 1;
                     }
 
                     if(bottomCellFlipped)
                     {
-                        bottomCell.x = gBoardSize - bottomCell.x - 1;
+                        bottomCellId.x = gBoardSize - bottomCellId.x - 1;
                     }
 
                     if(leftTopCellFlipped.x)
                     {
-                        leftTopCell.y = gBoardSize - leftTopCell.y - 1;
+                        leftTopCellId.y = gBoardSize - leftTopCellId.y - 1;
                     }
 
                     if(leftTopCellFlipped.y)
                     {
-                        leftTopCell.x = gBoardSize - leftTopCell.x - 1;
+                        leftTopCellId.x = gBoardSize - leftTopCellId.x - 1;
                     }
 
                     if(rightTopCellFlipped.x)
                     {
-                        rightTopCell.y = gBoardSize - rightTopCell.y - 1;
+                        rightTopCellId.y = gBoardSize - rightTopCellId.y - 1;
                     }
 
                     if(rightTopCellFlipped.y)
                     {
-                        rightTopCell.x = gBoardSize - rightTopCell.x - 1;
+                        rightTopCellId.x = gBoardSize - rightTopCellId.x - 1;
                     }
 
                     if(leftBottomCellFlipped.x)
                     {
-                        leftBottomCell.y = gBoardSize - leftBottomCell.y - 1;
+                        leftBottomCellId.y = gBoardSize - leftBottomCellId.y - 1;
                     }
 
                     if(leftBottomCellFlipped.y)
                     {
-                        leftBottomCell.x = gBoardSize - leftBottomCell.x - 1;
+                        leftBottomCellId.x = gBoardSize - leftBottomCellId.x - 1;
                     }
 
                     if(rightBottomCellFlipped.x)
                     {
-                        rightBottomCell.y = gBoardSize - rightBottomCell.y - 1;
+                        rightBottomCellId.y = gBoardSize - rightBottomCellId.y - 1;
                     }
 
                     if(rightBottomCellFlipped.y)
                     {
-                        rightBottomCell.x = gBoardSize - rightBottomCell.x - 1;
+                        rightBottomCellId.x = gBoardSize - rightBottomCellId.x - 1;
                     }
                 }
             }
 
-            uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
-            uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCell,       0).x;
-            uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCell,         0).x;
-            uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCell,      0).x;
-            uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCell,     0).x;
-            uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCell,    0).x;
-            uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCell,  0).x;
-            uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCell, 0).x;
+            uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCellId,        0).x;
+            uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCellId,       0).x;
+            uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCellId,         0).x;
+            uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCellId,      0).x;
+            uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCellId,     0).x;
+            uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCellId,    0).x;
+            uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCellId,  0).x;
+            uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCellId, 0).x;
 
             uvec4 edgeValue   = uvec4(leftPartValue,    topPartValue,      rightPartValue,       bottomPartValue);
             uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
@@ -1691,16 +1691,16 @@ function createDiamondsShaderProgram(context, vertexShader)
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
     
-                uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
-                uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
-                uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCell,         0).x;
-                uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCell,      0).x;
-                uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCell,     0).x;
-                uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCell,    0).x;
-                uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCell,  0).x;
-                uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCell, 0).x;
+                uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCellId,        0).x;
+                uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCellId,       0).x;
+                uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCellId,         0).x;
+                uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCellId,      0).x;
+                uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCellId,     0).x;
+                uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCellId,    0).x;
+                uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCellId,  0).x;
+                uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCellId, 0).x;
 
                 uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
                 uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
@@ -1718,19 +1718,19 @@ function createDiamondsShaderProgram(context, vertexShader)
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint stableValue = texelFetch(gStability, cellNumber, 0).x;
+                uint stableValue = texelFetch(gStability, cellId, 0).x;
 
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
-                uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCell,       0).x;
-                uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCell,         0).x;
-                uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCell,      0).x;
-                uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCell,     0).x;
-                uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCell,    0).x;
-                uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCell,  0).x;
-                uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCell, 0).x;
+                uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCellId,        0).x;
+                uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCellId,       0).x;
+                uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCellId,         0).x;
+                uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCellId,      0).x;
+                uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCellId,     0).x;
+                uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCellId,    0).x;
+                uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCellId,  0).x;
+                uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCellId, 0).x;
 
                 uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
                 uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
@@ -1843,12 +1843,12 @@ function createBeamsShaderProgram(context, vertexShader)
 
         if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
         {
-            highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
-            uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
+            highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
+            uint        cellValue  = texelFetch(gBoard, cellId, 0).x;
 
             int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
 
-            mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+            mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
             mediump float diamondRadius = float(cellSizeCorrected) / 2.0f;
 
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
@@ -1877,23 +1877,23 @@ function createBeamsShaderProgram(context, vertexShader)
 
             bvec4 insideV = b4nd(not(insideBeam.xyzw), not(insideBeam.yzwx), insideSide.xyzw, insideSide.yzwx); //V-A, V-B, V-C, V-D
 
-            ivec2 leftCell        = cellNumber + ivec2(-1,  0);
-            ivec2 rightCell       = cellNumber + ivec2( 1,  0);
-            ivec2 topCell         = cellNumber + ivec2( 0, -1);
-            ivec2 bottomCell      = cellNumber + ivec2( 0,  1);
-            ivec2 leftTopCell     = cellNumber + ivec2(-1, -1);
-            ivec2 rightTopCell    = cellNumber + ivec2( 1, -1);
-            ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
-            ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
+            ivec2 leftCellId        = cellId + ivec2(-1,  0);
+            ivec2 rightCellId       = cellId + ivec2( 1,  0);
+            ivec2 topCellId         = cellId + ivec2( 0, -1);
+            ivec2 bottomCellId      = cellId + ivec2( 0,  1);
+            ivec2 leftTopCellId     = cellId + ivec2(-1, -1);
+            ivec2 rightTopCellId    = cellId + ivec2( 1, -1);
+            ivec2 leftBottomCellId  = cellId + ivec2(-1,  1);
+            ivec2 rightBottomCellId = cellId + ivec2( 1,  1);
     
-            bool nonLeftEdge        = cellNumber.x > 0;
-            bool nonRightEdge       = cellNumber.x < gBoardSize - 1;
-            bool nonTopEdge         =                                  cellNumber.y > 0;
-            bool nonBottomEdge      =                                  cellNumber.y < gBoardSize - 1;
-            bool nonLeftTopEdge     = cellNumber.x > 0              && cellNumber.y > 0;
-            bool nonRightTopEdge    = cellNumber.x < gBoardSize - 1 && cellNumber.y > 0;
-            bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
-            bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
+            bool nonLeftEdge        = cellId.x > 0;
+            bool nonRightEdge       = cellId.x < gBoardSize - 1;
+            bool nonTopEdge         =                              cellId.y > 0;
+            bool nonBottomEdge      =                              cellId.y < gBoardSize - 1;
+            bool nonLeftTopEdge     = cellId.x > 0              && cellId.y > 0;
+            bool nonRightTopEdge    = cellId.x < gBoardSize - 1 && cellId.y > 0;
+            bool nonLeftBottomEdge  = cellId.x > 0              && cellId.y < gBoardSize - 1;
+            bool nonRightBottomEdge = cellId.x < gBoardSize - 1 && cellId.y < gBoardSize - 1;
 
             if(GetTopology() != SquareTopology)
             {
@@ -1910,105 +1910,105 @@ function createBeamsShaderProgram(context, vertexShader)
 
                 ivec2 boardSizeWrap = ivec2(gBoardSize) * int(maxCheckDistance);
 
-                uvec2 leftCellWrapped        = uvec2(leftCell        + boardSizeWrap);
-                uvec2 rightCellWrapped       = uvec2(rightCell       + boardSizeWrap);
-                uvec2 topCellWrapped         = uvec2(topCell         + boardSizeWrap);
-                uvec2 bottomCellWrapped      = uvec2(bottomCell      + boardSizeWrap);
-                uvec2 leftTopCellWrapped     = uvec2(leftTopCell     + boardSizeWrap);
-                uvec2 rightTopCellWrapped    = uvec2(rightTopCell    + boardSizeWrap);
-                uvec2 leftBottomCellWrapped  = uvec2(leftBottomCell  + boardSizeWrap);
-                uvec2 rightBottomCellWrapped = uvec2(rightBottomCell + boardSizeWrap);
+                uvec2 leftCellIdWrapped        = uvec2(leftCellId        + boardSizeWrap);
+                uvec2 rightCellIdWrapped       = uvec2(rightCellId       + boardSizeWrap);
+                uvec2 topCellIdWrapped         = uvec2(topCellId         + boardSizeWrap);
+                uvec2 bottomCellIdWrapped      = uvec2(bottomCellId      + boardSizeWrap);
+                uvec2 leftTopCellIdWrapped     = uvec2(leftTopCellId     + boardSizeWrap);
+                uvec2 rightTopCellIdWrapped    = uvec2(rightTopCellId    + boardSizeWrap);
+                uvec2 leftBottomCellIdWrapped  = uvec2(leftBottomCellId  + boardSizeWrap);
+                uvec2 rightBottomCellIdWrapped = uvec2(rightBottomCellId + boardSizeWrap);
 
-                leftCell        = ivec2(leftCellWrapped        % uvec2(gBoardSize));
-                rightCell       = ivec2(rightCellWrapped       % uvec2(gBoardSize));
-                topCell         = ivec2(topCellWrapped         % uvec2(gBoardSize));
-                bottomCell      = ivec2(bottomCellWrapped      % uvec2(gBoardSize));
-                leftTopCell     = ivec2(leftTopCellWrapped     % uvec2(gBoardSize));
-                rightTopCell    = ivec2(rightTopCellWrapped    % uvec2(gBoardSize));
-                leftBottomCell  = ivec2(leftBottomCellWrapped  % uvec2(gBoardSize));
-                rightBottomCell = ivec2(rightBottomCellWrapped % uvec2(gBoardSize));
+                leftCellId        = ivec2(leftCellIdWrapped        % uvec2(gBoardSize));
+                rightCellId       = ivec2(rightCellIdWrapped       % uvec2(gBoardSize));
+                topCellId         = ivec2(topCellIdWrapped         % uvec2(gBoardSize));
+                bottomCellId      = ivec2(bottomCellIdWrapped      % uvec2(gBoardSize));
+                leftTopCellId     = ivec2(leftTopCellIdWrapped     % uvec2(gBoardSize));
+                rightTopCellId    = ivec2(rightTopCellIdWrapped    % uvec2(gBoardSize));
+                leftBottomCellId  = ivec2(leftBottomCellIdWrapped  % uvec2(gBoardSize));
+                rightBottomCellId = ivec2(rightBottomCellIdWrapped % uvec2(gBoardSize));
 
                 if(GetTopology() == ProjectivePlaneTopology)
                 {
-                    bool  leftCellFlipped        =          (leftCellWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  rightCellFlipped       =          (rightCellWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  topCellFlipped         =          (topCellWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  bottomCellFlipped      =          (bottomCellWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bvec2 leftTopCellFlipped     = notEqual((leftTopCellWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 rightTopCellFlipped    = notEqual((rightTopCellWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 rightBottomCellFlipped = notEqual((rightBottomCellWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bool  leftCellFlipped        =          (leftCellIdWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  rightCellFlipped       =          (rightCellIdWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  topCellFlipped         =          (topCellIdWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  bottomCellFlipped      =          (bottomCellIdWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bvec2 leftTopCellFlipped     = notEqual((leftTopCellIdWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 rightTopCellFlipped    = notEqual((rightTopCellIdWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellIdWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 rightBottomCellFlipped = notEqual((rightBottomCellIdWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
 
                     if(leftCellFlipped)
                     {
-                        leftCell.y = gBoardSize - leftCell.y - 1;
+                        leftCellId.y = gBoardSize - leftCellId.y - 1;
                     }
 
                     if(rightCellFlipped)
                     {
-                        rightCell.y = gBoardSize - rightCell.y - 1;
+                        rightCellId.y = gBoardSize - rightCellId.y - 1;
                     }
 
                     if(topCellFlipped)
                     {
-                        topCell.x = gBoardSize - topCell.x - 1;
+                        topCellId.x = gBoardSize - topCellId.x - 1;
                     }
 
                     if(bottomCellFlipped)
                     {
-                        bottomCell.x = gBoardSize - bottomCell.x - 1;
+                        bottomCellId.x = gBoardSize - bottomCellId.x - 1;
                     }
 
                     if(leftTopCellFlipped.x)
                     {
-                        leftTopCell.y = gBoardSize - leftTopCell.y - 1;
+                        leftTopCellId.y = gBoardSize - leftTopCellId.y - 1;
                     }
 
                     if(leftTopCellFlipped.y)
                     {
-                        leftTopCell.x = gBoardSize - leftTopCell.x - 1;
+                        leftTopCellId.x = gBoardSize - leftTopCellId.x - 1;
                     }
 
                     if(rightTopCellFlipped.x)
                     {
-                        rightTopCell.y = gBoardSize - rightTopCell.y - 1;
+                        rightTopCellId.y = gBoardSize - rightTopCellId.y - 1;
                     }
 
                     if(rightTopCellFlipped.y)
                     {
-                        rightTopCell.x = gBoardSize - rightTopCell.x - 1;
+                        rightTopCellId.x = gBoardSize - rightTopCellId.x - 1;
                     }
 
                     if(leftBottomCellFlipped.x)
                     {
-                        leftBottomCell.y = gBoardSize - leftBottomCell.y - 1;
+                        leftBottomCellId.y = gBoardSize - leftBottomCellId.y - 1;
                     }
 
                     if(leftBottomCellFlipped.y)
                     {
-                        leftBottomCell.x = gBoardSize - leftBottomCell.x - 1;
+                        leftBottomCellId.x = gBoardSize - leftBottomCellId.x - 1;
                     }
 
                     if(rightBottomCellFlipped.x)
                     {
-                        rightBottomCell.y = gBoardSize - rightBottomCell.y - 1;
+                        rightBottomCellId.y = gBoardSize - rightBottomCellId.y - 1;
                     }
 
                     if(rightBottomCellFlipped.y)
                     {
-                        rightBottomCell.x = gBoardSize - rightBottomCell.x - 1;
+                        rightBottomCellId.x = gBoardSize - rightBottomCellId.x - 1;
                     }
                 }
             }
 
-            uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
-            uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCell,       0).x;
-            uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCell,         0).x;
-            uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCell,      0).x;
-            uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCell,     0).x;
-            uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCell,    0).x;
-            uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCell,  0).x;
-            uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCell, 0).x;
+            uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCellId,        0).x;
+            uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCellId,       0).x;
+            uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCellId,         0).x;
+            uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCellId,      0).x;
+            uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCellId,     0).x;
+            uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCellId,    0).x;
+            uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCellId,  0).x;
+            uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCellId, 0).x;
 
             uvec4 edgeValue   = uvec4(leftPartValue,    topPartValue,      rightPartValue,       bottomPartValue);
             uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
@@ -2047,16 +2047,16 @@ function createBeamsShaderProgram(context, vertexShader)
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
     
-                uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
-                uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
-                uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCell,         0).x;
-                uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCell,      0).x;
-                uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCell,     0).x;
-                uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCell,    0).x;
-                uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCell,  0).x;
-                uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCell, 0).x;
+                uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCellId,        0).x;
+                uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCellId,       0).x;
+                uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCellId,         0).x;
+                uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCellId,      0).x;
+                uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCellId,     0).x;
+                uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCellId,    0).x;
+                uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCellId,  0).x;
+                uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCellId, 0).x;
 
                 uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
                 uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
@@ -2094,19 +2094,19 @@ function createBeamsShaderProgram(context, vertexShader)
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint stabilityValue = texelFetch(gStability, cellNumber, 0).x;
+                uint stabilityValue = texelFetch(gStability, cellId, 0).x;
 
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
-                uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCell,       0).x;
-                uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCell,         0).x;
-                uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCell,      0).x;
-                uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCell,     0).x;
-                uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCell,    0).x;
-                uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCell,  0).x;
-                uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCell, 0).x;
+                uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCellId,        0).x;
+                uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCellId,       0).x;
+                uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCellId,         0).x;
+                uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCellId,      0).x;
+                uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCellId,     0).x;
+                uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCellId,    0).x;
+                uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCellId,  0).x;
+                uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCellId, 0).x;
 
                 uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
                 uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
@@ -2181,24 +2181,24 @@ function createRaindropsShaderProgram(context, vertexShader)
 
         if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
         {
-            highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
-            uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
+            highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
+            uint        cellValue  = texelFetch(gBoard, cellId, 0).x;
 
             int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
 
-            mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+            mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
             mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
             
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
-            ivec2 leftCell        = cellNumber + ivec2(-1,  0);
-            ivec2 rightCell       = cellNumber + ivec2( 1,  0);
-            ivec2 topCell         = cellNumber + ivec2( 0, -1);
-            ivec2 bottomCell      = cellNumber + ivec2( 0,  1);
-            ivec2 leftTopCell     = cellNumber + ivec2(-1, -1);
-            ivec2 rightTopCell    = cellNumber + ivec2( 1, -1);
-            ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
-            ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
+            ivec2 leftCellId        = cellId + ivec2(-1,  0);
+            ivec2 rightCellId       = cellId + ivec2( 1,  0);
+            ivec2 topCellId         = cellId + ivec2( 0, -1);
+            ivec2 bottomCellId      = cellId + ivec2( 0,  1);
+            ivec2 leftTopCellId     = cellId + ivec2(-1, -1);
+            ivec2 rightTopCellId    = cellId + ivec2( 1, -1);
+            ivec2 leftBottomCellId  = cellId + ivec2(-1,  1);
+            ivec2 rightBottomCellId = cellId + ivec2( 1,  1);
     
             bool insideCircle  = (dot(cellCoord, cellCoord) < (circleRadius * circleRadius));
             bool outsideCircle = (dot(cellCoord, cellCoord) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
@@ -2210,14 +2210,14 @@ function createRaindropsShaderProgram(context, vertexShader)
     
             bvec4 insideCorner = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
 
-            bool nonLeftEdge        = cellNumber.x > 0;
-            bool nonRightEdge       = cellNumber.x < gBoardSize - 1;
-            bool nonTopEdge         =                                  cellNumber.y > 0;
-            bool nonBottomEdge      =                                  cellNumber.y < gBoardSize - 1;
-            bool nonLeftTopEdge     = cellNumber.x > 0              && cellNumber.y > 0;
-            bool nonRightTopEdge    = cellNumber.x < gBoardSize - 1 && cellNumber.y > 0;
-            bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
-            bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
+            bool nonLeftEdge        = cellId.x > 0;
+            bool nonRightEdge       = cellId.x < gBoardSize - 1;
+            bool nonTopEdge         =                              cellId.y > 0;
+            bool nonBottomEdge      =                              cellId.y < gBoardSize - 1;
+            bool nonLeftTopEdge     = cellId.x > 0              && cellId.y > 0;
+            bool nonRightTopEdge    = cellId.x < gBoardSize - 1 && cellId.y > 0;
+            bool nonLeftBottomEdge  = cellId.x > 0              && cellId.y < gBoardSize - 1;
+            bool nonRightBottomEdge = cellId.x < gBoardSize - 1 && cellId.y < gBoardSize - 1;
 
             if(GetTopology() != SquareTopology)
             {
@@ -2234,105 +2234,105 @@ function createRaindropsShaderProgram(context, vertexShader)
 
                 ivec2 boardSizeWrap = ivec2(gBoardSize) * int(maxCheckDistance);
 
-                uvec2 leftCellWrapped        = uvec2(leftCell        + boardSizeWrap);
-                uvec2 rightCellWrapped       = uvec2(rightCell       + boardSizeWrap);
-                uvec2 topCellWrapped         = uvec2(topCell         + boardSizeWrap);
-                uvec2 bottomCellWrapped      = uvec2(bottomCell      + boardSizeWrap);
-                uvec2 leftTopCellWrapped     = uvec2(leftTopCell     + boardSizeWrap);
-                uvec2 rightTopCellWrapped    = uvec2(rightTopCell    + boardSizeWrap);
-                uvec2 leftBottomCellWrapped  = uvec2(leftBottomCell  + boardSizeWrap);
-                uvec2 rightBottomCellWrapped = uvec2(rightBottomCell + boardSizeWrap);
+                uvec2 leftCellIdWrapped        = uvec2(leftCellId        + boardSizeWrap);
+                uvec2 rightCellIdWrapped       = uvec2(rightCellId       + boardSizeWrap);
+                uvec2 topCellIdWrapped         = uvec2(topCellId         + boardSizeWrap);
+                uvec2 bottomCellIdWrapped      = uvec2(bottomCellId      + boardSizeWrap);
+                uvec2 leftTopCellIdWrapped     = uvec2(leftTopCellId     + boardSizeWrap);
+                uvec2 rightTopCellIdWrapped    = uvec2(rightTopCellId    + boardSizeWrap);
+                uvec2 leftBottomCellIdWrapped  = uvec2(leftBottomCellId  + boardSizeWrap);
+                uvec2 rightBottomCellIdWrapped = uvec2(rightBottomCellId + boardSizeWrap);
 
-                leftCell        = ivec2(leftCellWrapped        % uvec2(gBoardSize));
-                rightCell       = ivec2(rightCellWrapped       % uvec2(gBoardSize));
-                topCell         = ivec2(topCellWrapped         % uvec2(gBoardSize));
-                bottomCell      = ivec2(bottomCellWrapped      % uvec2(gBoardSize));
-                leftTopCell     = ivec2(leftTopCellWrapped     % uvec2(gBoardSize));
-                rightTopCell    = ivec2(rightTopCellWrapped    % uvec2(gBoardSize));
-                leftBottomCell  = ivec2(leftBottomCellWrapped  % uvec2(gBoardSize));
-                rightBottomCell = ivec2(rightBottomCellWrapped % uvec2(gBoardSize));
+                leftCellId        = ivec2(leftCellIdWrapped        % uvec2(gBoardSize));
+                rightCellId       = ivec2(rightCellIdWrapped       % uvec2(gBoardSize));
+                topCellId         = ivec2(topCellIdWrapped         % uvec2(gBoardSize));
+                bottomCellId      = ivec2(bottomCellIdWrapped      % uvec2(gBoardSize));
+                leftTopCellId     = ivec2(leftTopCellIdWrapped     % uvec2(gBoardSize));
+                rightTopCellId    = ivec2(rightTopCellIdWrapped    % uvec2(gBoardSize));
+                leftBottomCellId  = ivec2(leftBottomCellIdWrapped  % uvec2(gBoardSize));
+                rightBottomCellId = ivec2(rightBottomCellIdWrapped % uvec2(gBoardSize));
 
                 if(GetTopology() == ProjectivePlaneTopology)
                 {
-                    bool  leftCellFlipped        =          (leftCellWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  rightCellFlipped       =          (rightCellWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  topCellFlipped         =          (topCellWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  bottomCellFlipped      =          (bottomCellWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bvec2 leftTopCellFlipped     = notEqual((leftTopCellWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 rightTopCellFlipped    = notEqual((rightTopCellWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 rightBottomCellFlipped = notEqual((rightBottomCellWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bool  leftCellFlipped        =          (leftCellIdWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  rightCellFlipped       =          (rightCellIdWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  topCellFlipped         =          (topCellIdWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  bottomCellFlipped      =          (bottomCellIdWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bvec2 leftTopCellFlipped     = notEqual((leftTopCellIdWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 rightTopCellFlipped    = notEqual((rightTopCellIdWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellIdWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 rightBottomCellFlipped = notEqual((rightBottomCellIdWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
 
                     if(leftCellFlipped)
                     {
-                        leftCell.y = gBoardSize - leftCell.y - 1;
+                        leftCellId.y = gBoardSize - leftCellId.y - 1;
                     }
 
                     if(rightCellFlipped)
                     {
-                        rightCell.y = gBoardSize - rightCell.y - 1;
+                        rightCellId.y = gBoardSize - rightCellId.y - 1;
                     }
 
                     if(topCellFlipped)
                     {
-                        topCell.x = gBoardSize - topCell.x - 1;
+                        topCellId.x = gBoardSize - topCellId.x - 1;
                     }
 
                     if(bottomCellFlipped)
                     {
-                        bottomCell.x = gBoardSize - bottomCell.x - 1;
+                        bottomCellId.x = gBoardSize - bottomCellId.x - 1;
                     }
 
                     if(leftTopCellFlipped.x)
                     {
-                        leftTopCell.y = gBoardSize - leftTopCell.y - 1;
+                        leftTopCellId.y = gBoardSize - leftTopCellId.y - 1;
                     }
 
                     if(leftTopCellFlipped.y)
                     {
-                        leftTopCell.x = gBoardSize - leftTopCell.x - 1;
+                        leftTopCellId.x = gBoardSize - leftTopCellId.x - 1;
                     }
 
                     if(rightTopCellFlipped.x)
                     {
-                        rightTopCell.y = gBoardSize - rightTopCell.y - 1;
+                        rightTopCellId.y = gBoardSize - rightTopCellId.y - 1;
                     }
 
                     if(rightTopCellFlipped.y)
                     {
-                        rightTopCell.x = gBoardSize - rightTopCell.x - 1;
+                        rightTopCellId.x = gBoardSize - rightTopCellId.x - 1;
                     }
 
                     if(leftBottomCellFlipped.x)
                     {
-                        leftBottomCell.y = gBoardSize - leftBottomCell.y - 1;
+                        leftBottomCellId.y = gBoardSize - leftBottomCellId.y - 1;
                     }
 
                     if(leftBottomCellFlipped.y)
                     {
-                        leftBottomCell.x = gBoardSize - leftBottomCell.x - 1;
+                        leftBottomCellId.x = gBoardSize - leftBottomCellId.x - 1;
                     }
 
                     if(rightBottomCellFlipped.x)
                     {
-                        rightBottomCell.y = gBoardSize - rightBottomCell.y - 1;
+                        rightBottomCellId.y = gBoardSize - rightBottomCellId.y - 1;
                     }
 
                     if(rightBottomCellFlipped.y)
                     {
-                        rightBottomCell.x = gBoardSize - rightBottomCell.x - 1;
+                        rightBottomCellId.x = gBoardSize - rightBottomCellId.x - 1;
                     }
                 }
             }
 
-            uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
-            uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCell,       0).x;
-            uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCell,         0).x;
-            uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCell,      0).x;
-            uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCell,     0).x;
-            uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCell,    0).x;
-            uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCell,  0).x;
-            uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCell, 0).x;
+            uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCellId,        0).x;
+            uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCellId,       0).x;
+            uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCellId,         0).x;
+            uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCellId,      0).x;
+            uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCellId,     0).x;
+            uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCellId,    0).x;
+            uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCellId,  0).x;
+            uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCellId, 0).x;
 
             uvec4 edgeValue   = uvec4(leftPartValue,    topPartValue,      rightPartValue,       bottomPartValue);
             uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
@@ -2352,16 +2352,16 @@ function createRaindropsShaderProgram(context, vertexShader)
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
     
-                uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
-                uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
-                uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCell,         0).x;
-                uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCell,      0).x;
-                uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCell,     0).x;
-                uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCell,    0).x;
-                uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCell,  0).x;
-                uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCell, 0).x;
+                uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCellId,        0).x;
+                uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCellId,       0).x;
+                uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCellId,         0).x;
+                uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCellId,      0).x;
+                uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCellId,     0).x;
+                uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCellId,    0).x;
+                uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCellId,  0).x;
+                uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCellId, 0).x;
 
                 uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
                 uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
@@ -2379,19 +2379,19 @@ function createRaindropsShaderProgram(context, vertexShader)
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint stableValue = texelFetch(gStability, cellNumber, 0).x;
+                uint stableValue = texelFetch(gStability, cellId, 0).x;
 
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
-                uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCell,       0).x;
-                uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCell,         0).x;
-                uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCell,      0).x;
-                uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCell,     0).x;
-                uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCell,    0).x;
-                uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCell,  0).x;
-                uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCell, 0).x;
+                uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCellId,        0).x;
+                uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCellId,       0).x;
+                uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCellId,         0).x;
+                uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCellId,      0).x;
+                uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCellId,     0).x;
+                uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCellId,    0).x;
+                uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCellId,  0).x;
+                uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCellId, 0).x;
 
                 uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
                 uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
@@ -2457,12 +2457,12 @@ function createChainsShaderProgram(context, vertexShader)
 
         if(((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0))) //Inside the cell
         {
-            highp ivec2 cellNumber = screenPos.xy / ivec2(gCellSize);
-            uint        cellValue  = texelFetch(gBoard, cellNumber, 0).x;
+            highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
+            uint        cellValue  = texelFetch(gBoard, cellId, 0).x;
 
             int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
 
-            mediump vec2  cellCoord       = (vec2(screenPos.xy) - vec2(cellNumber * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+            mediump vec2  cellCoord       = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
             mediump float circleRadius    = float(cellSizeCorrected) / 2.0f;
             mediump float circleRadiusBig = float(cellSizeCorrected - 1);
             mediump float domainFactor    = 1.0f / float(gDomainSize - 1);
@@ -2500,31 +2500,31 @@ function createChainsShaderProgram(context, vertexShader)
             bool  insideFreeCircle = b1nd(insideCircle,       !insideLinkV  ,       !insideLinkH);
             bvec4 insideFreeCorner = b4nd(insideCorner, bvec4(!insideLinkH ), bvec4(!insideLinkV));
 
-            ivec2 leftCell        = cellNumber + ivec2(-1,  0);
-            ivec2 rightCell       = cellNumber + ivec2( 1,  0);
-            ivec2 topCell         = cellNumber + ivec2( 0, -1);
-            ivec2 bottomCell      = cellNumber + ivec2( 0,  1);
-            ivec2 leftTopCell     = cellNumber + ivec2(-1, -1);
-            ivec2 rightTopCell    = cellNumber + ivec2( 1, -1);
-            ivec2 leftBottomCell  = cellNumber + ivec2(-1,  1);
-            ivec2 rightBottomCell = cellNumber + ivec2( 1,  1);
-            ivec2 left2Cell       = cellNumber + ivec2(-2,  0);
-            ivec2 right2Cell      = cellNumber + ivec2( 2,  0);
-            ivec2 top2Cell        = cellNumber + ivec2( 0, -2);
-            ivec2 bottom2Cell     = cellNumber + ivec2( 0,  2);
+            ivec2 leftCellId        = cellId + ivec2(-1,  0);
+            ivec2 rightCellId       = cellId + ivec2( 1,  0);
+            ivec2 topCellId         = cellId + ivec2( 0, -1);
+            ivec2 bottomCellId      = cellId + ivec2( 0,  1);
+            ivec2 leftTopCellId     = cellId + ivec2(-1, -1);
+            ivec2 rightTopCellId    = cellId + ivec2( 1, -1);
+            ivec2 leftBottomCellId  = cellId + ivec2(-1,  1);
+            ivec2 rightBottomCellId = cellId + ivec2( 1,  1);
+            ivec2 left2CellId       = cellId + ivec2(-2,  0);
+            ivec2 right2CellId      = cellId + ivec2( 2,  0);
+            ivec2 top2CellId        = cellId + ivec2( 0, -2);
+            ivec2 bottom2CellId     = cellId + ivec2( 0,  2);
 
-            bool nonLeftEdge        = cellNumber.x > 0;
-            bool nonRightEdge       = cellNumber.x < gBoardSize - 1;
-            bool nonTopEdge         =                                  cellNumber.y > 0;
-            bool nonBottomEdge      =                                  cellNumber.y < gBoardSize - 1;
-            bool nonLeftTopEdge     = cellNumber.x > 0              && cellNumber.y > 0;
-            bool nonRightTopEdge    = cellNumber.x < gBoardSize - 1 && cellNumber.y > 0;
-            bool nonLeftBottomEdge  = cellNumber.x > 0              && cellNumber.y < gBoardSize - 1;
-            bool nonRightBottomEdge = cellNumber.x < gBoardSize - 1 && cellNumber.y < gBoardSize - 1;
-            bool nonLeft2Edge       = cellNumber.x > 1;
-            bool nonRight2Edge      = cellNumber.x < gBoardSize - 2;
-            bool nonTop2Edge        =                                  cellNumber.y > 1;
-            bool nonBottom2Edge     =                                  cellNumber.y < gBoardSize - 2;
+            bool nonLeftEdge        = cellId.x > 0;
+            bool nonRightEdge       = cellId.x < gBoardSize - 1;
+            bool nonTopEdge         =                              cellId.y > 0;
+            bool nonBottomEdge      =                              cellId.y < gBoardSize - 1;
+            bool nonLeftTopEdge     = cellId.x > 0              && cellId.y > 0;
+            bool nonRightTopEdge    = cellId.x < gBoardSize - 1 && cellId.y > 0;
+            bool nonLeftBottomEdge  = cellId.x > 0              && cellId.y < gBoardSize - 1;
+            bool nonRightBottomEdge = cellId.x < gBoardSize - 1 && cellId.y < gBoardSize - 1;
+            bool nonLeft2Edge       = cellId.x > 1;
+            bool nonRight2Edge      = cellId.x < gBoardSize - 2;
+            bool nonTop2Edge        =                              cellId.y > 1;
+            bool nonBottom2Edge     =                              cellId.y < gBoardSize - 2;
 
             if(GetTopology() != SquareTopology)
             {
@@ -2545,141 +2545,141 @@ function createChainsShaderProgram(context, vertexShader)
 
                 ivec2 boardSizeWrap = ivec2(gBoardSize) * int(maxCheckDistance);
 
-                uvec2 leftCellWrapped        = uvec2(leftCell        + boardSizeWrap);
-                uvec2 rightCellWrapped       = uvec2(rightCell       + boardSizeWrap);
-                uvec2 topCellWrapped         = uvec2(topCell         + boardSizeWrap);
-                uvec2 bottomCellWrapped      = uvec2(bottomCell      + boardSizeWrap);
-                uvec2 leftTopCellWrapped     = uvec2(leftTopCell     + boardSizeWrap);
-                uvec2 rightTopCellWrapped    = uvec2(rightTopCell    + boardSizeWrap);
-                uvec2 leftBottomCellWrapped  = uvec2(leftBottomCell  + boardSizeWrap);
-                uvec2 rightBottomCellWrapped = uvec2(rightBottomCell + boardSizeWrap);
-                uvec2 left2CellWrapped       = uvec2(left2Cell       + boardSizeWrap);
-                uvec2 right2CellWrapped      = uvec2(right2Cell      + boardSizeWrap);
-                uvec2 top2CellWrapped        = uvec2(top2Cell        + boardSizeWrap);
-                uvec2 bottom2CellWrapped     = uvec2(bottom2Cell     + boardSizeWrap);
+                uvec2 leftCellIdWrapped        = uvec2(leftCellId        + boardSizeWrap);
+                uvec2 rightCellIdWrapped       = uvec2(rightCellId       + boardSizeWrap);
+                uvec2 topCellIdWrapped         = uvec2(topCellId         + boardSizeWrap);
+                uvec2 bottomCellIdWrapped      = uvec2(bottomCellId      + boardSizeWrap);
+                uvec2 leftTopCellIdWrapped     = uvec2(leftTopCellId     + boardSizeWrap);
+                uvec2 rightTopCellIdWrapped    = uvec2(rightTopCellId    + boardSizeWrap);
+                uvec2 leftBottomCellIdWrapped  = uvec2(leftBottomCellId  + boardSizeWrap);
+                uvec2 rightBottomCellIdWrapped = uvec2(rightBottomCellId + boardSizeWrap);
+                uvec2 left2CellIdWrapped       = uvec2(left2CellId       + boardSizeWrap);
+                uvec2 right2CellIdWrapped      = uvec2(right2CellId      + boardSizeWrap);
+                uvec2 top2CellIdWrapped        = uvec2(top2CellId        + boardSizeWrap);
+                uvec2 bottom2CellIdWrapped     = uvec2(bottom2CellId     + boardSizeWrap);
 
-                leftCell        = ivec2(leftCellWrapped        % uvec2(gBoardSize));
-                rightCell       = ivec2(rightCellWrapped       % uvec2(gBoardSize));
-                topCell         = ivec2(topCellWrapped         % uvec2(gBoardSize));
-                bottomCell      = ivec2(bottomCellWrapped      % uvec2(gBoardSize));
-                leftTopCell     = ivec2(leftTopCellWrapped     % uvec2(gBoardSize));
-                rightTopCell    = ivec2(rightTopCellWrapped    % uvec2(gBoardSize));
-                leftBottomCell  = ivec2(leftBottomCellWrapped  % uvec2(gBoardSize));
-                rightBottomCell = ivec2(rightBottomCellWrapped % uvec2(gBoardSize));
-                left2Cell       = ivec2(left2CellWrapped       % uvec2(gBoardSize));
-                right2Cell      = ivec2(right2CellWrapped      % uvec2(gBoardSize));
-                top2Cell        = ivec2(top2CellWrapped        % uvec2(gBoardSize));
-                bottom2Cell     = ivec2(bottom2CellWrapped     % uvec2(gBoardSize));
+                leftCellId        = ivec2(leftCellIdWrapped        % uvec2(gBoardSize));
+                rightCellId       = ivec2(rightCellIdWrapped       % uvec2(gBoardSize));
+                topCellId         = ivec2(topCellIdWrapped         % uvec2(gBoardSize));
+                bottomCellId      = ivec2(bottomCellIdWrapped      % uvec2(gBoardSize));
+                leftTopCellId     = ivec2(leftTopCellIdWrapped     % uvec2(gBoardSize));
+                rightTopCellId    = ivec2(rightTopCellIdWrapped    % uvec2(gBoardSize));
+                leftBottomCellId  = ivec2(leftBottomCellIdWrapped  % uvec2(gBoardSize));
+                rightBottomCellId = ivec2(rightBottomCellIdWrapped % uvec2(gBoardSize));
+                left2CellId       = ivec2(left2CellIdWrapped       % uvec2(gBoardSize));
+                right2CellId      = ivec2(right2CellIdWrapped      % uvec2(gBoardSize));
+                top2CellId        = ivec2(top2CellIdWrapped        % uvec2(gBoardSize));
+                bottom2CellId     = ivec2(bottom2CellIdWrapped     % uvec2(gBoardSize));
 
                 if(GetTopology() == ProjectivePlaneTopology)
                 {
-                    bool  leftCellFlipped        =          (leftCellWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  rightCellFlipped       =          (rightCellWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  topCellFlipped         =          (topCellWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool  bottomCellFlipped      =          (bottomCellWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bvec2 leftTopCellFlipped     = notEqual((leftTopCellWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 rightTopCellFlipped    = notEqual((rightTopCellWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bvec2 rightBottomCellFlipped = notEqual((rightBottomCellWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
-                    bool left2CellFlipped        =          (left2CellWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool right2CellFlipped       =          (right2CellWrapped.x    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool top2CellFlipped         =          (top2CellWrapped.y      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
-                    bool bottom2CellFlipped      =          (bottom2CellWrapped.y   /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  leftCellFlipped        =          (leftCellIdWrapped.x      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  rightCellFlipped       =          (rightCellIdWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  topCellFlipped         =          (topCellIdWrapped.y       /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool  bottomCellFlipped      =          (bottomCellIdWrapped.y    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bvec2 leftTopCellFlipped     = notEqual((leftTopCellIdWrapped     / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 rightTopCellFlipped    = notEqual((rightTopCellIdWrapped    / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 leftBottomCellFlipped  = notEqual((leftBottomCellIdWrapped  / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bvec2 rightBottomCellFlipped = notEqual((rightBottomCellIdWrapped / uvec2(gBoardSize) + uvec2(maxCheckDistance)) % uvec2(2u), uvec2(0u));
+                    bool left2CellFlipped        =          (left2CellIdWrapped.x     /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool right2CellFlipped       =          (right2CellIdWrapped.x    /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool top2CellFlipped         =          (top2CellIdWrapped.y      /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
+                    bool bottom2CellFlipped      =          (bottom2CellIdWrapped.y   /  uint(gBoardSize) +       maxCheckDistance)  %       2u  !=     0u;
 
                     if(leftCellFlipped)
                     {
-                        leftCell.y = gBoardSize - leftCell.y - 1;
+                        leftCellId.y = gBoardSize - leftCellId.y - 1;
                     }
 
                     if(rightCellFlipped)
                     {
-                        rightCell.y = gBoardSize - rightCell.y - 1;
+                        rightCellId.y = gBoardSize - rightCellId.y - 1;
                     }
 
                     if(topCellFlipped)
                     {
-                        topCell.x = gBoardSize - topCell.x - 1;
+                        topCellId.x = gBoardSize - topCellId.x - 1;
                     }
 
                     if(bottomCellFlipped)
                     {
-                        bottomCell.x = gBoardSize - bottomCell.x - 1;
+                        bottomCellId.x = gBoardSize - bottomCellId.x - 1;
                     }
 
                     if(leftTopCellFlipped.x)
                     {
-                        leftTopCell.y = gBoardSize - leftTopCell.y - 1;
+                        leftTopCellId.y = gBoardSize - leftTopCellId.y - 1;
                     }
 
                     if(leftTopCellFlipped.y)
                     {
-                        leftTopCell.x = gBoardSize - leftTopCell.x - 1;
+                        leftTopCellId.x = gBoardSize - leftTopCellId.x - 1;
                     }
 
                     if(rightTopCellFlipped.x)
                     {
-                        rightTopCell.y = gBoardSize - rightTopCell.y - 1;
+                        rightTopCellId.y = gBoardSize - rightTopCellId.y - 1;
                     }
 
                     if(rightTopCellFlipped.y)
                     {
-                        rightTopCell.x = gBoardSize - rightTopCell.x - 1;
+                        rightTopCellId.x = gBoardSize - rightTopCellId.x - 1;
                     }
 
                     if(leftBottomCellFlipped.x)
                     {
-                        leftBottomCell.y = gBoardSize - leftBottomCell.y - 1;
+                        leftBottomCellId.y = gBoardSize - leftBottomCellId.y - 1;
                     }
 
                     if(leftBottomCellFlipped.y)
                     {
-                        leftBottomCell.x = gBoardSize - leftBottomCell.x - 1;
+                        leftBottomCellId.x = gBoardSize - leftBottomCellId.x - 1;
                     }
 
                     if(rightBottomCellFlipped.x)
                     {
-                        rightBottomCell.y = gBoardSize - rightBottomCell.y - 1;
+                        rightBottomCellId.y = gBoardSize - rightBottomCellId.y - 1;
                     }
 
                     if(rightBottomCellFlipped.y)
                     {
-                        rightBottomCell.x = gBoardSize - rightBottomCell.x - 1;
+                        rightBottomCellId.x = gBoardSize - rightBottomCellId.x - 1;
                     }
 
                     if(left2CellFlipped)
                     {
-                        left2Cell.y = gBoardSize - left2Cell.y - 1;
+                        left2CellId.y = gBoardSize - left2CellId.y - 1;
                     }
 
                     if(right2CellFlipped)
                     {
-                        right2Cell.y = gBoardSize - right2Cell.y - 1;
+                        right2CellId.y = gBoardSize - right2CellId.y - 1;
                     }
 
                     if(top2CellFlipped)
                     {
-                        top2Cell.x = gBoardSize - top2Cell.x - 1;
+                        top2CellId.x = gBoardSize - top2CellId.x - 1;
                     }
 
                     if(bottom2CellFlipped)
                     {
-                        bottom2Cell.x = gBoardSize - bottom2Cell.x - 1;
+                        bottom2CellId.x = gBoardSize - bottom2CellId.x - 1;
                     }
                 }
             }
 
-            uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCell,        0).x;
-            uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCell,       0).x;
-            uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCell,         0).x;
-            uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCell,      0).x;
-            uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCell,     0).x;
-            uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCell,    0).x;
-            uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCell,  0).x;
-            uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCell, 0).x;
-            uint left2PartValue       = uint(nonLeft2Edge)       * texelFetch(gBoard, left2Cell,       0).x;
-            uint right2PartValue      = uint(nonRight2Edge)      * texelFetch(gBoard, right2Cell,      0).x;
-            uint top2PartValue        = uint(nonTop2Edge)        * texelFetch(gBoard, top2Cell,        0).x;
-            uint bottom2PartValue     = uint(nonBottom2Edge)     * texelFetch(gBoard, bottom2Cell,     0).x;
+            uint leftPartValue        = uint(nonLeftEdge)        * texelFetch(gBoard, leftCellId,        0).x;
+            uint rightPartValue       = uint(nonRightEdge)       * texelFetch(gBoard, rightCellId,       0).x;
+            uint topPartValue         = uint(nonTopEdge)         * texelFetch(gBoard, topCellId,         0).x;
+            uint bottomPartValue      = uint(nonBottomEdge)      * texelFetch(gBoard, bottomCellId,      0).x;
+            uint leftTopPartValue     = uint(nonLeftTopEdge)     * texelFetch(gBoard, leftTopCellId,     0).x;
+            uint rightTopPartValue    = uint(nonRightTopEdge)    * texelFetch(gBoard, rightTopCellId,    0).x;
+            uint leftBottomPartValue  = uint(nonLeftBottomEdge)  * texelFetch(gBoard, leftBottomCellId,  0).x;
+            uint rightBottomPartValue = uint(nonRightBottomEdge) * texelFetch(gBoard, rightBottomCellId, 0).x;
+            uint left2PartValue       = uint(nonLeft2Edge)       * texelFetch(gBoard, left2CellId,       0).x;
+            uint right2PartValue      = uint(nonRight2Edge)      * texelFetch(gBoard, right2CellId,      0).x;
+            uint top2PartValue        = uint(nonTop2Edge)        * texelFetch(gBoard, top2CellId,        0).x;
+            uint bottom2PartValue     = uint(nonBottom2Edge)     * texelFetch(gBoard, bottom2CellId,     0).x;
 
             uvec4 edgeValue   = uvec4(leftPartValue,    topPartValue,      rightPartValue,       bottomPartValue);
             uvec4 cornerValue = uvec4(leftTopPartValue, rightTopPartValue, rightBottomPartValue, leftBottomPartValue);
@@ -2720,20 +2720,20 @@ function createChainsShaderProgram(context, vertexShader)
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint solutionValue = texelFetch(gSolution, cellNumber, 0).x;
+                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
     
-                uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCell,        0).x;
-                uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCell,       0).x;
-                uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCell,         0).x;
-                uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCell,      0).x;
-                uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCell,     0).x;
-                uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCell,    0).x;
-                uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCell,  0).x;
-                uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCell, 0).x;
-                uint left2PartSolved       = uint(nonLeft2Edge)       * texelFetch(gSolution, left2Cell,       0).x;
-                uint right2PartSolved      = uint(nonRight2Edge)      * texelFetch(gSolution, right2Cell,      0).x;
-                uint top2PartSolved        = uint(nonTop2Edge)        * texelFetch(gSolution, top2Cell,        0).x;
-                uint bottom2PartSolved     = uint(nonBottom2Edge)     * texelFetch(gSolution, bottom2Cell,     0).x;
+                uint leftPartSolved        = uint(nonLeftEdge)        * texelFetch(gSolution, leftCellId,        0).x;
+                uint rightPartSolved       = uint(nonRightEdge)       * texelFetch(gSolution, rightCellId,       0).x;
+                uint topPartSolved         = uint(nonTopEdge)         * texelFetch(gSolution, topCellId,         0).x;
+                uint bottomPartSolved      = uint(nonBottomEdge)      * texelFetch(gSolution, bottomCellId,      0).x;
+                uint leftTopPartSolved     = uint(nonLeftTopEdge)     * texelFetch(gSolution, leftTopCellId,     0).x;
+                uint rightTopPartSolved    = uint(nonRightTopEdge)    * texelFetch(gSolution, rightTopCellId,    0).x;
+                uint leftBottomPartSolved  = uint(nonLeftBottomEdge)  * texelFetch(gSolution, leftBottomCellId,  0).x;
+                uint rightBottomPartSolved = uint(nonRightBottomEdge) * texelFetch(gSolution, rightBottomCellId, 0).x;
+                uint left2PartSolved       = uint(nonLeft2Edge)       * texelFetch(gSolution, left2CellId,       0).x;
+                uint right2PartSolved      = uint(nonRight2Edge)      * texelFetch(gSolution, right2CellId,      0).x;
+                uint top2PartSolved        = uint(nonTop2Edge)        * texelFetch(gSolution, top2CellId,        0).x;
+                uint bottom2PartSolved     = uint(nonBottom2Edge)     * texelFetch(gSolution, bottom2CellId,     0).x;
 
                 uvec4 edgeSolved   = uvec4(leftPartSolved,    topPartSolved,      rightPartSolved,       bottomPartSolved);
                 uvec4 cornerSolved = uvec4(leftTopPartSolved, rightTopPartSolved, rightBottomPartSolved, leftBottomPartSolved);
@@ -2772,23 +2772,23 @@ function createChainsShaderProgram(context, vertexShader)
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint stabilityValue = texelFetch(gStability, cellNumber, 0).x;
+                uint stabilityValue = texelFetch(gStability, cellId, 0).x;
 
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCell,        0).x;
-                uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCell,       0).x;
-                uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCell,         0).x;
-                uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCell,      0).x;
-                uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCell,     0).x;
-                uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCell,    0).x;
-                uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCell,  0).x;
-                uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCell, 0).x;
-                uint left2PartStable       = uint(nonLeft2Edge)       * texelFetch(gStability, left2Cell,       0).x;
-                uint right2PartStable      = uint(nonRight2Edge)      * texelFetch(gStability, right2Cell,      0).x;
-                uint top2PartStable        = uint(nonTop2Edge)        * texelFetch(gStability, top2Cell,        0).x;
-                uint bottom2PartStable     = uint(nonBottom2Edge)     * texelFetch(gStability, bottom2Cell,     0).x;
+                uint leftPartStable        = uint(nonLeftEdge)        * texelFetch(gStability, leftCellId,        0).x;
+                uint rightPartStable       = uint(nonRightEdge)       * texelFetch(gStability, rightCellId,       0).x;
+                uint topPartStable         = uint(nonTopEdge)         * texelFetch(gStability, topCellId,         0).x;
+                uint bottomPartStable      = uint(nonBottomEdge)      * texelFetch(gStability, bottomCellId,      0).x;
+                uint leftTopPartStable     = uint(nonLeftTopEdge)     * texelFetch(gStability, leftTopCellId,     0).x;
+                uint rightTopPartStable    = uint(nonRightTopEdge)    * texelFetch(gStability, rightTopCellId,    0).x;
+                uint leftBottomPartStable  = uint(nonLeftBottomEdge)  * texelFetch(gStability, leftBottomCellId,  0).x;
+                uint rightBottomPartStable = uint(nonRightBottomEdge) * texelFetch(gStability, rightBottomCellId, 0).x;
+                uint left2PartStable       = uint(nonLeft2Edge)       * texelFetch(gStability, left2CellId,       0).x;
+                uint right2PartStable      = uint(nonRight2Edge)      * texelFetch(gStability, right2CellId,      0).x;
+                uint top2PartStable        = uint(nonTop2Edge)        * texelFetch(gStability, top2CellId,        0).x;
+                uint bottom2PartStable     = uint(nonBottom2Edge)     * texelFetch(gStability, bottom2CellId,     0).x;
 
                 uvec4 edgeStable   = uvec4(leftPartStable,    topPartStable,      rightPartStable,       bottomPartStable);
                 uvec4 cornerStable = uvec4(leftTopPartStable, rightTopPartStable, rightBottomPartStable, leftBottomPartStable);
