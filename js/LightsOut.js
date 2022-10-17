@@ -1652,6 +1652,12 @@ function createCirclesShaderProgam(context, vertexShader)
     //https://lightstrout.com/blog/2019/05/21/circles-render-mode/
     const circlesFSSource = ShaderCommonStart + ShaderSidesStateFunctions +
     `
+    bvec4 EqualSidesRule(uint cellValue, uvec4 sidesValues)
+    {
+        uvec4 cellValueVec = uvec4(cellValue);
+        return equal(cellValueVec, sidesValues);
+    }
+
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
@@ -1660,60 +1666,65 @@ function createCirclesShaderProgam(context, vertexShader)
         {
             highp ivec2 cellId = screenPos / ivec2(gCellSize);
 
-            uint          cellValue = texelFetch(gBoard, cellId, 0).x;
-            mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
-
+            uint cellValue = texelFetch(gBoard, cellId, 0).x;
             int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
 
             mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
             mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
 
+            mediump float domainFactor = 1.0f / float(gDomainSize - 1);
+
+            bvec4 isOnSide = bvec4(cellCoord.x <= 0.0f, cellCoord.y <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y >= 0.0f);
             bool insideCircle = (dot(cellCoord, cellCoord) <= circleRadius * circleRadius);
 
             CellSidesInfo sidesInfo = GetSidesState(cellId);
 
             uvec4 sidesBoardValues = GetSidesCellValues(sidesInfo, gBoard);
 
-            bool circleRuleColored = insideCircle || ((sidesBoardValues.x == cellValue && cellCoord.x <= 0.0f) 
-                                                  ||  (sidesBoardValues.y == cellValue && cellCoord.y <= 0.0f) 
-                                                  ||  (sidesBoardValues.z == cellValue && cellCoord.x >= 0.0f) 
-                                                  ||  (sidesBoardValues.w == cellValue && cellCoord.y >= 0.0f));
+            bvec4 sidesCandidate = EqualSidesRule(cellValue, sidesBoardValues);
 
-            cellPower = cellPower * float(circleRuleColored);
+            bool resSides = any(b4nd(isOnSide, sidesCandidate));
+            bool circleRuleColored = insideCircle || resSides;
+    
+            uint res = cellValue * uint(circleRuleColored);
+            
+            mediump float cellPower = float(res) * domainFactor;
             outColor  = mix(gColorNone, gColorEnabled, cellPower);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint          solutionValue = texelFetch(gSolution, cellId, 0).x;
-                mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
+                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
 
                 uvec4 sidesSolvedValues = GetSidesCellValues(sidesInfo, gSolution);
 
-                bool circleRuleSolved = insideCircle || ((sidesBoardValues.x == solutionValue && cellCoord.x <= 0.0f) 
-                                                     ||  (sidesBoardValues.y == solutionValue && cellCoord.y <= 0.0f) 
-                                                     ||  (sidesBoardValues.z == solutionValue && cellCoord.x >= 0.0f) 
-                                                     ||  (sidesBoardValues.w == solutionValue && cellCoord.y >= 0.0f));
+                bvec4 sidesSolvedCandidate = EqualSidesRule(solutionValue, sidesSolvedValues);
 
-                solutionPower = solutionPower * float(circleRuleSolved);
-                outColor      = mix(outColor, gColorSolved, solutionPower);
+                bool resSidesSolved = any(b4nd(isOnSide, sidesSolvedCandidate));
+                bool circleRuleSolved = insideCircle || resSidesSolved;
+        
+                uint resSolved = solutionValue * uint(circleRuleSolved);
+
+                mediump float solutionPower = float(resSolved) * domainFactor;
+                outColor = mix(outColor, gColorSolved, solutionPower);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint          stableValue = texelFetch(gStability, cellId, 0).x;
-                mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
+                uint stableValue = texelFetch(gStability, cellId, 0).x;
 
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uvec4 sidesStableValues = GetSidesCellValues(sidesInfo, gSolution);
+                uvec4 sidesStableValues = GetSidesCellValues(sidesInfo, gStability);
 
-                bool circleRuleStable = insideCircle || ((sidesBoardValues.x == stableValue && cellCoord.x <= 0.0f) 
-                                                     ||  (sidesBoardValues.y == stableValue && cellCoord.y <= 0.0f) 
-                                                     ||  (sidesBoardValues.z == stableValue && cellCoord.x >= 0.0f) 
-                                                     ||  (sidesBoardValues.w == stableValue && cellCoord.y >= 0.0f));
+                bvec4 sidesStableCandidate = EqualSidesRule(stableValue, sidesStableValues);
 
-                stablePower = stablePower * float(circleRuleStable);
-                outColor    = mix(outColor, colorStable, stablePower);
+                bool resSidesStable = any(b4nd(isOnSide, sidesStableCandidate));
+                bool circleRuleStable = insideCircle || resSidesStable;
+        
+                uint resStable = stableValue * uint(circleRuleStable);
+
+                mediump float stablePower = float(resStable) * domainFactor;
+                outColor = mix(outColor, colorStable, stablePower);
             }
         }
         else
