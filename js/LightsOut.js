@@ -2011,15 +2011,6 @@ function createBeamsShaderProgram(context, vertexShader)
 
             mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-            
-            /*
-
-
-            Ignore these temporary empty lines.
-            These are here so git diff doesn't freak out.
-        
-
-            */
 
             RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
 
@@ -2216,15 +2207,6 @@ function createRaindropsShaderProgram(context, vertexShader)
             mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
 
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-    
-            /*
-
-
-            Ignore these temporary empty lines.
-            These are here so git diff doesn't freak out.
-        
-
-            */
 
             RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
 
@@ -2406,28 +2388,7 @@ function createChainsShaderProgram(context, vertexShader)
 
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
-            /*
-
-
-
-
-
-
-
-            Ignore these temporary empty lines.
-            These are here so git diff doesn't freak out.
-        
-
-
-
-
-
-
-            */
-
             RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
-
-
 
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
