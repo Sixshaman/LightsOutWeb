@@ -1652,10 +1652,28 @@ function createCirclesShaderProgam(context, vertexShader)
     //https://lightstrout.com/blog/2019/05/21/circles-render-mode/
     const circlesFSSource = ShaderCommonStart + ShaderSidesStateFunctions +
     `
+    struct RegionInfo
+    {
+        bvec4 OnSides;
+        bool  InsideCircle;
+    };
+
     bvec4 EqualSidesRule(uint cellValue, uvec4 sidesValues)
     {
         uvec4 cellValueVec = uvec4(cellValue);
         return equal(cellValueVec, sidesValues);
+    }
+
+    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    {
+        int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+        mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
+
+        RegionInfo regionInfo;
+        regionInfo.OnSides      = bvec4(cellCoord.x <= 0.0f, cellCoord.y <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y >= 0.0f);
+        regionInfo.InsideCircle = dot(cellCoord, cellCoord) <= circleRadius * circleRadius;
+
+        return regionInfo;
     }
 
     void main(void)
@@ -1667,15 +1685,11 @@ function createCirclesShaderProgam(context, vertexShader)
             highp ivec2 cellId = screenPos / ivec2(gCellSize);
 
             uint cellValue = texelFetch(gBoard, cellId, 0).x;
-            int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
-
-            mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-            mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
+            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
 
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
-            bvec4 isOnSide = bvec4(cellCoord.x <= 0.0f, cellCoord.y <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y >= 0.0f);
-            bool insideCircle = (dot(cellCoord, cellCoord) <= circleRadius * circleRadius);
+            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
 
             CellSidesInfo sidesInfo = GetSidesState(cellId);
 
@@ -1683,8 +1697,8 @@ function createCirclesShaderProgam(context, vertexShader)
 
             bvec4 sidesCandidate = EqualSidesRule(cellValue, sidesBoardValues);
 
-            bool resSides = any(b4nd(isOnSide, sidesCandidate));
-            bool circleRuleColored = insideCircle || resSides;
+            bool resSides = any(b4nd(regionInfo.OnSides, sidesCandidate));
+            bool circleRuleColored = regionInfo.InsideCircle || resSides;
     
             uint res = cellValue * uint(circleRuleColored);
             
@@ -1699,8 +1713,8 @@ function createCirclesShaderProgam(context, vertexShader)
 
                 bvec4 sidesSolvedCandidate = EqualSidesRule(solutionValue, sidesSolvedValues);
 
-                bool resSidesSolved = any(b4nd(isOnSide, sidesSolvedCandidate));
-                bool circleRuleSolved = insideCircle || resSidesSolved;
+                bool resSidesSolved = any(b4nd(regionInfo.OnSides, sidesSolvedCandidate));
+                bool circleRuleSolved = regionInfo.InsideCircle || resSidesSolved;
         
                 uint resSolved = solutionValue * uint(circleRuleSolved);
 
@@ -1718,8 +1732,8 @@ function createCirclesShaderProgam(context, vertexShader)
 
                 bvec4 sidesStableCandidate = EqualSidesRule(stableValue, sidesStableValues);
 
-                bool resSidesStable = any(b4nd(isOnSide, sidesStableCandidate));
-                bool circleRuleStable = insideCircle || resSidesStable;
+                bool resSidesStable = any(b4nd(regionInfo.OnSides, sidesStableCandidate));
+                bool circleRuleStable = regionInfo.InsideCircle || resSidesStable;
         
                 uint resStable = stableValue * uint(circleRuleStable);
 
@@ -1741,6 +1755,12 @@ function createDiamondsShaderProgram(context, vertexShader)
     //http://lightstrout.com/blog/2019/12/09/diamonds-render-mode/
     const diamondsFSSource = ShaderCommonStart + ShaderSidesStateFunctions + ShaderCornersStateFunctions +
     `
+    struct RegionInfo
+    {
+        bvec4 InsideCorners;
+        bool  InsideDiamond;
+    };
+
     bvec4 emptyCornerRule(uvec4 edgeValue)
     {
         return equal(edgeValue.xyzw, edgeValue.yzwx);
@@ -1751,6 +1771,26 @@ function createDiamondsShaderProgram(context, vertexShader)
         return equal(uvec4(cellValue), cornerValue.xyzw);
     }
 
+    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    {
+        int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+        mediump float diamondRadius = float(cellSizeCorrected) / 2.0f;
+
+        bool insideDiamond   = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
+
+        bool insideTopLeft     = cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
+        bool insideTopRight    = cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
+        bool insideBottomRight = cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
+        bool insideBottomLeft  = cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
+        
+        bvec4 insideCorners = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
+
+        RegionInfo regionInfo;
+        regionInfo.InsideCorners = b4nd(bvec4(!insideDiamond), insideCorners);
+        regionInfo.InsideDiamond = insideDiamond;
+        return regionInfo;
+    }
+
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
@@ -1758,22 +1798,13 @@ function createDiamondsShaderProgram(context, vertexShader)
         if(IsInsideCell(screenPos))
         {
             highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
-            uint        cellValue  = texelFetch(gBoard, cellId, 0).x;
 
-            int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+            uint cellValue = texelFetch(gBoard, cellId, 0).x;
+            mediump vec2  cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
 
-            mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-            mediump float diamondRadius = float(cellSizeCorrected - 1) / 2.0f;
-            
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
-            bool insideDiamond     = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
-            bool insideTopLeft     = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
-            bool insideTopRight    = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-            bool insideBottomRight = !insideDiamond && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
-            bool insideBottomLeft  = !insideDiamond && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
-
-            bvec4 insideCorner = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
+            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
 
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
@@ -1789,7 +1820,7 @@ function createDiamondsShaderProgram(context, vertexShader)
             mediump float  cellPower = float(cellValue) * domainFactor;		
             mediump vec4 cornerPower =  vec4(resCorner) * domainFactor;
 
-            mediump float enablePower = cellPower * float(insideDiamond) + dot(cornerPower, vec4(insideCorner));
+            mediump float enablePower = cellPower * float(regionInfo.InsideDiamond) + dot(cornerPower, vec4(regionInfo.InsideCorners));
             outColor                  = mix(gColorNone, gColorEnabled, enablePower);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
@@ -1807,7 +1838,7 @@ function createDiamondsShaderProgram(context, vertexShader)
                 mediump float      solutionPower =  float(solutionValue) * domainFactor;		
                 mediump vec4 cornerSolutionPower = vec4(resCornerSolved) * domainFactor;
 
-                mediump float solvedPower = solutionPower * float(insideDiamond) + dot(cornerSolutionPower, vec4(insideCorner));
+                mediump float solvedPower = solutionPower * float(regionInfo.InsideDiamond) + dot(cornerSolutionPower, vec4(regionInfo.InsideCorners));
                 outColor                  = mix(outColor, gColorSolved, solvedPower);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
@@ -1828,7 +1859,7 @@ function createDiamondsShaderProgram(context, vertexShader)
                 mediump float      stabilityPower =    float(stableValue) * domainFactor;		
                 mediump vec4 cornerStabilityPower = vec4(resCornerStable) * domainFactor;
     
-                mediump float stablePower = stabilityPower * float(insideDiamond) + dot(cornerStabilityPower, vec4(insideCorner));
+                mediump float stablePower = stabilityPower * float(regionInfo.InsideDiamond) + dot(cornerStabilityPower, vec4(regionInfo.InsideCorners));
                 outColor                  = mix(outColor, colorStable, stablePower);
             }
         }
@@ -1846,6 +1877,17 @@ function createBeamsShaderProgram(context, vertexShader)
     //https://lightstrout.com/blog/2019/12/18/beams-render-mode/
     const beamsFSSource = ShaderCommonStart + ShaderSidesStateFunctions + ShaderCornersStateFunctions +
     `
+    struct RegionInfo
+    {
+        bvec4 InsideBRegion;
+        bvec4 InsideIRegion;
+        bvec4 InsideYTopRightRegion;
+        bvec4 InsideYBottomLeftRegion;
+        bvec4 InsideVRegion;
+        bool  InsideGRegion;
+        bool  OutsideCentralDiamond;
+    };
+
     bvec4 emptyCornerRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
     {
         bvec4 res = bvec4(true);
@@ -1922,6 +1964,42 @@ function createBeamsShaderProgram(context, vertexShader)
         return b4nd(equal(cellValueVec, cornerValue.xyzw), notEqual(cellValueVec, edgeValue.xyzw), notEqual(cellValueVec, edgeValue.yzwx)); //V#1
     }
 
+    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    {
+        int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+
+        mediump vec2 absCellCoord = abs(cellCoord);
+        mediump float diamondRadius = float(cellSizeCorrected) / 2.0f;
+
+        bvec4 insideSide = bvec4(cellCoord.x <= 0.0f, cellCoord.y <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y >= 0.0f);
+
+        //Fix for 1 pixel off. To make it work, x == 0 and y == 0 pixels shouldn't be considered part of beam (or else single pixel artifacts will appear)
+        //For even cell sizes, region inside diamond should be a bit smaller to compensate
+        bool insideCentralDiamond   = (absCellCoord.x + absCellCoord.y <= diamondRadius - 1.0f * float((gCellSize % 2 == 0) && ((gFlags & FLAG_NO_GRID) != 0)));
+        bool outsideCentralDiamond  = (absCellCoord.x + absCellCoord.y >= diamondRadius + 1.0f * float(gCellSize % 2 == 0));
+
+        bool insideVerticalBeam   = absCellCoord.x <= 0.707f * float(cellSizeCorrected) / 2.0f;
+        bool insideHorizontalBeam = absCellCoord.y <= 0.707f * float(cellSizeCorrected) / 2.0f;
+
+        bvec4 insideBeam = b4nd(bvec4(insideHorizontalBeam, insideVerticalBeam, insideHorizontalBeam, insideVerticalBeam), insideSide);
+
+        RegionInfo result;
+
+        result.OutsideCentralDiamond = outsideCentralDiamond;
+
+        result.InsideGRegion = insideCentralDiamond && insideHorizontalBeam && insideVerticalBeam; //G
+        
+        result.InsideBRegion = b4nd(insideBeam.xzzx,     insideBeam.yyww ,                       bvec4(!insideCentralDiamond)); //B-A, B-B, B-C, B-D
+        result.InsideIRegion = b4nd(insideBeam.xyzw, not(insideBeam.yxwz), not(insideBeam.wzyx), bvec4( insideCentralDiamond)); //I-A, I-B, I-C, I-D
+        
+        result.InsideYTopRightRegion   = b4nd(insideBeam.yyzz, not(insideBeam.xzyw), bvec4(!insideCentralDiamond), insideSide.xzyw); //Y-A, Y-B, Y-C, Y-D
+        result.InsideYBottomLeftRegion = b4nd(insideBeam.wwxx, not(insideBeam.zxwy), bvec4(!insideCentralDiamond), insideSide.zxwy); //Y-E, Y-F, Y-G, Y-H
+        
+        result.InsideVRegion = b4nd(not(insideBeam.xyzw), not(insideBeam.yzwx), insideSide.xyzw, insideSide.yzwx); //V-A, V-B, V-C, V-D
+
+        return result;
+    }
+
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
@@ -1931,36 +2009,19 @@ function createBeamsShaderProgram(context, vertexShader)
             highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
             uint        cellValue  = texelFetch(gBoard, cellId, 0).x;
 
-            int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
-
             mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-            mediump float diamondRadius = float(cellSizeCorrected) / 2.0f;
-
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-            mediump vec2 absCellCoord = abs(cellCoord);
+            
+            /*
 
-            //Fix for 1 pixel off. To make it work, x == 0 and y == 0 pixels shouldn't be considered part of beam (or else single pixel artifacts will appear)
-            //For even cell sizes, region inside diamond should be a bit smaller to compensate
-            bool insideCentralDiamond   = (absCellCoord.x + absCellCoord.y <= diamondRadius - 1.0f * float((gCellSize % 2 == 0) && ((gFlags & FLAG_NO_GRID) != 0)));
-            bool outsideCentralDiamond  = (absCellCoord.x + absCellCoord.y >= diamondRadius + 1.0f * float(gCellSize % 2 == 0));
 
-            bool insideHorizontalBeamLeft  = (absCellCoord.y <= 0.707f * float(cellSizeCorrected) / 2.0f && cellCoord.x <= 0.0f);
-            bool insideHorizontalBeamRight = (absCellCoord.y <= 0.707f * float(cellSizeCorrected) / 2.0f && cellCoord.x >= 0.0f);
-            bool insideVerticalBeamTop     = (absCellCoord.x <= 0.707f * float(cellSizeCorrected) / 2.0f && cellCoord.y <= 0.0f);
-            bool insideVerticalBeamBottom  = (absCellCoord.x <= 0.707f * float(cellSizeCorrected) / 2.0f && cellCoord.y >= 0.0f);
+            Ignore these temporary empty lines.
+            These are here so git diff doesn't freak out.
+        
 
-            bvec4 insideSide = bvec4(cellCoord.x <= 0.0f, cellCoord.y <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y >= 0.0f);
-            bvec4 insideBeam = bvec4(insideHorizontalBeamLeft, insideVerticalBeamTop, insideHorizontalBeamRight, insideVerticalBeamBottom);
+            */
 
-            bool insideG = insideCentralDiamond && (insideHorizontalBeamLeft || insideHorizontalBeamRight) && (insideVerticalBeamTop || insideVerticalBeamBottom); //G
-
-            bvec4 insideB = b4nd(insideBeam.xzzx,     insideBeam.yyww ,                       bvec4(!insideCentralDiamond)); //B-A, B-B, B-C, B-D
-            bvec4 insideI = b4nd(insideBeam.xyzw, not(insideBeam.yxwz), not(insideBeam.wzyx), bvec4( insideCentralDiamond)); //I-A, I-B, I-C, I-D
-
-            bvec4 insideYTopRight   = b4nd(insideBeam.yyzz, not(insideBeam.xzyw), bvec4(!insideCentralDiamond), insideSide.xzyw); //Y-A, Y-B, Y-C, Y-D
-            bvec4 insideYBottomLeft = b4nd(insideBeam.wwxx, not(insideBeam.zxwy), bvec4(!insideCentralDiamond), insideSide.zxwy); //Y-E, Y-F, Y-G, Y-H
-
-            bvec4 insideV = b4nd(not(insideBeam.xyzw), not(insideBeam.yzwx), insideSide.xyzw, insideSide.yzwx); //V-A, V-B, V-C, V-D
+            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
 
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
@@ -1969,7 +2030,7 @@ function createBeamsShaderProgram(context, vertexShader)
             uvec4 cornerValue = GetCornersCellValues(cornersInfo, gBoard);
 
             uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellValue, edgeValue, cornerValue)) * edgeValue;
-            emptyCornerCandidate      *= uint(outsideCentralDiamond); //Fix for 1 pixel offset beforehand 
+            emptyCornerCandidate      *= uint(regionInfo.OutsideCentralDiamond); //Fix for 1 pixel offset beforehand 
 
             uvec4 regionBCandidate = uvec4(regBRule(cellValue, edgeValue, cornerValue)) * cellValue;
             uvec4 regionICandidate = uvec4(regIRule(cellValue, edgeValue, cornerValue)) * cellValue;
@@ -1991,12 +2052,12 @@ function createBeamsShaderProgram(context, vertexShader)
             mediump vec4  regYBottomLeftPower = vec4( resYBottomLeft  ) * vec4(domainFactor);
             mediump vec4  regVPower           = vec4( resV            ) * vec4(domainFactor);
 
-            mediump float enablePower =    float(insideG)      *     regGPower;
-            enablePower              += dot(vec4(insideB),           regBPower);
-            enablePower              += dot(vec4(insideI),           regIPower); 
-            enablePower              += dot(vec4(insideYTopRight),   regYTopRightPower);
-            enablePower              += dot(vec4(insideYBottomLeft), regYBottomLeftPower); 
-            enablePower              += dot(vec4(insideV),           regVPower);
+            mediump float enablePower =    float(regionInfo.InsideGRegion)      *     regGPower;
+            enablePower              += dot(vec4(regionInfo.InsideBRegion),           regBPower);
+            enablePower              += dot(vec4(regionInfo.InsideIRegion),           regIPower); 
+            enablePower              += dot(vec4(regionInfo.InsideYTopRightRegion),   regYTopRightPower);
+            enablePower              += dot(vec4(regionInfo.InsideYBottomLeftRegion), regYBottomLeftPower); 
+            enablePower              += dot(vec4(regionInfo.InsideVRegion),           regVPower);
 
             outColor = mix(gColorNone, gColorEnabled, enablePower);
 
@@ -2029,12 +2090,12 @@ function createBeamsShaderProgram(context, vertexShader)
                 mediump vec4  regYBottomLeftSolutionPower = vec4( resYBottomLeftSolution  ) * vec4(domainFactor);
                 mediump vec4  regVSolutionPower           = vec4( resVSolution            ) * vec4(domainFactor);
 
-                mediump float solvedPower =    float(insideG)      *     regGSolutionPower;
-                solvedPower              += dot(vec4(insideB),           regBSolutionPower);
-                solvedPower              += dot(vec4(insideI),           regISolutionPower); 
-                solvedPower              += dot(vec4(insideYTopRight),   regYTopRightSolutionPower);
-                solvedPower              += dot(vec4(insideYBottomLeft), regYBottomLeftSolutionPower); 
-                solvedPower              += dot(vec4(insideV),           regVSolutionPower);
+                mediump float solvedPower =    float(regionInfo.InsideGRegion)      *     regGSolutionPower;
+                solvedPower              += dot(vec4(regionInfo.InsideBRegion),           regBSolutionPower);
+                solvedPower              += dot(vec4(regionInfo.InsideIRegion),           regISolutionPower); 
+                solvedPower              += dot(vec4(regionInfo.InsideYTopRightRegion),   regYTopRightSolutionPower);
+                solvedPower              += dot(vec4(regionInfo.InsideYBottomLeftRegion), regYBottomLeftSolutionPower); 
+                solvedPower              += dot(vec4(regionInfo.InsideVRegion),           regVSolutionPower);
                 
                 outColor = mix(outColor, gColorSolved, solvedPower);
             }
@@ -2070,12 +2131,12 @@ function createBeamsShaderProgram(context, vertexShader)
                 mediump vec4  regYBottomLeftStabilityPower = vec4( resYBottomLeftStability  ) * vec4(domainFactor);
                 mediump vec4  regVStabilityPower           = vec4( resVStability            ) * vec4(domainFactor);
 
-                mediump float stablePower =    float(insideG)      *     regGStabilityPower;
-                stablePower              += dot(vec4(insideB),           regBStabilityPower);
-                stablePower              += dot(vec4(insideI),           regIStabilityPower); 
-                stablePower              += dot(vec4(insideYTopRight),   regYTopRightStabilityPower);
-                stablePower              += dot(vec4(insideYBottomLeft), regYBottomLeftStabilityPower); 
-                stablePower              += dot(vec4(insideV),           regVStabilityPower);
+                mediump float stablePower =    float(regionInfo.InsideGRegion)      *     regGStabilityPower;
+                stablePower              += dot(vec4(regionInfo.InsideBRegion),           regBStabilityPower);
+                stablePower              += dot(vec4(regionInfo.InsideIRegion),           regIStabilityPower); 
+                stablePower              += dot(vec4(regionInfo.InsideYTopRightRegion),   regYTopRightStabilityPower);
+                stablePower              += dot(vec4(regionInfo.InsideYBottomLeftRegion), regYBottomLeftStabilityPower); 
+                stablePower              += dot(vec4(regionInfo.InsideVRegion),           regVStabilityPower);
                 
                 outColor = mix(outColor, colorStable, stablePower);
             }
@@ -2094,6 +2155,13 @@ function createRaindropsShaderProgram(context, vertexShader)
     //https://lightstrout.com/blog/2019/05/21/raindrops-render-mode/
     const raindropsFSSource = ShaderCommonStart + ShaderSidesStateFunctions + ShaderCornersStateFunctions +
     `
+    struct RegionInfo
+    {
+        bvec4 InsideCorners;
+        bool  InsideCircle;
+        bool  OutsideCircle;
+    };
+
     bvec4 emptyCornerRule(uvec4 edgeValue)
     {
         return equal(edgeValue.xyzw, edgeValue.yzwx);
@@ -2112,6 +2180,30 @@ function createRaindropsShaderProgram(context, vertexShader)
         return res;
     }
 
+    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    {
+        int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+
+        mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
+
+        bool insideCircle  = (dot(cellCoord, cellCoord) < (circleRadius * circleRadius));
+        bool outsideCircle = (dot(cellCoord, cellCoord) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
+
+        bool insideTopLeft     = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
+        bool insideTopRight    = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
+        bool insideBottomRight = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
+        bool insideBottomLeft  = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
+
+        RegionInfo result;
+
+        result.InsideCorners = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
+
+        result.InsideCircle  = insideCircle;
+        result.OutsideCircle = outsideCircle;
+
+        return result;
+    }
+
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
@@ -2121,22 +2213,20 @@ function createRaindropsShaderProgram(context, vertexShader)
             highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
             uint        cellValue  = texelFetch(gBoard, cellId, 0).x;
 
-            int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
 
-            mediump vec2  cellCoord    = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-            mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
-            
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
     
-            bool insideCircle  = (dot(cellCoord, cellCoord) < (circleRadius * circleRadius));
-            bool outsideCircle = (dot(cellCoord, cellCoord) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
+            /*
 
-            bool insideTopLeft     = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
-            bool insideTopRight    = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-            bool insideBottomRight = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
-            bool insideBottomLeft  = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
-    
-            bvec4 insideCorner = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
+
+            Ignore these temporary empty lines.
+            These are here so git diff doesn't freak out.
+        
+
+            */
+
+            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
 
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
@@ -2147,14 +2237,14 @@ function createRaindropsShaderProgram(context, vertexShader)
             uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue))                    * edgeValue;
             uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, edgeValue, cornerValue)) * cellValue;
 
-            emptyCornerCandidate = uint(outsideCircle) * emptyCornerCandidate;
+            emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
 
             uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
 
             mediump float  cellPower = float(cellValue) * domainFactor;		
             mediump vec4 cornerPower =  vec4(resCorner) * domainFactor;
 
-            mediump float enablePower = cellPower * float(insideCircle) + dot(cornerPower, vec4(insideCorner));
+            mediump float enablePower = cellPower * float(regionInfo.InsideCircle) + dot(cornerPower, vec4(regionInfo.InsideCorners));
             outColor                  = mix(gColorNone, gColorEnabled, enablePower);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
@@ -2172,7 +2262,7 @@ function createRaindropsShaderProgram(context, vertexShader)
                 mediump float      solutionPower =  float(solutionValue) * domainFactor;		
                 mediump vec4 cornerSolutionPower = vec4(resCornerSolved) * domainFactor;
 
-                mediump float solvedPower = solutionPower * float(insideCircle) + dot(cornerSolutionPower, vec4(insideCorner));
+                mediump float solvedPower = solutionPower * float(regionInfo.InsideCircle) + dot(cornerSolutionPower, vec4(regionInfo.InsideCorners));
                 outColor                  = mix(outColor, gColorSolved, solvedPower);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
@@ -2193,7 +2283,7 @@ function createRaindropsShaderProgram(context, vertexShader)
                 mediump float      stabilityPower =    float(stableValue) * domainFactor;		
                 mediump vec4 cornerStabilityPower = vec4(resCornerStable) * domainFactor;
     
-                mediump float stablePower = stabilityPower * float(insideCircle) + dot(cornerStabilityPower, vec4(insideCorner));
+                mediump float stablePower = stabilityPower * float(regionInfo.InsideCircle) + dot(cornerStabilityPower, vec4(regionInfo.InsideCorners));
                 outColor                  = mix(outColor, colorStable, stablePower);
             }
         }
@@ -2211,6 +2301,17 @@ function createChainsShaderProgram(context, vertexShader)
     //https://lightstrout.com/blog/2019/05/21/chains-render-mode/
     const chainsFSSource = ShaderCommonStart + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderSides2StateFunctions +
     `
+    struct RegionInfo
+    {
+        bvec4 InsideFreeCorners;
+        bvec4 InsideSlimEdgesTopRight;
+        bvec4 InsideSlimEdgesBottomLeft;
+        bvec2 InsideCenterLinks;
+        bool  InsideBothLinks;
+        bool  InsideFreeCircle;
+        bool  OutsideCircle;
+    };
+
     bvec4 emptyCornerRule(uvec4 edgeValue)
     {
         return equal(edgeValue.xyzw, edgeValue.yzwx);
@@ -2240,6 +2341,58 @@ function createChainsShaderProgram(context, vertexShader)
         return equal(cellValueVec, edge2Value.xyzw);
     }
 
+    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    {
+        int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+
+        mediump float circleRadius    = float(cellSizeCorrected) / 2.0f;
+        mediump float circleRadiusBig = float(cellSizeCorrected - 1);
+
+        mediump vec2 cellCoordLeft   = cellCoord + vec2(float( cellSizeCorrected),              0.0f);
+        mediump vec2 cellCoordRight  = cellCoord + vec2(float(-cellSizeCorrected),              0.0f);
+        mediump vec2 cellCoordTop    = cellCoord + vec2(             0.0f, float( cellSizeCorrected));
+        mediump vec2 cellCoordBottom = cellCoord + vec2(             0.0f, float(-cellSizeCorrected));
+
+        bool insideCircle  = (dot(cellCoord, cellCoord) < circleRadius          * circleRadius);
+        bool outsideCircle = (dot(cellCoord, cellCoord) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
+
+        bool insideCircleBigLeft   = (dot(  cellCoordLeft,   cellCoordLeft) < (circleRadiusBig) * (circleRadiusBig));
+        bool insideCircleBigRight  = (dot( cellCoordRight,  cellCoordRight) < (circleRadiusBig) * (circleRadiusBig));
+        bool insideCircleBigTop    = (dot(   cellCoordTop,    cellCoordTop) < (circleRadiusBig) * (circleRadiusBig));
+        bool insideCircleBigBottom = (dot(cellCoordBottom, cellCoordBottom) < (circleRadiusBig) * (circleRadiusBig));
+
+        bool insideLinkHorizontal = !insideCircleBigTop  && !insideCircleBigBottom;
+        bool insideLinkVertical   = !insideCircleBigLeft && !insideCircleBigRight;
+
+        bvec2 insideLink      = bvec2(insideLinkHorizontal, insideLinkVertical);
+        bool  insideBothLinks = insideLinkVertical && insideLinkHorizontal;
+
+        bool insideTopLeft     = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
+        bool insideTopRight    = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
+        bool insideBottomRight = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
+        bool insideBottomLeft  = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
+
+        bvec4 insideCircleBig = bvec4(insideCircleBigLeft, insideCircleBigTop, insideCircleBigRight, insideCircleBigBottom);
+        bvec4 insideCorner    = bvec4(insideTopLeft,       insideTopRight,     insideBottomRight,    insideBottomLeft);
+
+
+        RegionInfo result;
+
+        result.InsideFreeCorners = b4nd(insideCorner, bvec4(!insideLinkHorizontal), bvec4(!insideLinkVertical));
+        
+        result.InsideSlimEdgesTopRight   = b4nd(insideLink.xyyx, insideCorner.xxyy);
+        result.InsideSlimEdgesBottomLeft = b4nd(insideLink.xyyx, insideCorner.zzww);
+
+        result.InsideCenterLinks = b2nd(insideLink, bvec2(insideCircle), bvec2(!insideBothLinks));
+        result.InsideBothLinks   = insideBothLinks;
+
+        result.InsideFreeCircle = b1nd(insideCircle, !insideLinkVertical, !insideLinkHorizontal);
+
+        result.OutsideCircle = outsideCircle;
+
+        return result;
+    }
+
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
@@ -2249,45 +2402,32 @@ function createChainsShaderProgram(context, vertexShader)
             highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
             uint        cellValue  = texelFetch(gBoard, cellId, 0).x;
 
-            int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
 
-            mediump vec2  cellCoord       = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-            mediump float circleRadius    = float(cellSizeCorrected) / 2.0f;
-            mediump float circleRadiusBig = float(cellSizeCorrected - 1);
-            mediump float domainFactor    = 1.0f / float(gDomainSize - 1);
+            mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
-            mediump vec2 cellCoordLeft        = cellCoord + vec2(float( cellSizeCorrected),              0.0f);
-            mediump vec2 cellCoordRight       = cellCoord + vec2(float(-cellSizeCorrected),              0.0f);
-            mediump vec2 cellCoordTop         = cellCoord + vec2(             0.0f, float( cellSizeCorrected));
-            mediump vec2 cellCoordBottom      = cellCoord + vec2(             0.0f, float(-cellSizeCorrected));
+            /*
 
-            bool insideCircle     = (dot(      cellCoord,       cellCoord) < circleRadius          * circleRadius);
-            bool outsideCircle    = (dot(      cellCoord,       cellCoord) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
-            bool insideCircleBigL = (dot(  cellCoordLeft,   cellCoordLeft) < (circleRadiusBig)     * (circleRadiusBig));
-            bool insideCircleBigR = (dot( cellCoordRight,  cellCoordRight) < (circleRadiusBig)     * (circleRadiusBig));
-            bool insideCircleBigT = (dot(   cellCoordTop,    cellCoordTop) < (circleRadiusBig)     * (circleRadiusBig));
-            bool insideCircleBigB = (dot(cellCoordBottom, cellCoordBottom) < (circleRadiusBig)     * (circleRadiusBig));
 
-            bool insideTopLeft     = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
-            bool insideTopRight    = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-            bool insideBottomRight = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
-            bool insideBottomLeft  = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
 
-            bvec4 insideCircleBig = bvec4(insideCircleBigL, insideCircleBigT, insideCircleBigR,  insideCircleBigB);
-            bvec4 insideCorner    = bvec4(insideTopLeft,    insideTopRight,   insideBottomRight, insideBottomLeft);
 
-            bool insideLinkH = !insideCircleBigT && !insideCircleBigB;
-            bool insideLinkV = !insideCircleBigL && !insideCircleBigR;
 
-            bvec2 insideLink      = bvec2(insideLinkH, insideLinkV);
-            bool  insideBothLinks = insideLinkV && insideLinkH;
 
-            bvec4 insideSlimEdgeTopRightPart   = b4nd(insideLink.xyyx, insideCorner.xxyy);
-            bvec4 insideSlimEdgeBottomLeftPart = b4nd(insideLink.xyyx, insideCorner.zzww);
 
-            bvec2 insideCenterLink = b2nd(insideLink,   bvec2( insideCircle), bvec2(!insideBothLinks));
-            bool  insideFreeCircle = b1nd(insideCircle,       !insideLinkV  ,       !insideLinkH);
-            bvec4 insideFreeCorner = b4nd(insideCorner, bvec4(!insideLinkH ), bvec4(!insideLinkV));
+            Ignore these temporary empty lines.
+            These are here so git diff doesn't freak out.
+        
+
+
+
+
+
+
+            */
+
+            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
+
+
 
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
@@ -2302,7 +2442,7 @@ function createChainsShaderProgram(context, vertexShader)
             uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)                   ) * edgeValue;
             uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, edgeValue, cornerValue)) * cellValue;
 
-            emptyCornerCandidate = uint(outsideCircle) * emptyCornerCandidate;
+            emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
 
             uvec2 linkCandidate     = uvec2(linkRule(edgeValue)                ) *       edgeValue.xy;
             uvec4 slimEdgeCandidate = uvec4(slimEdgeRule(cellValue, edge2Value)) * uvec4(cellValue);
@@ -2321,12 +2461,12 @@ function createChainsShaderProgram(context, vertexShader)
             mediump vec2  linkPower           = vec2( resLink                   ) * vec2(domainFactor);
             mediump float midPower            = float(resMidLinks               ) *      domainFactor;
 
-            mediump float enablePower =    float(insideFreeCircle)      *       cellPower;
-            enablePower              += dot(vec4(insideFreeCorner),             cornerPower);
-            enablePower              += dot(vec4(insideSlimEdgeTopRightPart),   slimTopRightPower); 
-            enablePower              += dot(vec4(insideSlimEdgeBottomLeftPart), slimBottomLeftPower);
-            enablePower              += dot(vec2(insideCenterLink),             linkPower); 
-            enablePower              +=    float(insideBothLinks)       *       midPower;
+            mediump float enablePower =    float(regionInfo.InsideFreeCircle)    *      cellPower;
+            enablePower              += dot(vec4(regionInfo.InsideFreeCorners),         cornerPower);
+            enablePower              += dot(vec4(regionInfo.InsideSlimEdgesTopRight),   slimTopRightPower); 
+            enablePower              += dot(vec4(regionInfo.InsideSlimEdgesBottomLeft), slimBottomLeftPower);
+            enablePower              += dot(vec2(regionInfo.InsideCenterLinks),         linkPower); 
+            enablePower              +=    float(regionInfo.InsideBothLinks)     *      midPower;
 
             outColor = mix(gColorNone, gColorEnabled, enablePower);
 
@@ -2360,12 +2500,12 @@ function createChainsShaderProgram(context, vertexShader)
                 mediump vec2  linkSolutionPower           = vec2( resLinkSolution                   ) * vec2(domainFactor);
                 mediump float midSolutionPower            = float(resMidLinksSolution               ) *      domainFactor;
 
-                mediump float solvedPower =    float(insideFreeCircle)      *       cellSolutionPower;
-                solvedPower              += dot(vec4(insideFreeCorner),             cornerSolutionPower);
-                solvedPower              += dot(vec4(insideSlimEdgeTopRightPart),   slimTopRightSolutionPower); 
-                solvedPower              += dot(vec4(insideSlimEdgeBottomLeftPart), slimBottomLeftSolutionPower);
-                solvedPower              += dot(vec2(insideCenterLink),             linkSolutionPower); 
-                solvedPower              +=    float(insideBothLinks)       *       midSolutionPower;
+                mediump float solvedPower =    float(regionInfo.InsideFreeCircle)    *      cellSolutionPower;
+                solvedPower              += dot(vec4(regionInfo.InsideFreeCorners),         cornerSolutionPower);
+                solvedPower              += dot(vec4(regionInfo.InsideSlimEdgesTopRight),   slimTopRightSolutionPower); 
+                solvedPower              += dot(vec4(regionInfo.InsideSlimEdgesBottomLeft), slimBottomLeftSolutionPower);
+                solvedPower              += dot(vec2(regionInfo.InsideCenterLinks),         linkSolutionPower); 
+                solvedPower              +=    float(regionInfo.InsideBothLinks)     *      midSolutionPower;
 
                 outColor = mix(outColor, gColorSolved, solvedPower);
             }
@@ -2402,12 +2542,12 @@ function createChainsShaderProgram(context, vertexShader)
                 mediump vec2  linkStabilityPower           = vec2( resLinkStability                   ) * vec2(domainFactor);
                 mediump float midStabilityPower            = float(resMidLinksStability               ) *      domainFactor;
 
-                mediump float stablePower =    float(insideFreeCircle)      *       cellStabilityPower;
-                stablePower              += dot(vec4(insideFreeCorner),             cornerStabilityPower);
-                stablePower              += dot(vec4(insideSlimEdgeTopRightPart),   slimTopRightStabilityPower); 
-                stablePower              += dot(vec4(insideSlimEdgeBottomLeftPart), slimBottomLeftStabilityPower);
-                stablePower              += dot(vec2(insideCenterLink),             linkStabilityPower); 
-                stablePower              +=    float(insideBothLinks)       *       midStabilityPower;
+                mediump float stablePower =    float(regionInfo.InsideFreeCircle)    *      cellStabilityPower;
+                stablePower              += dot(vec4(regionInfo.InsideFreeCorners),         cornerStabilityPower);
+                stablePower              += dot(vec4(regionInfo.InsideSlimEdgesTopRight),   slimTopRightStabilityPower); 
+                stablePower              += dot(vec4(regionInfo.InsideSlimEdgesBottomLeft), slimBottomLeftStabilityPower);
+                stablePower              += dot(vec2(regionInfo.InsideCenterLinks),         linkStabilityPower); 
+                stablePower              +=    float(regionInfo.InsideBothLinks)     *      midStabilityPower;
 
                 outColor = mix(outColor, colorStable, stablePower);
             }
