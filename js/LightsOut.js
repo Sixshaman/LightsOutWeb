@@ -1320,6 +1320,16 @@ bool b1nd(bool a, bool b, bool c) //And that's what happens when you want the co
 {
     return a && b && c;
 }
+
+uint udot(uvec4 a, uvec4 b) //No words for this...
+{
+    return a.x * b.x + a.y * b.y + a.z * b.z + a.w * b.w;
+}
+
+uint udot(uvec2 a, uvec2 b)
+{
+    return a.x * b.x + a.y * b.y;
+}
 `;
 
 //Helper functions to access cardinal cell neighbours
@@ -1676,15 +1686,23 @@ function createCirclesShaderProgam(context, vertexShader)
         return regionInfo;
     }
 
+    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue, uvec4 sidesValues)
+    {
+        bvec4 sidesCandidate = EqualSidesRule(cellValue, sidesValues);
+
+        bool resSides = any(b4nd(regionInfo.OnSides, sidesCandidate));
+        bool circleRuleColored = regionInfo.InsideCircle || resSides;
+
+        return cellValue * uint(circleRuleColored);
+    }
+
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
 
         if(IsInsideCell(screenPos))
         {
-            highp ivec2 cellId = screenPos / ivec2(gCellSize);
-
-            uint cellValue = texelFetch(gBoard, cellId, 0).x;
+            highp  ivec2 cellId = screenPos / ivec2(gCellSize);
             mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
 
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
@@ -1693,52 +1711,30 @@ function createCirclesShaderProgam(context, vertexShader)
 
             CellSidesInfo sidesInfo = GetSidesState(cellId);
 
+            uint cellValue = texelFetch(gBoard, cellId, 0).x;
             uvec4 sidesBoardValues = GetSidesCellValues(sidesInfo, gBoard);
-
-            bvec4 sidesCandidate = EqualSidesRule(cellValue, sidesBoardValues);
-
-            bool resSides = any(b4nd(regionInfo.OnSides, sidesCandidate));
-            bool circleRuleColored = regionInfo.InsideCircle || resSides;
-    
-            uint res = cellValue * uint(circleRuleColored);
             
-            mediump float cellPower = float(res) * domainFactor;
-            outColor  = mix(gColorNone, gColorEnabled, cellPower);
+            uint regionValue = CalculateRegionValue(regionInfo, cellValue, sidesBoardValues);
+            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
-
+                uint  solutionValue    = texelFetch(gSolution, cellId, 0).x;
                 uvec4 sidesSolvedValues = GetSidesCellValues(sidesInfo, gSolution);
 
-                bvec4 sidesSolvedCandidate = EqualSidesRule(solutionValue, sidesSolvedValues);
-
-                bool resSidesSolved = any(b4nd(regionInfo.OnSides, sidesSolvedCandidate));
-                bool circleRuleSolved = regionInfo.InsideCircle || resSidesSolved;
-        
-                uint resSolved = solutionValue * uint(circleRuleSolved);
-
-                mediump float solutionPower = float(resSolved) * domainFactor;
-                outColor = mix(outColor, gColorSolved, solutionPower);
+                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue, sidesSolvedValues);
+                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint stableValue = texelFetch(gStability, cellId, 0).x;
-
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
+                uint stableValue = texelFetch(gStability, cellId, 0).x;
                 uvec4 sidesStableValues = GetSidesCellValues(sidesInfo, gStability);
 
-                bvec4 sidesStableCandidate = EqualSidesRule(stableValue, sidesStableValues);
-
-                bool resSidesStable = any(b4nd(regionInfo.OnSides, sidesStableCandidate));
-                bool circleRuleStable = regionInfo.InsideCircle || resSidesStable;
-        
-                uint resStable = stableValue * uint(circleRuleStable);
-
-                mediump float stablePower = float(resStable) * domainFactor;
-                outColor = mix(outColor, colorStable, stablePower);
+                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue, sidesStableValues);
+                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
             }
         }
         else
@@ -1791,6 +1787,16 @@ function createDiamondsShaderProgram(context, vertexShader)
         return regionInfo;
     }
 
+    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue, uvec4 sidesValues, uvec4 cornersValues)
+    {
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(sidesValues)        ) * sidesValues;
+        uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, cornersValues)) * cellValue;
+
+        uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
+
+        return cellValue * uint(regionInfo.InsideDiamond) + udot(resCorner, uvec4(regionInfo.InsideCorners));
+    }
+
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
@@ -1798,9 +1804,7 @@ function createDiamondsShaderProgram(context, vertexShader)
         if(IsInsideCell(screenPos))
         {
             highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
-
-            uint cellValue = texelFetch(gBoard, cellId, 0).x;
-            mediump vec2  cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
 
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
@@ -1809,58 +1813,33 @@ function createDiamondsShaderProgram(context, vertexShader)
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
 
-            uvec4 edgeValue   = GetSidesCellValues(sidesInfo, gBoard);
-            uvec4 cornerValue = GetCornersCellValues(cornersInfo, gBoard);
+            uint cellValue           = texelFetch(gBoard, cellId, 0).x;
+            uvec4 sidesBoardValues   = GetSidesCellValues(sidesInfo, gBoard);
+            uvec4 cornersBoardValues = GetCornersCellValues(cornersInfo, gBoard);
 
-            uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)        ) * edgeValue;
-            uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, cornerValue)) * cellValue;
-
-            uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
-
-            mediump float  cellPower = float(cellValue) * domainFactor;		
-            mediump vec4 cornerPower =  vec4(resCorner) * domainFactor;
-
-            mediump float enablePower = cellPower * float(regionInfo.InsideDiamond) + dot(cornerPower, vec4(regionInfo.InsideCorners));
-            outColor                  = mix(gColorNone, gColorEnabled, enablePower);
+            uint regionValue = CalculateRegionValue(regionInfo, cellValue, sidesBoardValues, cornersBoardValues);
+            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
+                uint  solutionValue       = texelFetch(gSolution, cellId, 0).x;
+                uvec4 sidesSolvedValues   = GetSidesCellValues(sidesInfo, gSolution);
+                uvec4 cornersSolvedValues = GetCornersCellValues(cornersInfo, gSolution);
 
-                uvec4 edgeSolved   = GetSidesCellValues(sidesInfo, gSolution);
-                uvec4 cornerSolved = GetCornersCellValues(cornersInfo, gSolution);
-
-                uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(edgeSolved)            ) * edgeSolved;
-                uvec4 cornerSolutionCandidate      = uvec4(cornerRule(solutionValue, cornerSolved)) * solutionValue;
-
-                uvec4 resCornerSolved = max(emptyCornerSolutionCandidate, cornerSolutionCandidate);
-    
-                mediump float      solutionPower =  float(solutionValue) * domainFactor;		
-                mediump vec4 cornerSolutionPower = vec4(resCornerSolved) * domainFactor;
-
-                mediump float solvedPower = solutionPower * float(regionInfo.InsideDiamond) + dot(cornerSolutionPower, vec4(regionInfo.InsideCorners));
-                outColor                  = mix(outColor, gColorSolved, solvedPower);
+                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue, sidesSolvedValues, cornersSolvedValues);
+                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint stableValue = texelFetch(gStability, cellId, 0).x;
-
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uvec4 edgeStable   = GetSidesCellValues(sidesInfo, gStability);
-                uvec4 cornerStable = GetCornersCellValues(cornersInfo, gStability);
+                uint  stableValue         = texelFetch(gStability, cellId, 0).x;
+                uvec4 sidesStableValues   = GetSidesCellValues(sidesInfo, gStability);
+                uvec4 cornersStableValues = GetCornersCellValues(cornersInfo, gStability);
     
-                uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(edgeStable)          ) * edgeStable;
-                uvec4 cornerStabilityCandidate      = uvec4(cornerRule(stableValue, cornerStable)) * stableValue;
-    
-                uvec4 resCornerStable = max(emptyCornerStabilityCandidate, cornerStabilityCandidate);
-    
-                mediump float      stabilityPower =    float(stableValue) * domainFactor;		
-                mediump vec4 cornerStabilityPower = vec4(resCornerStable) * domainFactor;
-    
-                mediump float stablePower = stabilityPower * float(regionInfo.InsideDiamond) + dot(cornerStabilityPower, vec4(regionInfo.InsideCorners));
-                outColor                  = mix(outColor, colorStable, stablePower);
+                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue, sidesStableValues, cornersStableValues);
+                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
             }
         }
         else
@@ -2000,6 +1979,34 @@ function createBeamsShaderProgram(context, vertexShader)
         return result;
     }
 
+    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue, uvec4 sidesValues, uvec4 cornersValues)
+    {
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellValue, sidesValues, cornersValues)) * sidesValues;
+        emptyCornerCandidate      *= uint(regionInfo.OutsideCentralDiamond); //Fix for 1 pixel offset beforehand 
+
+        uvec4 regionBCandidate = uvec4(regBRule(cellValue, sidesValues, cornersValues)) * cellValue;
+        uvec4 regionICandidate = uvec4(regIRule(cellValue, sidesValues, cornersValues)) * cellValue;
+
+        uvec4 regionYTopRightCandidate   = uvec4(regYTopRightRule(cellValue, sidesValues, cornersValues))   * cellValue;
+        uvec4 regionYBottomLeftCandidate = uvec4(regYBottomLeftRule(cellValue, sidesValues, cornersValues)) * cellValue;
+
+        uvec4 regionVCandidate = uvec4(regVRule(cellValue, sidesValues, cornersValues)) * cellValue;
+
+        uvec4 resB           = max(regionBCandidate,           emptyCornerCandidate.xyzw);
+        uvec4 resYTopRight   = max(regionYTopRightCandidate,   emptyCornerCandidate.xyyz);
+        uvec4 resYBottomLeft = max(regionYBottomLeftCandidate, emptyCornerCandidate.zwwx);
+        uvec4 resV           = max(regionVCandidate,           emptyCornerCandidate.xyzw);
+
+        uint regionPower = uint(regionInfo.InsideGRegion)         *        cellValue;
+        regionPower     += udot(uvec4(regionInfo.InsideBRegion),           resB);
+        regionPower     += udot(uvec4(regionInfo.InsideIRegion),           regionICandidate); 
+        regionPower     += udot(uvec4(regionInfo.InsideYTopRightRegion),   resYTopRight);
+        regionPower     += udot(uvec4(regionInfo.InsideYBottomLeftRegion), resYBottomLeft); 
+        regionPower     += udot(uvec4(regionInfo.InsideVRegion),           resV);
+
+        return regionPower;
+    }
+
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
@@ -2007,129 +2014,50 @@ function createBeamsShaderProgram(context, vertexShader)
         if(IsInsideCell(screenPos))
         {
             highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
-            uint        cellValue  = texelFetch(gBoard, cellId, 0).x;
+            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
 
-            mediump vec2  cellCoord     = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-
             RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
 
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
 
-            uvec4 edgeValue   = GetSidesCellValues(sidesInfo, gBoard);
-            uvec4 cornerValue = GetCornersCellValues(cornersInfo, gBoard);
+            /*
 
-            uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellValue, edgeValue, cornerValue)) * edgeValue;
-            emptyCornerCandidate      *= uint(regionInfo.OutsideCentralDiamond); //Fix for 1 pixel offset beforehand 
 
-            uvec4 regionBCandidate = uvec4(regBRule(cellValue, edgeValue, cornerValue)) * cellValue;
-            uvec4 regionICandidate = uvec4(regIRule(cellValue, edgeValue, cornerValue)) * cellValue;
+            Ignore these temporary empty lines.
+            These were added so git diff doesn't freak out.            
 
-            uvec4 regionYTopRightCandidate   = uvec4(regYTopRightRule(cellValue, edgeValue, cornerValue))   * cellValue;
-            uvec4 regionYBottomLeftCandidate = uvec4(regYBottomLeftRule(cellValue, edgeValue, cornerValue)) * cellValue;
 
-            uvec4 regionVCandidate = uvec4(regVRule(cellValue, edgeValue, cornerValue)) * cellValue;
+            */
 
-            uvec4 resB           = max(regionBCandidate,           emptyCornerCandidate.xyzw);
-            uvec4 resYTopRight   = max(regionYTopRightCandidate,   emptyCornerCandidate.xyyz);
-            uvec4 resYBottomLeft = max(regionYBottomLeftCandidate, emptyCornerCandidate.zwwx);
-            uvec4 resV           = max(regionVCandidate,           emptyCornerCandidate.xyzw);
+            uint cellValue           = texelFetch(gBoard, cellId, 0).x;
+            uvec4 sidesBoardValues   = GetSidesCellValues(sidesInfo, gBoard);
+            uvec4 cornersBoardValues = GetCornersCellValues(cornersInfo, gBoard);
 
-            mediump float regGPower           = float(cellValue       ) *      domainFactor;
-            mediump vec4  regIPower           = vec4( regionICandidate) * vec4(domainFactor);
-            mediump vec4  regBPower           = vec4( resB            ) * vec4(domainFactor);
-            mediump vec4  regYTopRightPower   = vec4( resYTopRight    ) * vec4(domainFactor);
-            mediump vec4  regYBottomLeftPower = vec4( resYBottomLeft  ) * vec4(domainFactor);
-            mediump vec4  regVPower           = vec4( resV            ) * vec4(domainFactor);
-
-            mediump float enablePower =    float(regionInfo.InsideGRegion)      *     regGPower;
-            enablePower              += dot(vec4(regionInfo.InsideBRegion),           regBPower);
-            enablePower              += dot(vec4(regionInfo.InsideIRegion),           regIPower); 
-            enablePower              += dot(vec4(regionInfo.InsideYTopRightRegion),   regYTopRightPower);
-            enablePower              += dot(vec4(regionInfo.InsideYBottomLeftRegion), regYBottomLeftPower); 
-            enablePower              += dot(vec4(regionInfo.InsideVRegion),           regVPower);
-
-            outColor = mix(gColorNone, gColorEnabled, enablePower);
+            uint regionValue = CalculateRegionValue(regionInfo, cellValue, sidesBoardValues, cornersBoardValues);
+            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
-    
-                uvec4 edgeSolved   = GetSidesCellValues(sidesInfo, gSolution);
-                uvec4 cornerSolved = GetCornersCellValues(cornersInfo, gSolution);
+                uint  solutionValue       = texelFetch(gSolution, cellId, 0).x;
+                uvec4 sidesSolvedValues   = GetSidesCellValues(sidesInfo, gSolution);
+                uvec4 cornersSolvedValues = GetCornersCellValues(cornersInfo, gSolution);
 
-                uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(solutionValue, edgeSolved, cornerSolved)) * edgeSolved;
-
-                uvec4 regionBSolutionCandidate = uvec4(regBRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-                uvec4 regionISolutionCandidate = uvec4(regIRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-
-                uvec4 regionYTopRightSolutionCandidate   = uvec4(regYTopRightRule(solutionValue, edgeSolved, cornerSolved))   * solutionValue;
-                uvec4 regionYBottomLeftSolutionCandidate = uvec4(regYBottomLeftRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-
-                uvec4 regionVSolutionCandidate = uvec4(regVRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-
-                uvec4 resBSolution           = max(regionBSolutionCandidate,           emptyCornerSolutionCandidate.xyzw);
-                uvec4 resYTopRightSolution   = max(regionYTopRightSolutionCandidate,   emptyCornerSolutionCandidate.xyyz);
-                uvec4 resYBottomLeftSolution = max(regionYBottomLeftSolutionCandidate, emptyCornerSolutionCandidate.zwwx);
-                uvec4 resVSolution           = max(regionVSolutionCandidate,           emptyCornerSolutionCandidate.xyzw);
-
-                mediump float regGSolutionPower           = float(solutionValue           ) *      domainFactor;
-                mediump vec4  regISolutionPower           = vec4( regionISolutionCandidate) * vec4(domainFactor);
-                mediump vec4  regBSolutionPower           = vec4( resBSolution            ) * vec4(domainFactor);
-                mediump vec4  regYTopRightSolutionPower   = vec4( resYTopRightSolution    ) * vec4(domainFactor);
-                mediump vec4  regYBottomLeftSolutionPower = vec4( resYBottomLeftSolution  ) * vec4(domainFactor);
-                mediump vec4  regVSolutionPower           = vec4( resVSolution            ) * vec4(domainFactor);
-
-                mediump float solvedPower =    float(regionInfo.InsideGRegion)      *     regGSolutionPower;
-                solvedPower              += dot(vec4(regionInfo.InsideBRegion),           regBSolutionPower);
-                solvedPower              += dot(vec4(regionInfo.InsideIRegion),           regISolutionPower); 
-                solvedPower              += dot(vec4(regionInfo.InsideYTopRightRegion),   regYTopRightSolutionPower);
-                solvedPower              += dot(vec4(regionInfo.InsideYBottomLeftRegion), regYBottomLeftSolutionPower); 
-                solvedPower              += dot(vec4(regionInfo.InsideVRegion),           regVSolutionPower);
-                
-                outColor = mix(outColor, gColorSolved, solvedPower);
+                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue, sidesSolvedValues, cornersSolvedValues);
+                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint stabilityValue = texelFetch(gStability, cellId, 0).x;
-
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uvec4 edgeStable   = GetSidesCellValues(sidesInfo, gStability);
-                uvec4 cornerStable = GetCornersCellValues(cornersInfo, gStability);
-
-                uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(stabilityValue, edgeStable, cornerStable)) * edgeStable;
-
-                uvec4 regionBStabilityCandidate = uvec4(regBRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
-                uvec4 regionIStabilityCandidate = uvec4(regIRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
-
-                uvec4 regionYTopRightStabilityCandidate   = uvec4(regYTopRightRule(stabilityValue, edgeStable, cornerStable))   * stabilityValue;
-                uvec4 regionYBottomLeftStabilityCandidate = uvec4(regYBottomLeftRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
-
-                uvec4 regionVStabilityCandidate = uvec4(regVRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
-
-                uvec4 resBStability           = max(regionBStabilityCandidate,           emptyCornerStabilityCandidate.xyzw);
-                uvec4 resYTopRightStability   = max(regionYTopRightStabilityCandidate,   emptyCornerStabilityCandidate.xyyz);
-                uvec4 resYBottomLeftStability = max(regionYBottomLeftStabilityCandidate, emptyCornerStabilityCandidate.zwwx);
-                uvec4 resVStability           = max(regionVStabilityCandidate,           emptyCornerStabilityCandidate.xyzw);
-
-                mediump float regGStabilityPower           = float(stabilityValue           ) *      domainFactor;
-                mediump vec4  regIStabilityPower           = vec4( regionIStabilityCandidate) * vec4(domainFactor);
-                mediump vec4  regBStabilityPower           = vec4( resBStability            ) * vec4(domainFactor);
-                mediump vec4  regYTopRightStabilityPower   = vec4( resYTopRightStability    ) * vec4(domainFactor);
-                mediump vec4  regYBottomLeftStabilityPower = vec4( resYBottomLeftStability  ) * vec4(domainFactor);
-                mediump vec4  regVStabilityPower           = vec4( resVStability            ) * vec4(domainFactor);
-
-                mediump float stablePower =    float(regionInfo.InsideGRegion)      *     regGStabilityPower;
-                stablePower              += dot(vec4(regionInfo.InsideBRegion),           regBStabilityPower);
-                stablePower              += dot(vec4(regionInfo.InsideIRegion),           regIStabilityPower); 
-                stablePower              += dot(vec4(regionInfo.InsideYTopRightRegion),   regYTopRightStabilityPower);
-                stablePower              += dot(vec4(regionInfo.InsideYBottomLeftRegion), regYBottomLeftStabilityPower); 
-                stablePower              += dot(vec4(regionInfo.InsideVRegion),           regVStabilityPower);
-                
-                outColor = mix(outColor, colorStable, stablePower);
+                uint  stableValue         = texelFetch(gStability, cellId, 0).x;
+                uvec4 sidesStableValues   = GetSidesCellValues(sidesInfo, gStability);
+                uvec4 cornersStableValues = GetCornersCellValues(cornersInfo, gStability);
+    
+                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue, sidesStableValues, cornersStableValues);
+                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
             }
         }
         else
@@ -2195,6 +2123,18 @@ function createRaindropsShaderProgram(context, vertexShader)
         return result;
     }
 
+    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue, uvec4 sidesValues, uvec4 cornersValues)
+    {
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(sidesValues))                      * sidesValues;
+        uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, sidesValues, cornersValues)) * cellValue;
+
+        emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
+
+        uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
+
+        return cellValue * uint(regionInfo.InsideCircle) + udot(resCorner, uvec4(regionInfo.InsideCorners));
+    }
+
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
@@ -2202,8 +2142,6 @@ function createRaindropsShaderProgram(context, vertexShader)
         if(IsInsideCell(screenPos))
         {
             highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
-            uint        cellValue  = texelFetch(gBoard, cellId, 0).x;
-
             mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
 
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
@@ -2213,60 +2151,33 @@ function createRaindropsShaderProgram(context, vertexShader)
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
 
-            uvec4 edgeValue   = GetSidesCellValues(sidesInfo, gBoard);
-            uvec4 cornerValue = GetCornersCellValues(cornersInfo, gBoard);
+            uint cellValue           = texelFetch(gBoard, cellId, 0).x;
+            uvec4 sidesBoardValues   = GetSidesCellValues(sidesInfo, gBoard);
+            uvec4 cornersBoardValues = GetCornersCellValues(cornersInfo, gBoard);
 
-            uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue))                    * edgeValue;
-            uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, edgeValue, cornerValue)) * cellValue;
-
-            emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
-
-            uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
-
-            mediump float  cellPower = float(cellValue) * domainFactor;		
-            mediump vec4 cornerPower =  vec4(resCorner) * domainFactor;
-
-            mediump float enablePower = cellPower * float(regionInfo.InsideCircle) + dot(cornerPower, vec4(regionInfo.InsideCorners));
-            outColor                  = mix(gColorNone, gColorEnabled, enablePower);
+            uint regionValue = CalculateRegionValue(regionInfo, cellValue, sidesBoardValues, cornersBoardValues);
+            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
-    
-                uvec4 edgeSolved   = GetSidesCellValues(sidesInfo, gSolution);
-                uvec4 cornerSolved = GetCornersCellValues(cornersInfo, gSolution);
+                uint  solutionValue       = texelFetch(gSolution, cellId, 0).x;
+                uvec4 sidesSolvedValues   = GetSidesCellValues(sidesInfo, gSolution);
+                uvec4 cornersSolvedValues = GetCornersCellValues(cornersInfo, gSolution);
 
-                uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(edgeSolved))                         * edgeSolved;
-                uvec4 cornerSolutionCandidate      = uvec4(cornerRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-
-                uvec4 resCornerSolved = max(emptyCornerSolutionCandidate, cornerSolutionCandidate);
-    
-                mediump float      solutionPower =  float(solutionValue) * domainFactor;		
-                mediump vec4 cornerSolutionPower = vec4(resCornerSolved) * domainFactor;
-
-                mediump float solvedPower = solutionPower * float(regionInfo.InsideCircle) + dot(cornerSolutionPower, vec4(regionInfo.InsideCorners));
-                outColor                  = mix(outColor, gColorSolved, solvedPower);
+                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue, sidesSolvedValues, cornersSolvedValues);
+                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint stableValue = texelFetch(gStability, cellId, 0).x;
-
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uvec4 edgeStable   = GetSidesCellValues(sidesInfo, gStability);
-                uvec4 cornerStable = GetCornersCellValues(cornersInfo, gStability);
+                uint  stableValue         = texelFetch(gStability, cellId, 0).x;
+                uvec4 sidesStableValues   = GetSidesCellValues(sidesInfo, gStability);
+                uvec4 cornersStableValues = GetCornersCellValues(cornersInfo, gStability);
     
-                uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(edgeStable))                       * edgeStable;
-                uvec4 cornerStabilityCandidate      = uvec4(cornerRule(stableValue, edgeStable, cornerStable)) * stableValue;
-    
-                uvec4 resCornerStable = max(emptyCornerStabilityCandidate, cornerStabilityCandidate);
-    
-                mediump float      stabilityPower =    float(stableValue) * domainFactor;		
-                mediump vec4 cornerStabilityPower = vec4(resCornerStable) * domainFactor;
-    
-                mediump float stablePower = stabilityPower * float(regionInfo.InsideCircle) + dot(cornerStabilityPower, vec4(regionInfo.InsideCorners));
-                outColor                  = mix(outColor, colorStable, stablePower);
+                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue, sidesStableValues, cornersStableValues);
+                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
             }
         }
         else
@@ -2375,6 +2286,35 @@ function createChainsShaderProgram(context, vertexShader)
         return result;
     }
 
+    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue, uvec4 sidesValues, uvec4 cornersValues, uvec4 sides2Values)
+    {
+        uint centerCandidate = cellValue;
+
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(sidesValues)                     ) * sidesValues;
+        uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, sidesValues, cornersValues)) * cellValue;
+
+        emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
+
+        uvec2 linkCandidate     = uvec2(linkRule(sidesValues)                ) * sidesValues.xy;
+        uvec4 slimEdgeCandidate = uvec4(slimEdgeRule(cellValue, sides2Values)) * uvec4(cellValue);
+
+        uvec4 resCorner                  = max(cornerCandidate, emptyCornerCandidate);
+        uvec4 resSlimCornerTopRightPart  = max(resCorner.xxyy, slimEdgeCandidate.xyyz);
+        uvec4 resSlimCornerBotomLeftPart = max(resCorner.zzww, slimEdgeCandidate.zwwx);
+
+        uvec2 resLink     = max(linkCandidate, uvec2(centerCandidate));
+        uint  resMidLinks = max(resLink.x,     resLink.y);
+
+        uint regionPower =       uint(regionInfo.InsideFreeCircle)    *      cellValue;
+        regionPower     += udot(uvec4(regionInfo.InsideFreeCorners),         resCorner);
+        regionPower     += udot(uvec4(regionInfo.InsideSlimEdgesTopRight),   resSlimCornerTopRightPart); 
+        regionPower     += udot(uvec4(regionInfo.InsideSlimEdgesBottomLeft), resSlimCornerBotomLeftPart);
+        regionPower     += udot(uvec2(regionInfo.InsideCenterLinks),         resLink); 
+        regionPower     +=       uint(regionInfo.InsideBothLinks)     *      resMidLinks;
+
+        return regionPower;
+    }
+
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
@@ -2382,8 +2322,6 @@ function createChainsShaderProgram(context, vertexShader)
         if(IsInsideCell(screenPos))
         {
             highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
-            uint        cellValue  = texelFetch(gBoard, cellId, 0).x;
-
             mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
 
             mediump float domainFactor = 1.0f / float(gDomainSize - 1);
@@ -2394,123 +2332,46 @@ function createChainsShaderProgram(context, vertexShader)
             CellCornersInfo cornersInfo = GetCornersState(cellId);
             CellSides2Info  sides2Info  = GetSides2State(cellId);
 
-            uvec4 edgeValue   = GetSidesCellValues(sidesInfo, gBoard);
-            uvec4 cornerValue = GetCornersCellValues(cornersInfo, gBoard);
-            uvec4 edge2Value  = GetSides2CellValues(sides2Info, gBoard);
+            /*
 
-            uint centerCandidate = cellValue;
 
-            uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(edgeValue)                   ) * edgeValue;
-            uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, edgeValue, cornerValue)) * cellValue;
+            Ignore these empty lines.
+            They were added so git diff doesn't freak out.
 
-            emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
 
-            uvec2 linkCandidate     = uvec2(linkRule(edgeValue)                ) *       edgeValue.xy;
-            uvec4 slimEdgeCandidate = uvec4(slimEdgeRule(cellValue, edge2Value)) * uvec4(cellValue);
 
-            uvec4 resCorner                  = max(cornerCandidate, emptyCornerCandidate);
-            uvec4 resSlimCornerTopRightPart  = max(resCorner.xxyy, slimEdgeCandidate.xyyz);
-            uvec4 resSlimCornerBotomLeftPart = max(resCorner.zzww, slimEdgeCandidate.zwwx);
+            */
 
-            uvec2 resLink     = max(linkCandidate, uvec2(centerCandidate));
-            uint  resMidLinks = max(resLink.x,     resLink.y);
+            uint cellValue           = texelFetch(gBoard, cellId, 0).x;
+            uvec4 sidesBoardValues   = GetSidesCellValues(sidesInfo, gBoard);
+            uvec4 cornersBoardValues = GetCornersCellValues(cornersInfo, gBoard);
+            uvec4 sides2BoardValues  = GetSides2CellValues(sides2Info, gBoard);
 
-            mediump float cellPower           = float(cellValue                 ) *      domainFactor;
-            mediump vec4  cornerPower         = vec4( resCorner                 ) * vec4(domainFactor);
-            mediump vec4  slimTopRightPower   = vec4( resSlimCornerTopRightPart ) * vec4(domainFactor);
-            mediump vec4  slimBottomLeftPower = vec4( resSlimCornerBotomLeftPart) * vec4(domainFactor);
-            mediump vec2  linkPower           = vec2( resLink                   ) * vec2(domainFactor);
-            mediump float midPower            = float(resMidLinks               ) *      domainFactor;
-
-            mediump float enablePower =    float(regionInfo.InsideFreeCircle)    *      cellPower;
-            enablePower              += dot(vec4(regionInfo.InsideFreeCorners),         cornerPower);
-            enablePower              += dot(vec4(regionInfo.InsideSlimEdgesTopRight),   slimTopRightPower); 
-            enablePower              += dot(vec4(regionInfo.InsideSlimEdgesBottomLeft), slimBottomLeftPower);
-            enablePower              += dot(vec2(regionInfo.InsideCenterLinks),         linkPower); 
-            enablePower              +=    float(regionInfo.InsideBothLinks)     *      midPower;
-
-            outColor = mix(gColorNone, gColorEnabled, enablePower);
+            uint regionValue = CalculateRegionValue(regionInfo, cellValue, sidesBoardValues, cornersBoardValues, sides2BoardValues);
+            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
-    
-                uvec4 edgeSolved   = GetSidesCellValues(sidesInfo, gSolution);
-                uvec4 cornerSolved = GetCornersCellValues(cornersInfo, gSolution);
-                uvec4 edge2Solved  = GetSides2CellValues(sides2Info, gSolution);
+                uint  solutionValue       = texelFetch(gSolution, cellId, 0).x;
+                uvec4 sidesSolvedValues   = GetSidesCellValues(sidesInfo, gSolution);
+                uvec4 cornersSolvedValues = GetCornersCellValues(cornersInfo, gSolution);
+                uvec4 sides2SolvedValues  = GetSides2CellValues(sides2Info, gSolution);
 
-                uint centerSolutionCandidate = solutionValue;
-
-                uvec4 emptyCornerSolutionCandidate = uvec4(emptyCornerRule(edgeSolved)                        ) * edgeSolved;
-                uvec4 cornerSolutionCandidate      = uvec4(cornerRule(solutionValue, edgeSolved, cornerSolved)) * solutionValue;
-    
-                uvec2 linkSolutionCandidate     = uvec2(linkRule(edgeSolved)                    ) *       edgeSolved.xy;
-                uvec4 slimEdgeSolutionCandidate = uvec4(slimEdgeRule(solutionValue, edge2Solved)) * uvec4(solutionValue);
-    
-                uvec4 resCornerSolution                  = max(cornerSolutionCandidate, emptyCornerSolutionCandidate);
-                uvec4 resSlimCornerTopRightPartSolution  = max(resCornerSolution.xxyy,  slimEdgeSolutionCandidate.xyyz);
-                uvec4 resSlimCornerBotomLeftPartSolution = max(resCornerSolution.zzww,  slimEdgeSolutionCandidate.zwwx);
-    
-                uvec2 resLinkSolution     = max(linkSolutionCandidate, uvec2(centerSolutionCandidate));
-                uint  resMidLinksSolution = max(resLinkSolution.x,     resLinkSolution.y);
-    
-                mediump float cellSolutionPower           = float(solutionValue                     ) *      domainFactor;
-                mediump vec4  cornerSolutionPower         = vec4( resCornerSolution                 ) * vec4(domainFactor);
-                mediump vec4  slimTopRightSolutionPower   = vec4( resSlimCornerTopRightPartSolution ) * vec4(domainFactor);
-                mediump vec4  slimBottomLeftSolutionPower = vec4( resSlimCornerBotomLeftPartSolution) * vec4(domainFactor);
-                mediump vec2  linkSolutionPower           = vec2( resLinkSolution                   ) * vec2(domainFactor);
-                mediump float midSolutionPower            = float(resMidLinksSolution               ) *      domainFactor;
-
-                mediump float solvedPower =    float(regionInfo.InsideFreeCircle)    *      cellSolutionPower;
-                solvedPower              += dot(vec4(regionInfo.InsideFreeCorners),         cornerSolutionPower);
-                solvedPower              += dot(vec4(regionInfo.InsideSlimEdgesTopRight),   slimTopRightSolutionPower); 
-                solvedPower              += dot(vec4(regionInfo.InsideSlimEdgesBottomLeft), slimBottomLeftSolutionPower);
-                solvedPower              += dot(vec2(regionInfo.InsideCenterLinks),         linkSolutionPower); 
-                solvedPower              +=    float(regionInfo.InsideBothLinks)     *      midSolutionPower;
-
-                outColor = mix(outColor, gColorSolved, solvedPower);
+                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue, sidesSolvedValues, cornersSolvedValues, sides2SolvedValues);
+                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint stabilityValue = texelFetch(gStability, cellId, 0).x;
-
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uvec4 edgeStable   = GetSidesCellValues(sidesInfo, gStability);
-                uvec4 cornerStable = GetCornersCellValues(cornersInfo, gStability);
-                uvec4 edge2Stable  = GetSides2CellValues(sides2Info, gStability);
-  
-                uint centerStabilityCandidate = stabilityValue;
+                uint  stableValue         = texelFetch(gStability, cellId, 0).x;
+                uvec4 sidesStableValues   = GetSidesCellValues(sidesInfo, gStability);
+                uvec4 cornersStableValues = GetCornersCellValues(cornersInfo, gStability);
+                uvec4 sides2StableValues  = GetSides2CellValues(sides2Info, gStability);
     
-                uvec4 emptyCornerStabilityCandidate = uvec4(emptyCornerRule(edgeStable)                         ) * edgeStable;
-                uvec4 cornerStabilityCandidate      = uvec4(cornerRule(stabilityValue, edgeStable, cornerStable)) * stabilityValue;
-    
-                uvec2 linkStabilityCandidate     = uvec2(linkRule(edgeStable)                     ) *       edgeStable.xy;
-                uvec4 slimEdgeStabilityCandidate = uvec4(slimEdgeRule(stabilityValue, edge2Stable)) * uvec4(stabilityValue);
-    
-                uvec4 resCornerStability                  = max(cornerStabilityCandidate, emptyCornerStabilityCandidate);
-                uvec4 resSlimCornerTopRightPartStability  = max(resCornerStability.xxyy,  slimEdgeStabilityCandidate.xyyz);
-                uvec4 resSlimCornerBotomLeftPartStability = max(resCornerStability.zzww,  slimEdgeStabilityCandidate.zwwx);
-    
-                uvec2 resLinkStability     = max(linkStabilityCandidate, uvec2(centerStabilityCandidate));
-                uint  resMidLinksStability = max(resLinkStability.x,     resLinkStability.y);
-    
-                mediump float cellStabilityPower           = float(stabilityValue                     ) *      domainFactor;
-                mediump vec4  cornerStabilityPower         = vec4( resCornerStability                 ) * vec4(domainFactor);
-                mediump vec4  slimTopRightStabilityPower   = vec4( resSlimCornerTopRightPartStability ) * vec4(domainFactor);
-                mediump vec4  slimBottomLeftStabilityPower = vec4( resSlimCornerBotomLeftPartStability) * vec4(domainFactor);
-                mediump vec2  linkStabilityPower           = vec2( resLinkStability                   ) * vec2(domainFactor);
-                mediump float midStabilityPower            = float(resMidLinksStability               ) *      domainFactor;
-
-                mediump float stablePower =    float(regionInfo.InsideFreeCircle)    *      cellStabilityPower;
-                stablePower              += dot(vec4(regionInfo.InsideFreeCorners),         cornerStabilityPower);
-                stablePower              += dot(vec4(regionInfo.InsideSlimEdgesTopRight),   slimTopRightStabilityPower); 
-                stablePower              += dot(vec4(regionInfo.InsideSlimEdgesBottomLeft), slimBottomLeftStabilityPower);
-                stablePower              += dot(vec2(regionInfo.InsideCenterLinks),         linkStabilityPower); 
-                stablePower              +=    float(regionInfo.InsideBothLinks)     *      midStabilityPower;
-
-                outColor = mix(outColor, colorStable, stablePower);
+                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue, sidesStableValues, cornersStableValues, sides2StableValues);
+                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
             }
         }
         else
