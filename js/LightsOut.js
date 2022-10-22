@@ -1660,8 +1660,8 @@ CellSides2Info GetSides2State(highp ivec2 cellId)
 }
 `;
 
-//Common shader functions to get the neighbour cell values
-const ShaderCommonNeighbourFunctions = 
+//Common shader end functions, including main()
+const ShaderCommonEnd = 
 `
 CellNeighbourValues GetCellNeighbourValues(ivec2 cellId, CellSidesInfo sidesInfo, CellCornersInfo cornersInfo, CellSides2Info sides2Info, highp usampler2D board)
 {
@@ -1673,6 +1673,49 @@ CellNeighbourValues GetCellNeighbourValues(ivec2 cellId, CellSidesInfo sidesInfo
     result.Sides2Values  = GetSides2CellValues(sides2Info,   board);
 
     return result;
+}
+
+void main(void)
+{
+    ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
+
+    if(IsInsideCell(screenPos))
+    {
+        highp  ivec2 cellId = screenPos / ivec2(gCellSize);
+        mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
+
+        mediump float domainFactor = 1.0f / float(gDomainSize - 1);
+
+        RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
+
+        CellSidesInfo   sidesInfo   = GetSidesState(cellId);
+        CellCornersInfo cornersInfo = GetCornersState(cellId);
+        CellSides2Info  sides2Info  = GetSides2State(cellId);
+
+        CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
+        uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
+        outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
+
+        if((gFlags & FLAG_SHOW_SOLUTION) != 0)
+        {
+            CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
+            uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
+            outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
+        }
+        else if((gFlags & FLAG_SHOW_STABILITY) != 0)
+        {
+            lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
+            colorStable.a = 1.0f;
+
+            CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
+            uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
+            outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
+        }
+    }
+    else
+    {
+        outColor = gColorBetween;
+    }
 }
 `;
 
@@ -1702,9 +1745,7 @@ function createDefaultVertexShader(context)
 
 function createSquaresShaderProgram(context, vertexShader)
 {
-    const squaresFSSource = ShaderCommonStart 
-                          + ShaderNoSidesStateFunctions + ShaderNoCornersStateFunctions + ShaderNoSides2StateFunctions
-                          + ShaderCommonNeighbourFunctions +
+    const squaresShaderFunctions = 
     `
     struct RegionInfo
     {
@@ -1721,49 +1762,11 @@ function createSquaresShaderProgram(context, vertexShader)
     {
         return cellNeighbours.CellValue;
     }
+    `;
 
-    void main(void)
-    {
-        ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
-
-        if(IsInsideCell(screenPos))
-        {
-            highp  ivec2 cellId = screenPos / ivec2(gCellSize);
-            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-
-            mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-
-            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
-
-            CellSidesInfo   sidesInfo   = GetSidesState(cellId);
-            CellCornersInfo cornersInfo = GetCornersState(cellId);
-            CellSides2Info  sides2Info  = GetSides2State(cellId);
-
-            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
-            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
-            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
-
-            if((gFlags & FLAG_SHOW_SOLUTION) != 0)
-            {
-                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
-                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
-                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
-            }
-            else if((gFlags & FLAG_SHOW_STABILITY) != 0)
-            {
-                lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
-                colorStable.a = 1.0f;
-
-                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
-                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
-                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
-            }
-        }
-        else
-        {
-            outColor = gColorBetween;
-        }
-    }`;
+    const squaresFSSource = ShaderCommonStart 
+                          + ShaderNoSidesStateFunctions + ShaderNoCornersStateFunctions + ShaderNoSides2StateFunctions
+                          + squaresShaderFunctions + ShaderCommonEnd;
 
     return createShaderProgram(context, squaresFSSource, vertexShader);
 }
@@ -1771,9 +1774,7 @@ function createSquaresShaderProgram(context, vertexShader)
 function createCirclesShaderProgam(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/05/21/circles-render-mode/
-    const circlesFSSource = ShaderCommonStart 
-                          + ShaderSidesStateFunctions + ShaderNoCornersStateFunctions + ShaderNoSides2StateFunctions
-                          + ShaderCommonNeighbourFunctions +
+    const circlesShaderFunctions = 
     `
     struct RegionInfo
     {
@@ -1808,49 +1809,11 @@ function createCirclesShaderProgam(context, vertexShader)
 
         return cellNeighbours.CellValue * uint(circleRuleColored);
     }
+    `;
 
-    void main(void)
-    {
-        ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
-
-        if(IsInsideCell(screenPos))
-        {
-            highp  ivec2 cellId = screenPos / ivec2(gCellSize);
-            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-
-            mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-
-            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
-
-            CellSidesInfo   sidesInfo   = GetSidesState(cellId);
-            CellCornersInfo cornersInfo = GetCornersState(cellId);
-            CellSides2Info  sides2Info  = GetSides2State(cellId);
-
-            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
-            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
-            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
-
-            if((gFlags & FLAG_SHOW_SOLUTION) != 0)
-            {
-                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
-                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
-                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
-            }
-            else if((gFlags & FLAG_SHOW_STABILITY) != 0)
-            {
-                lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
-                colorStable.a = 1.0f;
-
-                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
-                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
-                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
-            }
-        }
-        else
-        {
-            outColor = gColorBetween;
-        }
-    }`;
+    const circlesFSSource = ShaderCommonStart 
+                          + ShaderSidesStateFunctions + ShaderNoCornersStateFunctions + ShaderNoSides2StateFunctions
+                          + circlesShaderFunctions + ShaderCommonEnd;
 
     return createShaderProgram(context, circlesFSSource, vertexShader);
 }
@@ -1858,9 +1821,7 @@ function createCirclesShaderProgam(context, vertexShader)
 function createDiamondsShaderProgram(context, vertexShader)
 {
     //http://lightstrout.com/blog/2019/12/09/diamonds-render-mode/
-    const diamondsFSSource = ShaderCommonStart 
-                           + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderNoSides2StateFunctions
-                           + ShaderCommonNeighbourFunctions +
+    const diamondsShaderFunctions = 
     `
     struct RegionInfo
     {
@@ -1907,49 +1868,12 @@ function createDiamondsShaderProgram(context, vertexShader)
 
         return cellNeighbours.CellValue * uint(regionInfo.InsideDiamond) + udot(resCorner, uvec4(regionInfo.InsideCorners));
     }
+    `;
 
-    void main(void)
-    {
-        ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
-
-        if(IsInsideCell(screenPos))
-        {
-            highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
-            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-
-            mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-
-            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
-
-            CellSidesInfo   sidesInfo   = GetSidesState(cellId);
-            CellCornersInfo cornersInfo = GetCornersState(cellId);
-            CellSides2Info  sides2Info  = GetSides2State(cellId);
-
-            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
-            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
-            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
-
-            if((gFlags & FLAG_SHOW_SOLUTION) != 0)
-            {
-                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
-                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
-                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
-            }
-            else if((gFlags & FLAG_SHOW_STABILITY) != 0)
-            {
-                lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
-                colorStable.a = 1.0f;
-
-                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
-                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
-                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
-            }
-        }
-        else
-        {
-            outColor = gColorBetween;
-        }
-    }`;
+    const diamondsFSSource = ShaderCommonStart 
+                           + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderNoSides2StateFunctions
+                           + diamondsShaderFunctions + ShaderCommonEnd;
+    
 
     return createShaderProgram(context, diamondsFSSource, vertexShader);
 }
@@ -1957,9 +1881,7 @@ function createDiamondsShaderProgram(context, vertexShader)
 function createBeamsShaderProgram(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/12/18/beams-render-mode/
-    const beamsFSSource = ShaderCommonStart 
-                        + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderNoSides2StateFunctions
-                        + ShaderCommonNeighbourFunctions +
+    const beamsShaderFunctions = 
     `
     struct RegionInfo
     {
@@ -2111,48 +2033,12 @@ function createBeamsShaderProgram(context, vertexShader)
 
         return regionPower;
     }
+    `;
 
-    void main(void)
-    {
-        ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
-
-        if(IsInsideCell(screenPos))
-        {
-            highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
-            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-
-            mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
-
-            CellSidesInfo   sidesInfo   = GetSidesState(cellId);
-            CellCornersInfo cornersInfo = GetCornersState(cellId);
-            CellSides2Info  sides2Info  = GetSides2State(cellId);
-
-            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
-            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
-            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
-
-            if((gFlags & FLAG_SHOW_SOLUTION) != 0)
-            {
-                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
-                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
-                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
-            }
-            else if((gFlags & FLAG_SHOW_STABILITY) != 0)
-            {
-                lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
-                colorStable.a = 1.0f;
-
-                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
-                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
-                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
-            }
-        }
-        else
-        {
-            outColor = gColorBetween;
-        }
-    }`;
+    const beamsFSSource = ShaderCommonStart 
+                        + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderNoSides2StateFunctions
+                        + beamsShaderFunctions + ShaderCommonEnd;
+    
 
     return createShaderProgram(context, beamsFSSource, vertexShader);
 }
@@ -2160,9 +2046,7 @@ function createBeamsShaderProgram(context, vertexShader)
 function createRaindropsShaderProgram(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/05/21/raindrops-render-mode/
-    const raindropsFSSource = ShaderCommonStart 
-                            + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderNoSides2StateFunctions
-                            + ShaderCommonNeighbourFunctions +
+    const raindropsShaderFunctions = 
     `
     struct RegionInfo
     {
@@ -2224,49 +2108,11 @@ function createRaindropsShaderProgram(context, vertexShader)
 
         return cellNeighbours.CellValue * uint(regionInfo.InsideCircle) + udot(resCorner, uvec4(regionInfo.InsideCorners));
     }
+    `;
 
-    void main(void)
-    {
-        ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
-
-        if(IsInsideCell(screenPos))
-        {
-            highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
-            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-
-            mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-
-            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
-
-            CellSidesInfo   sidesInfo   = GetSidesState(cellId);
-            CellCornersInfo cornersInfo = GetCornersState(cellId);
-            CellSides2Info  sides2Info  = GetSides2State(cellId);
-
-            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
-            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
-            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
-
-            if((gFlags & FLAG_SHOW_SOLUTION) != 0)
-            {
-                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
-                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
-                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
-            }
-            else if((gFlags & FLAG_SHOW_STABILITY) != 0)
-            {
-                lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
-                colorStable.a = 1.0f;
-
-                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
-                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
-                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
-            }
-        }
-        else
-        {
-            outColor = gColorBetween;
-        }
-    }`;
+    const raindropsFSSource = ShaderCommonStart 
+                            + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderNoSides2StateFunctions
+                            + raindropsShaderFunctions + ShaderCommonEnd;
 
     return createShaderProgram(context, raindropsFSSource, vertexShader);
 }
@@ -2274,9 +2120,7 @@ function createRaindropsShaderProgram(context, vertexShader)
 function createChainsShaderProgram(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/05/21/chains-render-mode/
-    const chainsFSSource = ShaderCommonStart 
-                         + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderSides2StateFunctions
-                         + ShaderCommonNeighbourFunctions +
+    const chainsShaderFunctions = 
     `
     struct RegionInfo
     {
@@ -2398,49 +2242,11 @@ function createChainsShaderProgram(context, vertexShader)
 
         return regionPower;
     }
+    `;
 
-    void main(void)
-    {
-        ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
-
-        if(IsInsideCell(screenPos))
-        {
-            highp ivec2 cellId = screenPos.xy / ivec2(gCellSize);
-            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-
-            mediump float domainFactor = 1.0f / float(gDomainSize - 1);
-
-            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
-
-            CellSidesInfo   sidesInfo   = GetSidesState(cellId);
-            CellCornersInfo cornersInfo = GetCornersState(cellId);
-            CellSides2Info  sides2Info  = GetSides2State(cellId);
-
-            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
-            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
-            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
-
-            if((gFlags & FLAG_SHOW_SOLUTION) != 0)
-            {
-                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
-                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
-                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
-            }
-            else if((gFlags & FLAG_SHOW_STABILITY) != 0)
-            {
-                lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
-                colorStable.a = 1.0f;
-
-                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
-                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
-                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
-            }
-        }
-        else
-        {
-            outColor = gColorBetween;
-        }
-    }`;
+    const chainsFSSource = ShaderCommonStart 
+                         + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderSides2StateFunctions
+                         + chainsShaderFunctions + ShaderCommonEnd;
 
     return createShaderProgram(context, chainsFSSource, vertexShader);
 }
