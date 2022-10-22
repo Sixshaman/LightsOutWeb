@@ -1617,35 +1617,56 @@ function createSquaresShaderProgram(context, vertexShader)
 {
     const squaresFSSource = ShaderCommonStart +
     `
+    struct RegionInfo
+    {
+        int Unused;
+    };
+
+    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    {
+        RegionInfo unused;
+        return unused;
+    }
+
+    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue)
+    {
+        return cellValue;
+    }
+
     void main(void)
     {
         ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
 
         if(IsInsideCell(screenPos))
         {
-            highp ivec2 cellId = screenPos.xy / ivec2(gCellSize, gCellSize);
+            highp  ivec2 cellId = screenPos / ivec2(gCellSize);
+            mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
 
-            uint          cellValue = texelFetch(gBoard, cellId, 0).x;
-            mediump float cellPower = float(cellValue) / float(gDomainSize - 1);
+            mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
-            outColor = mix(gColorNone, gColorEnabled, cellPower);
+            RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
+
+            uint cellValue = texelFetch(gBoard, cellId, 0).x;
+            
+            uint regionValue = CalculateRegionValue(regionInfo, cellValue);
+            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint          solutionValue = texelFetch(gSolution, cellId, 0).x;
-                mediump float solutionPower = float(solutionValue) / float(gDomainSize - 1);
+                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
 
-                outColor = mix(outColor, gColorSolved, solutionPower);
+                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue);
+                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
-                uint          stableValue = texelFetch(gStability, cellId, 0).x;
-                mediump float stablePower = float(stableValue) / float(gDomainSize - 1);
-
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                outColor = mix(outColor, colorStable, stablePower);
+                uint stableValue = texelFetch(gStability, cellId, 0).x;
+
+                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue);
+                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
             }
         }
         else
