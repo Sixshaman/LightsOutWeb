@@ -2022,15 +2022,6 @@ function createBeamsShaderProgram(context, vertexShader)
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
 
-            /*
-
-
-            Ignore these temporary empty lines.
-            These were added so git diff doesn't freak out.            
-
-
-            */
-
             uint cellValue           = texelFetch(gBoard, cellId, 0).x;
             uvec4 sidesBoardValues   = GetSidesCellValues(sidesInfo, gBoard);
             uvec4 cornersBoardValues = GetCornersCellValues(cornersInfo, gBoard);
@@ -2331,17 +2322,7 @@ function createChainsShaderProgram(context, vertexShader)
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
             CellSides2Info  sides2Info  = GetSides2State(cellId);
-
-            /*
-
-
-            Ignore these empty lines.
-            They were added so git diff doesn't freak out.
-
-
-
-            */
-
+            
             uint cellValue           = texelFetch(gBoard, cellId, 0).x;
             uvec4 sidesBoardValues   = GetSidesCellValues(sidesInfo, gBoard);
             uvec4 cornersBoardValues = GetCornersCellValues(cornersInfo, gBoard);
