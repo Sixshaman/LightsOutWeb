@@ -1270,6 +1270,14 @@ struct CellSides2Info
     bvec4 Mask;
 };
 
+struct CellNeighbourValues
+{
+    uvec4 SidesValues;
+    uvec4 CornersValues;
+    uvec4 Sides2Values;
+    uint  CellValue;
+};
+
 uint GetTopology()
 {
     return uint((gFlags & MASK_TOPOLOGY) >> 3);
@@ -1411,6 +1419,27 @@ CellSidesInfo GetSidesState(highp ivec2 cellId)
 }
 `;
 
+//Dummy functions for cardinal cell neighbours, for shaders that don't need them
+const ShaderNoSidesStateFunctions = 
+`
+uvec4 GetSidesCellValues(CellSidesInfo sidesInfo, highp usampler2D board)
+{
+    return uvec4(0u);
+}
+
+CellSidesInfo GetSidesState(highp ivec2 cellId)
+{
+    CellSidesInfo sidesInfo;
+    sidesInfo.LeftCellId   = ivec2(0);
+    sidesInfo.RightCellId  = ivec2(0);
+    sidesInfo.TopCellId    = ivec2(0);
+    sidesInfo.BottomCellId = ivec2(0);
+    sidesInfo.Mask         = bvec4(false);
+
+    return sidesInfo;
+}
+`;
+
 //Helper functions to access diagonal cell neighbours
 const ShaderCornersStateFunctions = 
 `
@@ -1510,6 +1539,27 @@ CellCornersInfo GetCornersState(highp ivec2 cellId)
 }
 `;
 
+//Dummy functions for diagonal cell neighbours, for shaders that don't need them
+const ShaderNoCornersStateFunctions = 
+`
+uvec4 GetCornersCellValues(CellCornersInfo cornersInfo, highp usampler2D board)
+{
+    return uvec4(0u);
+}
+
+CellCornersInfo GetCornersState(highp ivec2 cellId)
+{
+    CellCornersInfo cornersInfo;
+    cornersInfo.TopLeftCellId     = ivec2(0);
+    cornersInfo.TopRightCellId    = ivec2(0);
+    cornersInfo.BottomLeftCellId  = ivec2(0);
+    cornersInfo.BottomRightCellId = ivec2(0);
+    cornersInfo.Mask              = bvec4(false);
+
+    return cornersInfo;
+}
+`;
+
 //Helper functions to access cardinal cell 2-neighbours
 const ShaderSides2StateFunctions = 
 `
@@ -1589,6 +1639,43 @@ CellSides2Info GetSides2State(highp ivec2 cellId)
 }
 `;
 
+//Dummy functions for cardinal cell 2-neighbours, for shaders that don't need them
+const ShaderNoSides2StateFunctions = 
+`
+uvec4 GetSides2CellValues(CellSides2Info sides2Info, highp usampler2D board)
+{
+    return uvec4(0u);
+}
+
+CellSides2Info GetSides2State(highp ivec2 cellId)
+{
+    CellSides2Info sides2Info;
+    sides2Info.Left2CellId   = ivec2(0);
+    sides2Info.Right2CellId  = ivec2(0);
+    sides2Info.Top2CellId    = ivec2(0);
+    sides2Info.Bottom2CellId = ivec2(0);
+    sides2Info.Mask          = bvec4(false);
+
+    return sides2Info;
+}
+`;
+
+//Common shader functions to get the neighbour cell values
+const ShaderCommonNeighbourFunctions = 
+`
+CellNeighbourValues GetCellNeighbourValues(ivec2 cellId, CellSidesInfo sidesInfo, CellCornersInfo cornersInfo, CellSides2Info sides2Info, highp usampler2D board)
+{
+    CellNeighbourValues result;
+
+    result.CellValue     = texelFetch(board, cellId, 0).x;
+    result.SidesValues   = GetSidesCellValues(sidesInfo,     board);
+    result.CornersValues = GetCornersCellValues(cornersInfo, board);
+    result.Sides2Values  = GetSides2CellValues(sides2Info,   board);
+
+    return result;
+}
+`;
+
 function createDefaultVertexShader(context)
 {
     let defaultVSSource = 
@@ -1615,7 +1702,9 @@ function createDefaultVertexShader(context)
 
 function createSquaresShaderProgram(context, vertexShader)
 {
-    const squaresFSSource = ShaderCommonStart +
+    const squaresFSSource = ShaderCommonStart 
+                          + ShaderNoSidesStateFunctions + ShaderNoCornersStateFunctions + ShaderNoSides2StateFunctions
+                          + ShaderCommonNeighbourFunctions +
     `
     struct RegionInfo
     {
@@ -1628,9 +1717,9 @@ function createSquaresShaderProgram(context, vertexShader)
         return unused;
     }
 
-    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue)
+    uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
-        return cellValue;
+        return cellNeighbours.CellValue;
     }
 
     void main(void)
@@ -1646,27 +1735,28 @@ function createSquaresShaderProgram(context, vertexShader)
 
             RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
 
-            uint cellValue = texelFetch(gBoard, cellId, 0).x;
-            
-            uint regionValue = CalculateRegionValue(regionInfo, cellValue);
-            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
+            CellSidesInfo   sidesInfo   = GetSidesState(cellId);
+            CellCornersInfo cornersInfo = GetCornersState(cellId);
+            CellSides2Info  sides2Info  = GetSides2State(cellId);
+
+            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
+            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
+            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint solutionValue = texelFetch(gSolution, cellId, 0).x;
-
-                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue);
-                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
+                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
+                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
+                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uint stableValue = texelFetch(gStability, cellId, 0).x;
-
-                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue);
-                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
+                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
+                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
+                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
             }
         }
         else
@@ -1681,7 +1771,9 @@ function createSquaresShaderProgram(context, vertexShader)
 function createCirclesShaderProgam(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/05/21/circles-render-mode/
-    const circlesFSSource = ShaderCommonStart + ShaderSidesStateFunctions +
+    const circlesFSSource = ShaderCommonStart 
+                          + ShaderSidesStateFunctions + ShaderNoCornersStateFunctions + ShaderNoSides2StateFunctions
+                          + ShaderCommonNeighbourFunctions +
     `
     struct RegionInfo
     {
@@ -1707,14 +1799,14 @@ function createCirclesShaderProgam(context, vertexShader)
         return regionInfo;
     }
 
-    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue, uvec4 sidesValues)
+    uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
-        bvec4 sidesCandidate = EqualSidesRule(cellValue, sidesValues);
+        bvec4 sidesCandidate = EqualSidesRule(cellNeighbours.CellValue, cellNeighbours.SidesValues);
 
         bool resSides = any(b4nd(regionInfo.OnSides, sidesCandidate));
         bool circleRuleColored = regionInfo.InsideCircle || resSides;
 
-        return cellValue * uint(circleRuleColored);
+        return cellNeighbours.CellValue * uint(circleRuleColored);
     }
 
     void main(void)
@@ -1730,32 +1822,28 @@ function createCirclesShaderProgam(context, vertexShader)
 
             RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
 
-            CellSidesInfo sidesInfo = GetSidesState(cellId);
+            CellSidesInfo   sidesInfo   = GetSidesState(cellId);
+            CellCornersInfo cornersInfo = GetCornersState(cellId);
+            CellSides2Info  sides2Info  = GetSides2State(cellId);
 
-            uint cellValue = texelFetch(gBoard, cellId, 0).x;
-            uvec4 sidesBoardValues = GetSidesCellValues(sidesInfo, gBoard);
-            
-            uint regionValue = CalculateRegionValue(regionInfo, cellValue, sidesBoardValues);
-            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
+            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
+            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
+            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint  solutionValue    = texelFetch(gSolution, cellId, 0).x;
-                uvec4 sidesSolvedValues = GetSidesCellValues(sidesInfo, gSolution);
-
-                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue, sidesSolvedValues);
-                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
+                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
+                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
+                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uint stableValue = texelFetch(gStability, cellId, 0).x;
-                uvec4 sidesStableValues = GetSidesCellValues(sidesInfo, gStability);
-
-                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue, sidesStableValues);
-                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
+                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
+                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
+                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
             }
         }
         else
@@ -1770,7 +1858,9 @@ function createCirclesShaderProgam(context, vertexShader)
 function createDiamondsShaderProgram(context, vertexShader)
 {
     //http://lightstrout.com/blog/2019/12/09/diamonds-render-mode/
-    const diamondsFSSource = ShaderCommonStart + ShaderSidesStateFunctions + ShaderCornersStateFunctions +
+    const diamondsFSSource = ShaderCommonStart 
+                           + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderNoSides2StateFunctions
+                           + ShaderCommonNeighbourFunctions +
     `
     struct RegionInfo
     {
@@ -1808,14 +1898,14 @@ function createDiamondsShaderProgram(context, vertexShader)
         return regionInfo;
     }
 
-    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue, uvec4 sidesValues, uvec4 cornersValues)
+    uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
-        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(sidesValues)        ) * sidesValues;
-        uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, cornersValues)) * cellValue;
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues;
+        uvec4 cornerCandidate      = uvec4(cornerRule(cellNeighbours.CellValue, cellNeighbours.CornersValues)) * cellNeighbours.CellValue;
 
         uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
 
-        return cellValue * uint(regionInfo.InsideDiamond) + udot(resCorner, uvec4(regionInfo.InsideCorners));
+        return cellNeighbours.CellValue * uint(regionInfo.InsideDiamond) + udot(resCorner, uvec4(regionInfo.InsideCorners));
     }
 
     void main(void)
@@ -1833,34 +1923,26 @@ function createDiamondsShaderProgram(context, vertexShader)
 
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
+            CellSides2Info  sides2Info  = GetSides2State(cellId);
 
-            uint cellValue           = texelFetch(gBoard, cellId, 0).x;
-            uvec4 sidesBoardValues   = GetSidesCellValues(sidesInfo, gBoard);
-            uvec4 cornersBoardValues = GetCornersCellValues(cornersInfo, gBoard);
-
-            uint regionValue = CalculateRegionValue(regionInfo, cellValue, sidesBoardValues, cornersBoardValues);
-            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
+            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
+            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
+            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint  solutionValue       = texelFetch(gSolution, cellId, 0).x;
-                uvec4 sidesSolvedValues   = GetSidesCellValues(sidesInfo, gSolution);
-                uvec4 cornersSolvedValues = GetCornersCellValues(cornersInfo, gSolution);
-
-                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue, sidesSolvedValues, cornersSolvedValues);
-                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
+                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
+                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
+                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uint  stableValue         = texelFetch(gStability, cellId, 0).x;
-                uvec4 sidesStableValues   = GetSidesCellValues(sidesInfo, gStability);
-                uvec4 cornersStableValues = GetCornersCellValues(cornersInfo, gStability);
-    
-                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue, sidesStableValues, cornersStableValues);
-                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
+                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
+                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
+                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
             }
         }
         else
@@ -1875,7 +1957,9 @@ function createDiamondsShaderProgram(context, vertexShader)
 function createBeamsShaderProgram(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/12/18/beams-render-mode/
-    const beamsFSSource = ShaderCommonStart + ShaderSidesStateFunctions + ShaderCornersStateFunctions +
+    const beamsFSSource = ShaderCommonStart 
+                        + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderNoSides2StateFunctions
+                        + ShaderCommonNeighbourFunctions +
     `
     struct RegionInfo
     {
@@ -1888,80 +1972,80 @@ function createBeamsShaderProgram(context, vertexShader)
         bool  OutsideCentralDiamond;
     };
 
-    bvec4 emptyCornerRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
+    bvec4 emptyCornerRule(CellNeighbourValues cellNeighbours)
     {
         bvec4 res = bvec4(true);
 
-        res = b4nd(res,    equal(edgeValue.xyzw, edgeValue.yzwx));
-        res = b4nd(res, notEqual(edgeValue.xyzw, cornerValue.xyzw));
-        res = b4nd(res, notEqual(edgeValue.xyzw, uvec4(cellValue)));
+        res = b4nd(res,    equal(cellNeighbours.SidesValues.xyzw, cellNeighbours.SidesValues.yzwx));
+        res = b4nd(res, notEqual(cellNeighbours.SidesValues.xyzw, cellNeighbours.CornersValues.xyzw));
+        res = b4nd(res, notEqual(cellNeighbours.SidesValues.xyzw, uvec4(cellNeighbours.CellValue)));
 
         return res;
     }
 
-    bvec4 regBRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
+    bvec4 regBRule(CellNeighbourValues cellNeighbours)
     {
         bvec4 res = bvec4(false);
         
-        uvec4 cellValueVec = uvec4(cellValue);
+        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
 
-        res = b4or(res,      equal(cellValueVec, edgeValue.xyzw  )                                                                                                                                                                     ); //B#1
-        res = b4or(res,      equal(cellValueVec, edgeValue.yzwx  )                                                                                                                                                                     ); //B#2
-        res = b4or(res,      equal(cellValueVec, cornerValue.xyzw)                                                                                                                                                                     ); //B#3
-        res = b4or(res, b4nd(equal(cellValueVec, edgeValue.zwxy  ),    equal(cellValueVec, edgeValue.wxyz  )                                                                                                                          )); //B#4
-        res = b4or(res, b4nd(equal(cellValueVec, cornerValue.zwxy), notEqual(cellValueVec, cornerValue.wxyz), notEqual(cellValueVec, edgeValue.wxyz), notEqual(cellValueVec, edgeValue.zwxy), notEqual(cellValueVec, cornerValue.yzwx))); //B#5
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.xyzw  )                                                                                                                                                                                                                                         ); //B#1
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.yzwx  )                                                                                                                                                                                                                                         ); //B#2
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.CornersValues.xyzw)                                                                                                                                                                                                                                         ); //B#3
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.zwxy  ),    equal(cellValueVec, cellNeighbours.SidesValues.wxyz)                                                                                                                                                                               )); //B#4
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zwxy), notEqual(cellValueVec, cellNeighbours.CornersValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.zwxy), notEqual(cellValueVec, cellNeighbours.CornersValues.yzwx))); //B#5
 
         return res;
     }
 
-    bvec4 regIRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
+    bvec4 regIRule(CellNeighbourValues cellNeighbours)
     {
         bvec4 res = bvec4(false);
         
-        bool loneDiamond = cellValue != edgeValue.x   && cellValue != edgeValue.y   && cellValue != edgeValue.z   && cellValue != edgeValue.w 
-                        && cellValue != cornerValue.x && cellValue != cornerValue.y && cellValue != cornerValue.z && cellValue != cornerValue.w;
+        bool loneDiamond = cellNeighbours.CellValue != cellNeighbours.SidesValues.x   && cellNeighbours.CellValue != cellNeighbours.SidesValues.y   && cellNeighbours.CellValue != cellNeighbours.SidesValues.z   && cellNeighbours.CellValue != cellNeighbours.SidesValues.w 
+                        && cellNeighbours.CellValue != cellNeighbours.CornersValues.x && cellNeighbours.CellValue != cellNeighbours.CornersValues.y && cellNeighbours.CellValue != cellNeighbours.CornersValues.z && cellNeighbours.CellValue != cellNeighbours.CornersValues.w;
 
-        uvec4 cellValueVec   = uvec4(cellValue);
+        uvec4 cellValueVec   = uvec4(cellNeighbours.CellValue);
         bvec4 loneDiamondVec = bvec4(loneDiamond);
 
-        res = b4or(res,      equal(cellValueVec,   edgeValue.xyzw  )                                                                                                                           ); //I#1
-        res = b4or(res, b4nd(equal(cellValueVec,   cornerValue.xyzw), notEqual(cellValueVec,   edgeValue.yzwx)                                                                                )); //I#2
-        res = b4or(res, b4nd(equal(cellValueVec,   cornerValue.wxyz), notEqual(cellValueVec,   edgeValue.wxyz)                                                                                )); //I#3
-        res = b4or(res, b4nd(equal(cellValueVec,   cornerValue.zwxy),    equal(cellValueVec, cornerValue.yzwx), notEqual(cellValueVec, edgeValue.wxyz), notEqual(cellValueVec, edgeValue.yzwx))); //I#4
-        res = b4or(res, b4nd(equal(cellValueVec,   edgeValue.zwxy  ), notEqual(cellValueVec,   edgeValue.wxyz), notEqual(cellValueVec, edgeValue.yzwx)                                        )); //I#5
-        res = b4or(res,           loneDiamondVec                                                                                                                                               ); //I#6
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.xyzw  )                                                                                                                                                                              ); //I#1
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), notEqual(cellValueVec,   cellNeighbours.SidesValues.yzwx)                                                                                                                  )); //I#2
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.wxyz), notEqual(cellValueVec,   cellNeighbours.SidesValues.wxyz)                                                                                                                  )); //I#3
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zwxy),    equal(cellValueVec, cellNeighbours.CornersValues.yzwx), notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx))); //I#4
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.zwxy  ), notEqual(cellValueVec,   cellNeighbours.SidesValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx)                                                         )); //I#5
+        res = b4or(res,           loneDiamondVec                                                                                                                                                                                                                 ); //I#6
 
         return res;
     }
 
-    bvec4 regYTopRightRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
+    bvec4 regYTopRightRule(CellNeighbourValues cellNeighbours)
     {
         bvec4 res = bvec4(false);
 
-        uvec4 cellValueVec = uvec4(cellValue);
+        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
         
-        res = b4or(res,      equal(cellValueVec, edgeValue.yyzz  )                                         ); //Y#1
-        res = b4or(res, b4nd(equal(cellValueVec, cornerValue.xyyz), notEqual(cellValueVec, edgeValue.xzyw))); //Y#2
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.yyzz  )                                                          ); //Y#1
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyyz), notEqual(cellValueVec, cellNeighbours.SidesValues.xzyw))); //Y#2
 
         return res;
     }
 
-    bvec4 regYBottomLeftRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
+    bvec4 regYBottomLeftRule(CellNeighbourValues cellNeighbours)
     {
         bvec4 res = bvec4(false);
 
-        uvec4 cellValueVec = uvec4(cellValue);
+        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
         
-        res = b4or(res,      equal(cellValueVec, edgeValue.wwxx  )                                         ); //Y#1
-        res = b4or(res, b4nd(equal(cellValueVec, cornerValue.zwwx), notEqual(cellValueVec, edgeValue.zxwy))); //Y#2
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.wwxx  )                                                          ); //Y#1
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zwwx), notEqual(cellValueVec, cellNeighbours.SidesValues.zxwy))); //Y#2
 
         return res;
     }
 
-    bvec4 regVRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
+    bvec4 regVRule(CellNeighbourValues cellNeighbours)
     {
-        uvec4 cellValueVec = uvec4(cellValue);
-        return b4nd(equal(cellValueVec, cornerValue.xyzw), notEqual(cellValueVec, edgeValue.xyzw), notEqual(cellValueVec, edgeValue.yzwx)); //V#1
+        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
+        return b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx)); //V#1
     }
 
     RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
@@ -2000,25 +2084,25 @@ function createBeamsShaderProgram(context, vertexShader)
         return result;
     }
 
-    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue, uvec4 sidesValues, uvec4 cornersValues)
+    uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
-        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellValue, sidesValues, cornersValues)) * sidesValues;
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours)) * cellNeighbours.SidesValues;
         emptyCornerCandidate      *= uint(regionInfo.OutsideCentralDiamond); //Fix for 1 pixel offset beforehand 
 
-        uvec4 regionBCandidate = uvec4(regBRule(cellValue, sidesValues, cornersValues)) * cellValue;
-        uvec4 regionICandidate = uvec4(regIRule(cellValue, sidesValues, cornersValues)) * cellValue;
+        uvec4 regionBCandidate = uvec4(regBRule(cellNeighbours)) * cellNeighbours.CellValue;
+        uvec4 regionICandidate = uvec4(regIRule(cellNeighbours)) * cellNeighbours.CellValue;
 
-        uvec4 regionYTopRightCandidate   = uvec4(regYTopRightRule(cellValue, sidesValues, cornersValues))   * cellValue;
-        uvec4 regionYBottomLeftCandidate = uvec4(regYBottomLeftRule(cellValue, sidesValues, cornersValues)) * cellValue;
+        uvec4 regionYTopRightCandidate   = uvec4(regYTopRightRule(cellNeighbours))   * cellNeighbours.CellValue;
+        uvec4 regionYBottomLeftCandidate = uvec4(regYBottomLeftRule(cellNeighbours)) * cellNeighbours.CellValue;
 
-        uvec4 regionVCandidate = uvec4(regVRule(cellValue, sidesValues, cornersValues)) * cellValue;
+        uvec4 regionVCandidate = uvec4(regVRule(cellNeighbours)) * cellNeighbours.CellValue;
 
         uvec4 resB           = max(regionBCandidate,           emptyCornerCandidate.xyzw);
         uvec4 resYTopRight   = max(regionYTopRightCandidate,   emptyCornerCandidate.xyyz);
         uvec4 resYBottomLeft = max(regionYBottomLeftCandidate, emptyCornerCandidate.zwwx);
         uvec4 resV           = max(regionVCandidate,           emptyCornerCandidate.xyzw);
 
-        uint regionPower = uint(regionInfo.InsideGRegion)         *        cellValue;
+        uint regionPower = uint(regionInfo.InsideGRegion)         *        cellNeighbours.CellValue;
         regionPower     += udot(uvec4(regionInfo.InsideBRegion),           resB);
         regionPower     += udot(uvec4(regionInfo.InsideIRegion),           regionICandidate); 
         regionPower     += udot(uvec4(regionInfo.InsideYTopRightRegion),   resYTopRight);
@@ -2042,34 +2126,26 @@ function createBeamsShaderProgram(context, vertexShader)
 
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
+            CellSides2Info  sides2Info  = GetSides2State(cellId);
 
-            uint cellValue           = texelFetch(gBoard, cellId, 0).x;
-            uvec4 sidesBoardValues   = GetSidesCellValues(sidesInfo, gBoard);
-            uvec4 cornersBoardValues = GetCornersCellValues(cornersInfo, gBoard);
-
-            uint regionValue = CalculateRegionValue(regionInfo, cellValue, sidesBoardValues, cornersBoardValues);
-            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
+            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
+            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
+            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint  solutionValue       = texelFetch(gSolution, cellId, 0).x;
-                uvec4 sidesSolvedValues   = GetSidesCellValues(sidesInfo, gSolution);
-                uvec4 cornersSolvedValues = GetCornersCellValues(cornersInfo, gSolution);
-
-                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue, sidesSolvedValues, cornersSolvedValues);
-                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
+                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
+                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
+                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uint  stableValue         = texelFetch(gStability, cellId, 0).x;
-                uvec4 sidesStableValues   = GetSidesCellValues(sidesInfo, gStability);
-                uvec4 cornersStableValues = GetCornersCellValues(cornersInfo, gStability);
-    
-                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue, sidesStableValues, cornersStableValues);
-                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
+                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
+                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
+                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
             }
         }
         else
@@ -2084,7 +2160,9 @@ function createBeamsShaderProgram(context, vertexShader)
 function createRaindropsShaderProgram(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/05/21/raindrops-render-mode/
-    const raindropsFSSource = ShaderCommonStart + ShaderSidesStateFunctions + ShaderCornersStateFunctions +
+    const raindropsFSSource = ShaderCommonStart 
+                            + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderNoSides2StateFunctions
+                            + ShaderCommonNeighbourFunctions +
     `
     struct RegionInfo
     {
@@ -2098,15 +2176,15 @@ function createRaindropsShaderProgram(context, vertexShader)
         return equal(edgeValue.xyzw, edgeValue.yzwx);
     }
 
-    bvec4 cornerRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
+    bvec4 cornerRule(CellNeighbourValues cellNeighbours)
     {
         bvec4 res = bvec4(false);
 
-        uvec4 cellValueVec = uvec4(cellValue);
+        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
         
-        res = b4or(res, equal(cellValueVec, cornerValue.xyzw));
-        res = b4or(res, equal(cellValueVec,   edgeValue.xyzw));
-        res = b4or(res, equal(cellValueVec,   edgeValue.yzwx));
+        res = b4or(res, equal(cellValueVec, cellNeighbours.CornersValues.xyzw));
+        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.xyzw));
+        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.yzwx));
 
         return res;
     }
@@ -2135,16 +2213,16 @@ function createRaindropsShaderProgram(context, vertexShader)
         return result;
     }
 
-    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue, uvec4 sidesValues, uvec4 cornersValues)
+    uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
-        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(sidesValues))                      * sidesValues;
-        uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, sidesValues, cornersValues)) * cellValue;
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues;
+        uvec4 cornerCandidate      = uvec4(cornerRule(cellNeighbours)) * cellNeighbours.CellValue;
 
         emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
 
         uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
 
-        return cellValue * uint(regionInfo.InsideCircle) + udot(resCorner, uvec4(regionInfo.InsideCorners));
+        return cellNeighbours.CellValue * uint(regionInfo.InsideCircle) + udot(resCorner, uvec4(regionInfo.InsideCorners));
     }
 
     void main(void)
@@ -2162,34 +2240,26 @@ function createRaindropsShaderProgram(context, vertexShader)
 
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
+            CellSides2Info  sides2Info  = GetSides2State(cellId);
 
-            uint cellValue           = texelFetch(gBoard, cellId, 0).x;
-            uvec4 sidesBoardValues   = GetSidesCellValues(sidesInfo, gBoard);
-            uvec4 cornersBoardValues = GetCornersCellValues(cornersInfo, gBoard);
-
-            uint regionValue = CalculateRegionValue(regionInfo, cellValue, sidesBoardValues, cornersBoardValues);
-            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
+            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
+            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
+            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint  solutionValue       = texelFetch(gSolution, cellId, 0).x;
-                uvec4 sidesSolvedValues   = GetSidesCellValues(sidesInfo, gSolution);
-                uvec4 cornersSolvedValues = GetCornersCellValues(cornersInfo, gSolution);
-
-                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue, sidesSolvedValues, cornersSolvedValues);
-                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
+                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
+                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
+                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uint  stableValue         = texelFetch(gStability, cellId, 0).x;
-                uvec4 sidesStableValues   = GetSidesCellValues(sidesInfo, gStability);
-                uvec4 cornersStableValues = GetCornersCellValues(cornersInfo, gStability);
-    
-                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue, sidesStableValues, cornersStableValues);
-                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
+                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
+                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
+                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
             }
         }
         else
@@ -2204,7 +2274,9 @@ function createRaindropsShaderProgram(context, vertexShader)
 function createChainsShaderProgram(context, vertexShader)
 {
     //https://lightstrout.com/blog/2019/05/21/chains-render-mode/
-    const chainsFSSource = ShaderCommonStart + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderSides2StateFunctions +
+    const chainsFSSource = ShaderCommonStart 
+                         + ShaderSidesStateFunctions + ShaderCornersStateFunctions + ShaderSides2StateFunctions
+                         + ShaderCommonNeighbourFunctions +
     `
     struct RegionInfo
     {
@@ -2222,15 +2294,15 @@ function createChainsShaderProgram(context, vertexShader)
         return equal(edgeValue.xyzw, edgeValue.yzwx);
     }
 
-    bvec4 cornerRule(uint cellValue, uvec4 edgeValue, uvec4 cornerValue)
+    bvec4 cornerRule(CellNeighbourValues cellNeighbours)
     {
         bvec4 res = bvec4(false);
         
-        uvec4 cellValueVec = uvec4(cellValue);
+        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
 
-        res = b4or(res, equal(cellValueVec, cornerValue.xyzw));
-        res = b4or(res, equal(cellValueVec,   edgeValue.xyzw));
-        res = b4or(res, equal(cellValueVec,   edgeValue.yzwx));
+        res = b4or(res, equal(cellValueVec, cellNeighbours.CornersValues.xyzw));
+        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.xyzw));
+        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.yzwx));
 
         return res;
     }
@@ -2298,17 +2370,17 @@ function createChainsShaderProgram(context, vertexShader)
         return result;
     }
 
-    uint CalculateRegionValue(RegionInfo regionInfo, uint cellValue, uvec4 sidesValues, uvec4 cornersValues, uvec4 sides2Values)
+    uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
-        uint centerCandidate = cellValue;
+        uint centerCandidate = cellNeighbours.CellValue;
 
-        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(sidesValues)                     ) * sidesValues;
-        uvec4 cornerCandidate      = uvec4(cornerRule(cellValue, sidesValues, cornersValues)) * cellValue;
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues;
+        uvec4 cornerCandidate      = uvec4(cornerRule(cellNeighbours)) * cellNeighbours.CellValue;
 
         emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
 
-        uvec2 linkCandidate     = uvec2(linkRule(sidesValues)                ) * sidesValues.xy;
-        uvec4 slimEdgeCandidate = uvec4(slimEdgeRule(cellValue, sides2Values)) * uvec4(cellValue);
+        uvec2 linkCandidate     = uvec2(linkRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.xy;
+        uvec4 slimEdgeCandidate = uvec4(slimEdgeRule(cellNeighbours.CellValue, cellNeighbours.Sides2Values)) * uvec4(cellNeighbours.CellValue);
 
         uvec4 resCorner                  = max(cornerCandidate, emptyCornerCandidate);
         uvec4 resSlimCornerTopRightPart  = max(resCorner.xxyy, slimEdgeCandidate.xyyz);
@@ -2317,7 +2389,7 @@ function createChainsShaderProgram(context, vertexShader)
         uvec2 resLink     = max(linkCandidate, uvec2(centerCandidate));
         uint  resMidLinks = max(resLink.x,     resLink.y);
 
-        uint regionPower =       uint(regionInfo.InsideFreeCircle)    *      cellValue;
+        uint regionPower =       uint(regionInfo.InsideFreeCircle)    *      cellNeighbours.CellValue;
         regionPower     += udot(uvec4(regionInfo.InsideFreeCorners),         resCorner);
         regionPower     += udot(uvec4(regionInfo.InsideSlimEdgesTopRight),   resSlimCornerTopRightPart); 
         regionPower     += udot(uvec4(regionInfo.InsideSlimEdgesBottomLeft), resSlimCornerBotomLeftPart);
@@ -2343,37 +2415,25 @@ function createChainsShaderProgram(context, vertexShader)
             CellSidesInfo   sidesInfo   = GetSidesState(cellId);
             CellCornersInfo cornersInfo = GetCornersState(cellId);
             CellSides2Info  sides2Info  = GetSides2State(cellId);
-            
-            uint cellValue           = texelFetch(gBoard, cellId, 0).x;
-            uvec4 sidesBoardValues   = GetSidesCellValues(sidesInfo, gBoard);
-            uvec4 cornersBoardValues = GetCornersCellValues(cornersInfo, gBoard);
-            uvec4 sides2BoardValues  = GetSides2CellValues(sides2Info, gBoard);
 
-            uint regionValue = CalculateRegionValue(regionInfo, cellValue, sidesBoardValues, cornersBoardValues, sides2BoardValues);
-            outColor = mix(gColorNone, gColorEnabled, float(regionValue) * domainFactor);
+            CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
+            uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
+            outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
 
             if((gFlags & FLAG_SHOW_SOLUTION) != 0)
             {
-                uint  solutionValue       = texelFetch(gSolution, cellId, 0).x;
-                uvec4 sidesSolvedValues   = GetSidesCellValues(sidesInfo, gSolution);
-                uvec4 cornersSolvedValues = GetCornersCellValues(cornersInfo, gSolution);
-                uvec4 sides2SolvedValues  = GetSides2CellValues(sides2Info, gSolution);
-
-                uint regionSolvedValue = CalculateRegionValue(regionInfo, solutionValue, sidesSolvedValues, cornersSolvedValues, sides2SolvedValues);
-                outColor = mix(outColor, gColorSolved, float(regionSolvedValue) * domainFactor);
+                CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
+                uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
+                outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
             }
             else if((gFlags & FLAG_SHOW_STABILITY) != 0)
             {
                 lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
                 colorStable.a = 1.0f;
 
-                uint  stableValue         = texelFetch(gStability, cellId, 0).x;
-                uvec4 sidesStableValues   = GetSidesCellValues(sidesInfo, gStability);
-                uvec4 cornersStableValues = GetCornersCellValues(cornersInfo, gStability);
-                uvec4 sides2StableValues  = GetSides2CellValues(sides2Info, gStability);
-    
-                uint regionStableValue = CalculateRegionValue(regionInfo, stableValue, sidesStableValues, cornersStableValues, sides2StableValues);
-                outColor = mix(outColor, colorStable, float(regionStableValue) * domainFactor);
+                CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
+                uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
+                outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
             }
         }
         else
