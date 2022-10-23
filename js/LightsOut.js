@@ -1299,34 +1299,9 @@ bvec4 b4or(bvec4 a, bvec4 b) //Yet another thing that doesn't require writing fu
     return bvec4(a.x || b.x, a.y || b.y, a.z || b.z, a.w || b.w);
 }
 
-bvec2 b2nd(bvec2 a, bvec2 b) //Yet another thing that doesn't require writing functions in hlsl
+bvec2 b2nd(bvec2 a, bvec2 b)
 {
     return bvec2(a.x && b.x, a.y && b.y);
-}
-
-bvec4 b4nd(bvec4 a, bvec4 b, bvec4 c) //No, they are not kidding
-{
-    return bvec4(a.x && b.x && c.x, a.y && b.y && c.y, a.z && b.z && c.z, a.w && b.w && c.w);
-}
-
-bvec4 b4nd(bvec4 a, bvec4 b, bvec4 c, bvec4 d)
-{
-    return bvec4(a.x && b.x && c.x && d.x, a.y && b.y && c.y && d.y, a.z && b.z && c.z && d.z, a.w && b.w && c.w && d.w);
-}
-
-bvec4 b4nd(bvec4 a, bvec4 b, bvec4 c, bvec4 d, bvec4 e)
-{
-    return bvec4(a.x && b.x && c.x && d.x && e.x, a.y && b.y && c.y && d.y && e.y, a.z && b.z && c.z && d.z && e.z, a.w && b.w && c.w && d.w && e.w);
-}
-
-bvec2 b2nd(bvec2 a, bvec2 b, bvec2 c) //For Christ's sake
-{
-    return bvec2(a.x && b.x && c.x, a.y && b.y && c.y);
-}
-
-bool b1nd(bool a, bool b, bool c) //And that's what happens when you want the code which is both uniform-looking and working
-{
-    return a && b && c;
 }
 
 uint udot(uvec4 a, uvec4 b) //No words for this...
@@ -1911,11 +1886,11 @@ function createBeamsShaderProgram(context, vertexShader)
         
         uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
 
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.xyzw  )                                                                                                                                                                                                                                         ); //B#1
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.yzwx  )                                                                                                                                                                                                                                         ); //B#2
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.CornersValues.xyzw)                                                                                                                                                                                                                                         ); //B#3
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.zwxy  ),    equal(cellValueVec, cellNeighbours.SidesValues.wxyz)                                                                                                                                                                               )); //B#4
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zwxy), notEqual(cellValueVec, cellNeighbours.CornersValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.zwxy), notEqual(cellValueVec, cellNeighbours.CornersValues.yzwx))); //B#5
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.xyzw  )                                                                                                                                                                                                                                                           ); //B#1
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.yzwx  )                                                                                                                                                                                                                                                           ); //B#2
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.CornersValues.xyzw)                                                                                                                                                                                                                                                           ); //B#3
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.zwxy  ), equal(cellValueVec, cellNeighbours.SidesValues.wxyz)                                                                                                                                                                                                    )); //B#4
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zwxy), b4nd(b4nd(notEqual(cellValueVec, cellNeighbours.CornersValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz)), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.zwxy), notEqual(cellValueVec, cellNeighbours.CornersValues.yzwx))))); //B#5
 
         return res;
     }
@@ -1930,12 +1905,12 @@ function createBeamsShaderProgram(context, vertexShader)
         uvec4 cellValueVec   = uvec4(cellNeighbours.CellValue);
         bvec4 loneDiamondVec = bvec4(loneDiamond);
 
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.xyzw  )                                                                                                                                                                              ); //I#1
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), notEqual(cellValueVec,   cellNeighbours.SidesValues.yzwx)                                                                                                                  )); //I#2
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.wxyz), notEqual(cellValueVec,   cellNeighbours.SidesValues.wxyz)                                                                                                                  )); //I#3
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zwxy),    equal(cellValueVec, cellNeighbours.CornersValues.yzwx), notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx))); //I#4
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.zwxy  ), notEqual(cellValueVec,   cellNeighbours.SidesValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx)                                                         )); //I#5
-        res = b4or(res,           loneDiamondVec                                                                                                                                                                                                                 ); //I#6
+        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.xyzw)                                                                                                                                                                                              ); //I#1
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx)                                                                                                                             )); //I#2
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz)                                                                                                                             )); //I#3
+        res = b4or(res, b4nd(b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zwxy), equal(cellValueVec, cellNeighbours.CornersValues.yzwx)), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx)))); //I#4
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.zwxy), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx))                                                                )); //I#5
+        res = b4or(res, loneDiamondVec                                                                                                                                                                                                                                    ); //I#6
 
         return res;
     }
@@ -1967,7 +1942,7 @@ function createBeamsShaderProgram(context, vertexShader)
     bvec4 regVRule(CellNeighbourValues cellNeighbours)
     {
         uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
-        return b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx)); //V#1
+        return b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx))); //V#1
     }
 
     RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
@@ -1995,13 +1970,14 @@ function createBeamsShaderProgram(context, vertexShader)
 
         result.InsideGRegion = insideCentralDiamond && insideHorizontalBeam && insideVerticalBeam; //G
         
-        result.InsideBRegion = b4nd(insideBeam.xzzx,     insideBeam.yyww ,                       bvec4(!insideCentralDiamond)); //B-A, B-B, B-C, B-D
-        result.InsideIRegion = b4nd(insideBeam.xyzw, not(insideBeam.yxwz), not(insideBeam.wzyx), bvec4( insideCentralDiamond)); //I-A, I-B, I-C, I-D
+        result.InsideBRegion = b4nd(b4nd(insideBeam.xzzx, insideBeam.yyww), bvec4(!insideCentralDiamond)); //B-A, B-B, B-C, B-D
+
+        result.InsideIRegion = b4nd(b4nd(not(insideBeam.yxwz), not(insideBeam.wzyx)), b4nd(insideBeam.xyzw, bvec4(insideCentralDiamond))); //I-A, I-B, I-C, I-D
         
-        result.InsideYTopRightRegion   = b4nd(insideBeam.yyzz, not(insideBeam.xzyw), bvec4(!insideCentralDiamond), insideSide.xzyw); //Y-A, Y-B, Y-C, Y-D
-        result.InsideYBottomLeftRegion = b4nd(insideBeam.wwxx, not(insideBeam.zxwy), bvec4(!insideCentralDiamond), insideSide.zxwy); //Y-E, Y-F, Y-G, Y-H
+        result.InsideYTopRightRegion   = b4nd(b4nd(insideBeam.yyzz, not(insideBeam.xzyw)), b4nd(bvec4(!insideCentralDiamond), insideSide.xzyw)); //Y-A, Y-B, Y-C, Y-D
+        result.InsideYBottomLeftRegion = b4nd(b4nd(insideBeam.wwxx, not(insideBeam.zxwy)), b4nd(bvec4(!insideCentralDiamond), insideSide.zxwy)); //Y-E, Y-F, Y-G, Y-H
         
-        result.InsideVRegion = b4nd(not(insideBeam.xyzw), not(insideBeam.yzwx), insideSide.xyzw, insideSide.yzwx); //V-A, V-B, V-C, V-D
+        result.InsideVRegion = b4nd(b4nd(not(insideBeam.xyzw), not(insideBeam.yzwx)), b4nd(insideSide.xyzw, insideSide.yzwx)); //V-A, V-B, V-C, V-D
 
         return result;
     }
@@ -2199,15 +2175,15 @@ function createChainsShaderProgram(context, vertexShader)
 
         RegionInfo result;
 
-        result.InsideFreeCorners = b4nd(insideCorner, bvec4(!insideLinkHorizontal), bvec4(!insideLinkVertical));
+        result.InsideFreeCorners = b4nd(insideCorner, bvec4(!insideLinkHorizontal && !insideLinkVertical));
         
         result.InsideSlimEdgesTopRight   = b4nd(insideLink.xyyx, insideCorner.xxyy);
         result.InsideSlimEdgesBottomLeft = b4nd(insideLink.xyyx, insideCorner.zzww);
 
-        result.InsideCenterLinks = b2nd(insideLink, bvec2(insideCircle), bvec2(!insideBothLinks));
+        result.InsideCenterLinks = b2nd(insideLink, b2nd(bvec2(insideCircle), bvec2(!insideBothLinks)));
         result.InsideBothLinks   = insideBothLinks;
 
-        result.InsideFreeCircle = b1nd(insideCircle, !insideLinkVertical, !insideLinkHorizontal);
+        result.InsideFreeCircle = insideCircle && !insideLinkVertical && !insideLinkHorizontal;
 
         result.OutsideCircle = outsideCircle;
 
