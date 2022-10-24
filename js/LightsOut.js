@@ -1246,8 +1246,8 @@ const uint ProjectivePlaneTopology = 2u;
 struct CellSidesInfo
 {
     ivec2 LeftCellId;
-    ivec2 TopCellId;
     ivec2 RightCellId;
+    ivec2 TopCellId;
     ivec2 BottomCellId;
     bvec4 Mask;
 };
@@ -1256,16 +1256,16 @@ struct CellCornersInfo
 {
     ivec2 TopLeftCellId;
     ivec2 TopRightCellId;
-    ivec2 BottomRightCellId;
     ivec2 BottomLeftCellId;
+    ivec2 BottomRightCellId;
     bvec4 Mask;
 };
 
 struct CellSides2Info
 {
     ivec2 Left2CellId;
-    ivec2 Top2CellId;
     ivec2 Right2CellId;
+    ivec2 Top2CellId;
     ivec2 Bottom2CellId;
     bvec4 Mask;
 };
@@ -1321,8 +1321,8 @@ const ShaderSidesStateFunctions =
 uvec4 GetSidesCellValues(CellSidesInfo sidesInfo, highp usampler2D board)
 {
     uvec4 result = uvec4(texelFetch(board, sidesInfo.LeftCellId,   0).x,
-                         texelFetch(board, sidesInfo.TopCellId,    0).x,
                          texelFetch(board, sidesInfo.RightCellId,  0).x,
+                         texelFetch(board, sidesInfo.TopCellId,    0).x,
                          texelFetch(board, sidesInfo.BottomCellId, 0).x);
 
     result *= uvec4(sidesInfo.Mask);
@@ -1385,8 +1385,8 @@ CellSidesInfo GetSidesState(highp ivec2 cellId)
     else
     {
         sidesInfo.Mask.x = cellId.x > 0;
-        sidesInfo.Mask.y = cellId.y > 0;
-        sidesInfo.Mask.z = cellId.x < gBoardSize - 1;
+        sidesInfo.Mask.y = cellId.x < gBoardSize - 1;
+        sidesInfo.Mask.z = cellId.y > 0;
         sidesInfo.Mask.w = cellId.y < gBoardSize - 1;
     }
 
@@ -1422,8 +1422,8 @@ uvec4 GetCornersCellValues(CellCornersInfo cornersInfo, highp usampler2D board)
 {
     uvec4 result = uvec4(texelFetch(board, cornersInfo.TopLeftCellId,     0).x,
                          texelFetch(board, cornersInfo.TopRightCellId,    0).x,
-                         texelFetch(board, cornersInfo.BottomRightCellId, 0).x,
-                         texelFetch(board, cornersInfo.BottomLeftCellId,  0).x);
+                         texelFetch(board, cornersInfo.BottomLeftCellId,  0).x,
+                         texelFetch(board, cornersInfo.BottomRightCellId, 0).x);
 
     result *= uvec4(cornersInfo.Mask);
     return result;
@@ -1506,8 +1506,8 @@ CellCornersInfo GetCornersState(highp ivec2 cellId)
     {
         cornersInfo.Mask.x = cellId.x > 0              && cellId.y > 0;
         cornersInfo.Mask.y = cellId.x < gBoardSize - 1 && cellId.y > 0;
-        cornersInfo.Mask.z = cellId.x < gBoardSize - 1 && cellId.y < gBoardSize - 1;
-        cornersInfo.Mask.w = cellId.x > 0              && cellId.y < gBoardSize - 1;
+        cornersInfo.Mask.z = cellId.x > 0              && cellId.y < gBoardSize - 1;
+        cornersInfo.Mask.w = cellId.x < gBoardSize - 1 && cellId.y < gBoardSize - 1;
     }
 
     return cornersInfo;
@@ -1541,8 +1541,8 @@ const ShaderSides2StateFunctions =
 uvec4 GetSides2CellValues(CellSides2Info sides2Info, highp usampler2D board)
 {
     uvec4 result = uvec4(texelFetch(board, sides2Info.Left2CellId,   0).x,
-                         texelFetch(board, sides2Info.Top2CellId,    0).x,
                          texelFetch(board, sides2Info.Right2CellId,  0).x,
+                         texelFetch(board, sides2Info.Top2CellId,    0).x,
                          texelFetch(board, sides2Info.Bottom2CellId, 0).x);
 
     result *= uvec4(sides2Info.Mask);
@@ -1605,8 +1605,8 @@ CellSides2Info GetSides2State(highp ivec2 cellId)
     else
     {
         sides2Info.Mask.x = cellId.x > 1;
-        sides2Info.Mask.y = cellId.y > 1;
-        sides2Info.Mask.z = cellId.x < gBoardSize - 2;
+        sides2Info.Mask.y = cellId.x < gBoardSize - 2;
+        sides2Info.Mask.z = cellId.y > 1;
         sides2Info.Mask.w = cellId.y < gBoardSize - 2;
     }
 
@@ -1769,7 +1769,7 @@ function createCirclesShaderProgam(context, vertexShader)
         mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
 
         RegionInfo regionInfo;
-        regionInfo.OnSides      = bvec4(cellCoord.x <= 0.0f, cellCoord.y <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y >= 0.0f);
+        regionInfo.OnSides      = bvec4(cellCoord.x <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y <= 0.0f, cellCoord.y >= 0.0f);
         regionInfo.InsideCircle = dot(cellCoord, cellCoord) <= circleRadius * circleRadius;
 
         return regionInfo;
@@ -1806,12 +1806,12 @@ function createDiamondsShaderProgram(context, vertexShader)
 
     bvec4 emptyCornerRule(uvec4 edgeValue)
     {
-        return equal(edgeValue.xyzw, edgeValue.yzwx);
+        return equal(edgeValue.xyxy, edgeValue.zzww);
     }
 
     bvec4 cornerRule(uint cellValue, uvec4 cornerValue)
     {
-        return equal(uvec4(cellValue), cornerValue.xyzw);
+        return equal(uvec4(cellValue), cornerValue);
     }
 
     RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
@@ -1819,14 +1819,14 @@ function createDiamondsShaderProgram(context, vertexShader)
         int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
         mediump float diamondRadius = float(cellSizeCorrected) / 2.0f;
 
-        bool insideDiamond   = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
+        bool insideDiamond = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
 
         bool insideTopLeft     = cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
         bool insideTopRight    = cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-        bool insideBottomRight = cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
         bool insideBottomLeft  = cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
+        bool insideBottomRight = cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
         
-        bvec4 insideCorners = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
+        bvec4 insideCorners = bvec4(insideTopLeft, insideTopRight, insideBottomLeft, insideBottomRight);
 
         RegionInfo regionInfo;
         regionInfo.InsideCorners = b4nd(bvec4(!insideDiamond), insideCorners);
@@ -1836,8 +1836,8 @@ function createDiamondsShaderProgram(context, vertexShader)
 
     uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
-        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues;
-        uvec4 cornerCandidate      = uvec4(cornerRule(cellNeighbours.CellValue, cellNeighbours.CornersValues)) * cellNeighbours.CellValue;
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.zzww;
+        uvec4 cornerCandidate = uvec4(cornerRule(cellNeighbours.CellValue, cellNeighbours.CornersValues)) * cellNeighbours.CellValue;
 
         uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
 
@@ -1862,8 +1862,8 @@ function createBeamsShaderProgram(context, vertexShader)
     {
         bvec4 InsideBRegion;
         bvec4 InsideIRegion;
-        bvec4 InsideYTopRightRegion;
-        bvec4 InsideYBottomLeftRegion;
+        bvec4 InsideYHorizontalRegion;
+        bvec4 InsideYVerticalRegion;
         bvec4 InsideVRegion;
         bool  InsideGRegion;
         bool  OutsideCentralDiamond;
@@ -1873,9 +1873,9 @@ function createBeamsShaderProgram(context, vertexShader)
     {
         bvec4 res = bvec4(true);
 
-        res = b4nd(res,    equal(cellNeighbours.SidesValues.xyzw, cellNeighbours.SidesValues.yzwx));
-        res = b4nd(res, notEqual(cellNeighbours.SidesValues.xyzw, cellNeighbours.CornersValues.xyzw));
-        res = b4nd(res, notEqual(cellNeighbours.SidesValues.xyzw, uvec4(cellNeighbours.CellValue)));
+        res = b4nd(res,    equal(cellNeighbours.SidesValues.xyxy, cellNeighbours.SidesValues.zzww));
+        res = b4nd(res, notEqual(cellNeighbours.SidesValues.xyxy, cellNeighbours.CornersValues.xyzw));
+        res = b4nd(res, notEqual(cellNeighbours.SidesValues.zzww, uvec4(cellNeighbours.CellValue)));
 
         return res;
     }
@@ -1886,11 +1886,11 @@ function createBeamsShaderProgram(context, vertexShader)
         
         uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
 
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.xyzw  )                                                                                                                                                                                                                                                           ); //B#1
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.yzwx  )                                                                                                                                                                                                                                                           ); //B#2
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.xyxy  )                                                                                                                                                                                                                                                           ); //B#1
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.zzww  )                                                                                                                                                                                                                                                           ); //B#2
         res = b4or(res,      equal(cellValueVec, cellNeighbours.CornersValues.xyzw)                                                                                                                                                                                                                                                           ); //B#3
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.zwxy  ), equal(cellValueVec, cellNeighbours.SidesValues.wxyz)                                                                                                                                                                                                    )); //B#4
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zwxy), b4nd(b4nd(notEqual(cellValueVec, cellNeighbours.CornersValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz)), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.zwxy), notEqual(cellValueVec, cellNeighbours.CornersValues.yzwx))))); //B#5
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.wwzz  ), equal(cellValueVec, cellNeighbours.SidesValues.yxyx)                                                                                                                                                                                                    )); //B#4
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.wzyx), b4nd(b4nd(notEqual(cellValueVec, cellNeighbours.CornersValues.yxxy), notEqual(cellValueVec, cellNeighbours.SidesValues.yxyx)), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.wwzz), notEqual(cellValueVec, cellNeighbours.CornersValues.zwwz))))); //B#5
 
         return res;
     }
@@ -1906,35 +1906,35 @@ function createBeamsShaderProgram(context, vertexShader)
         bvec4 loneDiamondVec = bvec4(loneDiamond);
 
         res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.xyzw)                                                                                                                                                                                              ); //I#1
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx)                                                                                                                             )); //I#2
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz)                                                                                                                             )); //I#3
-        res = b4or(res, b4nd(b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zwxy), equal(cellValueVec, cellNeighbours.CornersValues.yzwx)), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx)))); //I#4
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.zwxy), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.wxyz), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx))                                                                )); //I#5
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zyyz), notEqual(cellValueVec, cellNeighbours.SidesValues.wzyx)                                                                                                                             )); //I#2
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xwxw), notEqual(cellValueVec, cellNeighbours.SidesValues.zwxy)                                                                                                                             )); //I#3
+        res = b4or(res, b4nd(b4nd(equal(cellValueVec, cellNeighbours.CornersValues.yzzy), equal(cellValueVec, cellNeighbours.CornersValues.wxwx)), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.zzxx), notEqual(cellValueVec, cellNeighbours.SidesValues.wwyy)))); //I#4
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.yxwz), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.zzxx), notEqual(cellValueVec, cellNeighbours.SidesValues.wwyy))                                                                )); //I#5
         res = b4or(res, loneDiamondVec                                                                                                                                                                                                                                    ); //I#6
 
         return res;
     }
 
-    bvec4 regYTopRightRule(CellNeighbourValues cellNeighbours)
+    bvec4 regYHorizontalRule(CellNeighbourValues cellNeighbours)
     {
         bvec4 res = bvec4(false);
 
         uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
         
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.yyzz  )                                                          ); //Y#1
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyyz), notEqual(cellValueVec, cellNeighbours.SidesValues.xzyw))); //Y#2
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.xyxy  )                                                          ); //Y#1
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.zzww))); //Y#2
 
         return res;
     }
 
-    bvec4 regYBottomLeftRule(CellNeighbourValues cellNeighbours)
+    bvec4 regYVerticalRule(CellNeighbourValues cellNeighbours)
     {
         bvec4 res = bvec4(false);
 
         uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
         
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.wwxx  )                                                          ); //Y#1
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zwwx), notEqual(cellValueVec, cellNeighbours.SidesValues.zxwy))); //Y#2
+        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.zzww  )                                                          ); //Y#1
+        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.xyxy))); //Y#2
 
         return res;
     }
@@ -1942,7 +1942,7 @@ function createBeamsShaderProgram(context, vertexShader)
     bvec4 regVRule(CellNeighbourValues cellNeighbours)
     {
         uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
-        return b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.yzwx))); //V#1
+        return b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.xyxy), notEqual(cellValueVec, cellNeighbours.SidesValues.zzww))); //V#1
     }
 
     RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
@@ -1952,7 +1952,8 @@ function createBeamsShaderProgram(context, vertexShader)
         mediump vec2 absCellCoord = abs(cellCoord);
         mediump float diamondRadius = float(cellSizeCorrected) / 2.0f;
 
-        bvec4 insideSide = bvec4(cellCoord.x <= 0.0f, cellCoord.y <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y >= 0.0f);
+        bvec4 insideSides   = bvec4(cellCoord.x <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y <= 0.0f, cellCoord.y >= 0.0f);
+        bvec4 insideCorners = b4nd(insideSides.xyxy, insideSides.zzww);
 
         //Fix for 1 pixel off. To make it work, x == 0 and y == 0 pixels shouldn't be considered part of beam (or else single pixel artifacts will appear)
         //For even cell sizes, region inside diamond should be a bit smaller to compensate
@@ -1962,7 +1963,7 @@ function createBeamsShaderProgram(context, vertexShader)
         bool insideVerticalBeam   = absCellCoord.x <= 0.707f * float(cellSizeCorrected) / 2.0f;
         bool insideHorizontalBeam = absCellCoord.y <= 0.707f * float(cellSizeCorrected) / 2.0f;
 
-        bvec4 insideBeam = b4nd(bvec4(insideHorizontalBeam, insideVerticalBeam, insideHorizontalBeam, insideVerticalBeam), insideSide);
+        bvec4 insideBeams = b4nd(bvec4(bvec2(insideHorizontalBeam), bvec2(insideVerticalBeam)), insideSides);
 
         RegionInfo result;
 
@@ -1970,41 +1971,41 @@ function createBeamsShaderProgram(context, vertexShader)
 
         result.InsideGRegion = insideCentralDiamond && insideHorizontalBeam && insideVerticalBeam; //G
         
-        result.InsideBRegion = b4nd(b4nd(insideBeam.xzzx, insideBeam.yyww), bvec4(!insideCentralDiamond)); //B-A, B-B, B-C, B-D
+        result.InsideBRegion = b4nd(b4nd(insideBeams.xyxy, insideBeams.zzww), bvec4(!insideCentralDiamond)); //B-A, B-B, B-D, B-C
 
-        result.InsideIRegion = b4nd(b4nd(not(insideBeam.yxwz), not(insideBeam.wzyx)), b4nd(insideBeam.xyzw, bvec4(insideCentralDiamond))); //I-A, I-B, I-C, I-D
+        result.InsideIRegion = b4nd(b4nd(not(insideBeams.zzxx), not(insideBeams.wwyy)), b4nd(insideBeams.xyzw, bvec4(insideCentralDiamond))); //I-D, I-B, I-A, I-C
         
-        result.InsideYTopRightRegion   = b4nd(b4nd(insideBeam.yyzz, not(insideBeam.xzyw)), b4nd(bvec4(!insideCentralDiamond), insideSide.xzyw)); //Y-A, Y-B, Y-C, Y-D
-        result.InsideYBottomLeftRegion = b4nd(b4nd(insideBeam.wwxx, not(insideBeam.zxwy)), b4nd(bvec4(!insideCentralDiamond), insideSide.zxwy)); //Y-E, Y-F, Y-G, Y-H
+        result.InsideYHorizontalRegion = b4nd(b4nd(insideBeams.xyxy, not(insideBeams.zzww)), b4nd(bvec4(!insideCentralDiamond), insideSides.zzww)); //Y-H, Y-C, Y-G, Y-D
+        result.InsideYVerticalRegion   = b4nd(b4nd(insideBeams.zzww, not(insideBeams.xyxy)), b4nd(bvec4(!insideCentralDiamond), insideSides.xyxy)); //Y-A, Y-B, Y-F, Y-E
         
-        result.InsideVRegion = b4nd(b4nd(not(insideBeam.xyzw), not(insideBeam.yzwx)), b4nd(insideSide.xyzw, insideSide.yzwx)); //V-A, V-B, V-C, V-D
+        result.InsideVRegion = b4nd(b4nd(not(insideBeams.xyxy), not(insideBeams.zzww)), b4nd(insideSides.xyxy, insideSides.zzww)); //V-A, V-B, V-D, V-C
 
         return result;
     }
 
     uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
-        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours)) * cellNeighbours.SidesValues;
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours)) * cellNeighbours.SidesValues.zzww;
         emptyCornerCandidate      *= uint(regionInfo.OutsideCentralDiamond); //Fix for 1 pixel offset beforehand 
 
         uvec4 regionBCandidate = uvec4(regBRule(cellNeighbours)) * cellNeighbours.CellValue;
         uvec4 regionICandidate = uvec4(regIRule(cellNeighbours)) * cellNeighbours.CellValue;
 
-        uvec4 regionYTopRightCandidate   = uvec4(regYTopRightRule(cellNeighbours))   * cellNeighbours.CellValue;
-        uvec4 regionYBottomLeftCandidate = uvec4(regYBottomLeftRule(cellNeighbours)) * cellNeighbours.CellValue;
+        uvec4 regionYHorizontalCandidate = uvec4(regYHorizontalRule(cellNeighbours))   * cellNeighbours.CellValue;
+        uvec4 regionYVerticalCandidate   = uvec4(regYVerticalRule(cellNeighbours)) * cellNeighbours.CellValue;
 
         uvec4 regionVCandidate = uvec4(regVRule(cellNeighbours)) * cellNeighbours.CellValue;
 
-        uvec4 resB           = max(regionBCandidate,           emptyCornerCandidate.xyzw);
-        uvec4 resYTopRight   = max(regionYTopRightCandidate,   emptyCornerCandidate.xyyz);
-        uvec4 resYBottomLeft = max(regionYBottomLeftCandidate, emptyCornerCandidate.zwwx);
-        uvec4 resV           = max(regionVCandidate,           emptyCornerCandidate.xyzw);
+        uvec4 resB           = max(regionBCandidate,           emptyCornerCandidate);
+        uvec4 resYTopRight   = max(regionYHorizontalCandidate, emptyCornerCandidate);
+        uvec4 resYBottomLeft = max(regionYVerticalCandidate,   emptyCornerCandidate);
+        uvec4 resV           = max(regionVCandidate,           emptyCornerCandidate);
 
         uint regionPower = uint(regionInfo.InsideGRegion)         *        cellNeighbours.CellValue;
         regionPower     += udot(uvec4(regionInfo.InsideBRegion),           resB);
         regionPower     += udot(uvec4(regionInfo.InsideIRegion),           regionICandidate); 
-        regionPower     += udot(uvec4(regionInfo.InsideYTopRightRegion),   resYTopRight);
-        regionPower     += udot(uvec4(regionInfo.InsideYBottomLeftRegion), resYBottomLeft); 
+        regionPower     += udot(uvec4(regionInfo.InsideYHorizontalRegion), resYTopRight);
+        regionPower     += udot(uvec4(regionInfo.InsideYVerticalRegion),   resYBottomLeft); 
         regionPower     += udot(uvec4(regionInfo.InsideVRegion),           resV);
 
         return regionPower;
@@ -2033,7 +2034,7 @@ function createRaindropsShaderProgram(context, vertexShader)
 
     bvec4 emptyCornerRule(uvec4 edgeValue)
     {
-        return equal(edgeValue.xyzw, edgeValue.yzwx);
+        return equal(edgeValue.xyxy, edgeValue.zzww);
     }
 
     bvec4 cornerRule(CellNeighbourValues cellNeighbours)
@@ -2043,8 +2044,8 @@ function createRaindropsShaderProgram(context, vertexShader)
         uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
         
         res = b4or(res, equal(cellValueVec, cellNeighbours.CornersValues.xyzw));
-        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.xyzw));
-        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.yzwx));
+        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.xyxy));
+        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.zzww));
 
         return res;
     }
@@ -2060,12 +2061,12 @@ function createRaindropsShaderProgram(context, vertexShader)
 
         bool insideTopLeft     = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
         bool insideTopRight    = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-        bool insideBottomRight = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
         bool insideBottomLeft  = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
+        bool insideBottomRight = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
 
         RegionInfo result;
 
-        result.InsideCorners = bvec4(insideTopLeft, insideTopRight, insideBottomRight, insideBottomLeft);
+        result.InsideCorners = bvec4(insideTopLeft, insideTopRight, insideBottomLeft, insideBottomRight);
 
         result.InsideCircle  = insideCircle;
         result.OutsideCircle = outsideCircle;
@@ -2075,7 +2076,7 @@ function createRaindropsShaderProgram(context, vertexShader)
 
     uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
-        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues;
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.zzww;
         uvec4 cornerCandidate      = uvec4(cornerRule(cellNeighbours)) * cellNeighbours.CellValue;
 
         emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
@@ -2101,8 +2102,8 @@ function createChainsShaderProgram(context, vertexShader)
     struct RegionInfo
     {
         bvec4 InsideFreeCorners;
-        bvec4 InsideSlimEdgesTopRight;
-        bvec4 InsideSlimEdgesBottomLeft;
+        bvec4 InsideSlimEdgesHorizontal;
+        bvec4 InsideSlimEdgesVertical;
         bvec2 InsideCenterLinks;
         bool  InsideBothLinks;
         bool  InsideFreeCircle;
@@ -2111,7 +2112,7 @@ function createChainsShaderProgram(context, vertexShader)
 
     bvec4 emptyCornerRule(uvec4 edgeValue)
     {
-        return equal(edgeValue.xyzw, edgeValue.yzwx);
+        return equal(edgeValue.xyxy, edgeValue.zzww);
     }
 
     bvec4 cornerRule(CellNeighbourValues cellNeighbours)
@@ -2121,15 +2122,15 @@ function createChainsShaderProgram(context, vertexShader)
         uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
 
         res = b4or(res, equal(cellValueVec, cellNeighbours.CornersValues.xyzw));
-        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.xyzw));
-        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.yzwx));
+        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.xyxy));
+        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.zzww));
 
         return res;
     }
 
     bvec2 linkRule(uvec4 edgeValue)
     {
-        return equal(edgeValue.xy, edgeValue.zw);
+        return equal(edgeValue.xz, edgeValue.yw);
     }
 
     bvec4 slimEdgeRule(uint cellValue, uvec4 edge2Value)
@@ -2166,19 +2167,19 @@ function createChainsShaderProgram(context, vertexShader)
 
         bool insideTopLeft     = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
         bool insideTopRight    = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-        bool insideBottomRight = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
         bool insideBottomLeft  = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
+        bool insideBottomRight = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
 
-        bvec4 insideCircleBig = bvec4(insideCircleBigLeft, insideCircleBigTop, insideCircleBigRight, insideCircleBigBottom);
-        bvec4 insideCorner    = bvec4(insideTopLeft,       insideTopRight,     insideBottomRight,    insideBottomLeft);
+        bvec4 insideCircleBig = bvec4(insideCircleBigLeft, insideCircleBigRight, insideCircleBigTop, insideCircleBigBottom);
+        bvec4 insideCorner    = bvec4(insideTopLeft,       insideTopRight,       insideBottomLeft,   insideBottomRight);
 
 
         RegionInfo result;
 
         result.InsideFreeCorners = b4nd(insideCorner, bvec4(!insideLinkHorizontal && !insideLinkVertical));
         
-        result.InsideSlimEdgesTopRight   = b4nd(insideLink.xyyx, insideCorner.xxyy);
-        result.InsideSlimEdgesBottomLeft = b4nd(insideLink.xyyx, insideCorner.zzww);
+        result.InsideSlimEdgesHorizontal = b4nd(insideLink.xxxx, insideCorner.xyzw);
+        result.InsideSlimEdgesVertical   = b4nd(insideLink.yyyy, insideCorner.xyzw);
 
         result.InsideCenterLinks = b2nd(insideLink, b2nd(bvec2(insideCircle), bvec2(!insideBothLinks)));
         result.InsideBothLinks   = insideBothLinks;
@@ -2194,25 +2195,25 @@ function createChainsShaderProgram(context, vertexShader)
     {
         uint centerCandidate = cellNeighbours.CellValue;
 
-        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues;
+        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.zzww;
         uvec4 cornerCandidate      = uvec4(cornerRule(cellNeighbours)) * cellNeighbours.CellValue;
 
         emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
 
-        uvec2 linkCandidate     = uvec2(linkRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.xy;
+        uvec2 linkCandidate     = uvec2(linkRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.xz;
         uvec4 slimEdgeCandidate = uvec4(slimEdgeRule(cellNeighbours.CellValue, cellNeighbours.Sides2Values)) * uvec4(cellNeighbours.CellValue);
 
-        uvec4 resCorner                  = max(cornerCandidate, emptyCornerCandidate);
-        uvec4 resSlimCornerTopRightPart  = max(resCorner.xxyy, slimEdgeCandidate.xyyz);
-        uvec4 resSlimCornerBotomLeftPart = max(resCorner.zzww, slimEdgeCandidate.zwwx);
+        uvec4 resCorner               = max(cornerCandidate, emptyCornerCandidate);
+        uvec4 resSlimCornerHorizontal = max(resCorner.xyzw, slimEdgeCandidate.xyxy);
+        uvec4 resSlimCornerVertical   = max(resCorner.xyzw, slimEdgeCandidate.zzww);
 
         uvec2 resLink     = max(linkCandidate, uvec2(centerCandidate));
         uint  resMidLinks = max(resLink.x,     resLink.y);
 
         uint regionPower =       uint(regionInfo.InsideFreeCircle)    *      cellNeighbours.CellValue;
         regionPower     += udot(uvec4(regionInfo.InsideFreeCorners),         resCorner);
-        regionPower     += udot(uvec4(regionInfo.InsideSlimEdgesTopRight),   resSlimCornerTopRightPart); 
-        regionPower     += udot(uvec4(regionInfo.InsideSlimEdgesBottomLeft), resSlimCornerBotomLeftPart);
+        regionPower     += udot(uvec4(regionInfo.InsideSlimEdgesHorizontal), resSlimCornerHorizontal); 
+        regionPower     += udot(uvec4(regionInfo.InsideSlimEdgesVertical),   resSlimCornerVertical);
         regionPower     += udot(uvec2(regionInfo.InsideCenterLinks),         resLink); 
         regionPower     +=       uint(regionInfo.InsideBothLinks)     *      resMidLinks;
 
