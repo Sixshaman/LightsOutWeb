@@ -1313,6 +1313,18 @@ uint udot(uvec2 a, uvec2 b)
 {
     return a.x * b.x + a.y * b.y;
 }
+
+//Vectorized form of the ternary operator
+uvec4 select(uvec4 a, uvec4 b, bvec4 mask)
+{
+    uvec4 res;
+    res.x = mask.x ? a.x : b.x;
+    res.y = mask.y ? a.y : b.y;
+    res.z = mask.z ? a.z : b.z;
+    res.w = mask.w ? a.w : b.w;
+
+    return res;
+}
 `;
 
 //Helper functions to access cardinal cell neighbours
@@ -1801,6 +1813,7 @@ function createDiamondsShaderProgram(context, vertexShader)
     struct RegionInfo
     {
         bvec4 InsideCorners;
+        bvec4 InsideEmptyCorners;
         bool  InsideDiamond;
     };
 
@@ -1809,7 +1822,7 @@ function createDiamondsShaderProgram(context, vertexShader)
         return equal(edgeValue.xyxy, edgeValue.zzww);
     }
 
-    bvec4 cornerRule(uint cellValue, uvec4 cornerValue)
+    bvec4 filledCornerRule(uint cellValue, uvec4 cornerValue)
     {
         return equal(uvec4(cellValue), cornerValue);
     }
@@ -1819,7 +1832,13 @@ function createDiamondsShaderProgram(context, vertexShader)
         int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
         mediump float diamondRadius = float(cellSizeCorrected) / 2.0f;
 
-        bool insideDiamond = (abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius);
+        //Fix for 1-pixel error.
+        //For empty corners to match neighbour diamonds, we should draw them with the diamond radius smaller by 1 unit.
+        //With grid visible, this method produces 1-pixel "hole" artifacts. To counteract it, we make the diamond greater by 0.5 units.
+
+        bool insideDiamond   = abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius + 0.5f * float((gFlags & FLAG_NO_GRID) == 0);
+        bool insideDiamondSm = abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius - 1.0f;
+        bool outsideDiamond  = abs(cellCoord.x) + abs(cellCoord.y) >= diamondRadius + 0.5f * float((gFlags & FLAG_NO_GRID) == 0);
 
         bool insideTopLeft     = cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
         bool insideTopRight    = cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
@@ -1829,19 +1848,29 @@ function createDiamondsShaderProgram(context, vertexShader)
         bvec4 insideCorners = bvec4(insideTopLeft, insideTopRight, insideBottomLeft, insideBottomRight);
 
         RegionInfo regionInfo;
-        regionInfo.InsideCorners = b4nd(bvec4(!insideDiamond), insideCorners);
-        regionInfo.InsideDiamond = insideDiamond;
+        regionInfo.InsideEmptyCorners = b4nd(bvec4(outsideDiamond), insideCorners);
+        regionInfo.InsideCorners      = b4nd(bvec4(!insideDiamondSm), insideCorners);
+        regionInfo.InsideDiamond      = insideDiamond;
         return regionInfo;
     }
 
     uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
-        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.zzww;
-        uvec4 cornerCandidate = uvec4(cornerRule(cellNeighbours.CellValue, cellNeighbours.CornersValues)) * cellNeighbours.CellValue;
+        uvec4 emptyCornerCandidate  = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.zzww;
+        uvec4 filledCornerCandidate = uvec4(filledCornerRule(cellNeighbours.CellValue, cellNeighbours.CornersValues)) * cellNeighbours.CellValue;
 
-        uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
+        uvec4 resEmptyCorner  = emptyCornerCandidate  * uvec4(regionInfo.InsideEmptyCorners);
+        uvec4 resFilledCorner = filledCornerCandidate * uvec4(regionInfo.InsideCorners);
 
-        return cellNeighbours.CellValue * uint(regionInfo.InsideDiamond) + udot(resCorner, uvec4(regionInfo.InsideCorners));
+        bvec4 selectMask = greaterThan(emptyCornerCandidate, filledCornerCandidate);
+        
+        uvec4 cornerCandidate  = select(emptyCornerCandidate, filledCornerCandidate, selectMask);
+        uvec4 cornerRegionRule = select(uvec4(regionInfo.InsideEmptyCorners), uvec4(regionInfo.InsideCorners), selectMask);
+
+        uint resCorner  = udot(cornerCandidate, cornerRegionRule);
+        uint resDiamond = cellNeighbours.CellValue * uint(regionInfo.InsideDiamond);
+
+        return max(resCorner, resDiamond);
     }
     `;
 
