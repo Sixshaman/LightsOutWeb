@@ -1889,13 +1889,13 @@ function createBeamsShaderProgram(context, vertexShader)
     `
     struct RegionInfo
     {
-        bvec4 InsideBRegion;
-        bvec4 InsideIRegion;
-        bvec4 InsideYHorizontalRegion;
-        bvec4 InsideYVerticalRegion;
-        bvec4 InsideVRegion;
-        bool  InsideGRegion;
-        bool  OutsideCentralDiamond;
+        bvec4 InsideBRegion;           //Smaller (1 - 1/sqrt(2))/2 square corners: top-left, top-right, bottom-left, bottom-right (B-A, B-B, B-D, B-C)
+        bvec4 InsideIRegion;           //Central diamond corners: left, right, top, bottom (I-D, I-B, I-A, I-C)
+        bvec4 InsideYHorizontalRegion; //Square edge pieces on horizontal beam: top on left, bottom on left, top on right, bottom on right (Y-H, Y-C, Y-G, Y-D)
+        bvec4 InsideYVerticalRegion;   //Square edge pieces on vertical beam: left on top, right on top, left on bottom, right on bottom (Y-A, Y-B, Y-F, Y-E)
+        bvec4 InsideVRegion;           //Square corners: top-left, top-right, bottom-left, bottom-right (V-A, V-B, V-D, V-C)
+        bool  InsideGRegion;           //Central octagon
+        bool  OutsideCentralDiamond;   //Out of central diamond (all regions combined except G-region and I-regions)
     };
 
     bvec4 emptyCornerRule(CellNeighbourValues cellNeighbours)
@@ -1909,69 +1909,102 @@ function createBeamsShaderProgram(context, vertexShader)
         return res;
     }
 
-    bvec4 regBRule(CellNeighbourValues cellNeighbours)
+    bvec4 regionBRule(bvec4 equalsSides, bvec4 equalsCorners)
     {
         bvec4 res = bvec4(false);
-        
-        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
 
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.xyxy  )                                                                                                                                                                                                                                                           ); //B#1
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.zzww  )                                                                                                                                                                                                                                                           ); //B#2
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.CornersValues.xyzw)                                                                                                                                                                                                                                                           ); //B#3
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.wwzz  ), equal(cellValueVec, cellNeighbours.SidesValues.yxyx)                                                                                                                                                                                                    )); //B#4
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.wzyx), b4nd(b4nd(notEqual(cellValueVec, cellNeighbours.CornersValues.yxxy), notEqual(cellValueVec, cellNeighbours.SidesValues.yxyx)), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.wwzz), notEqual(cellValueVec, cellNeighbours.CornersValues.zwwz))))); //B#5
+        //Rules B1 and B2: check the neighbour cell in one of adjacent cardinal directions
+        res = b4or(res, equalsSides.xyxy); //B#1
+        res = b4or(res, equalsSides.zzww); //B#2
+
+        //Rule B3: check the neighbour cell in the corresponding diagonal direction 
+        res = b4or(res, equalsCorners); //B#3
+
+        //Rule B4: check both neighbour cells in two opposite cardinal directions
+        bvec4 equalsOppositeSides = b4nd(equalsSides.wwzz, equalsSides.yxyx);
+        res = b4or(res, equalsOppositeSides); //B#4
+
+        //Rule B5 (diagonal beam continuation): check the neighbour cell in the opposite diagonal direction.
+        //Mind the possible direction change: the rule applies only if the cells in two lateral diagonal directions and two opposite cardinal directions are unlit
+        bvec4 notEqualsLateralCorners = b4nd(not(equalsCorners.yxxy), not(equalsCorners.zwwz));
+        bvec4 notEqualsOppositeSides  = b4nd(not(equalsSides.yxyx), not(equalsSides.wwzz));
+        bvec4 notEqualsSurround       = b4nd(notEqualsLateralCorners, notEqualsOppositeSides);
+        bvec4 beamContinuesIntertial  = b4nd(equalsCorners.wzyx, notEqualsSurround);
+        res = b4or(res, beamContinuesIntertial); //B#5
 
         return res;
     }
 
-    bvec4 regIRule(CellNeighbourValues cellNeighbours)
+    bvec4 regionIRule(bvec4 equalsSides, bvec4 equalsCorners)
     {
         bvec4 res = bvec4(false);
-        
-        bool loneDiamond = cellNeighbours.CellValue != cellNeighbours.SidesValues.x   && cellNeighbours.CellValue != cellNeighbours.SidesValues.y   && cellNeighbours.CellValue != cellNeighbours.SidesValues.z   && cellNeighbours.CellValue != cellNeighbours.SidesValues.w 
-                        && cellNeighbours.CellValue != cellNeighbours.CornersValues.x && cellNeighbours.CellValue != cellNeighbours.CornersValues.y && cellNeighbours.CellValue != cellNeighbours.CornersValues.z && cellNeighbours.CellValue != cellNeighbours.CornersValues.w;
 
-        uvec4 cellValueVec   = uvec4(cellNeighbours.CellValue);
+        //Rule I1: check the neighbour cell in the corresponding cardinal direction
+        res = b4or(res, equalsSides); //I#1
+
+        //Rules I2 and I3: check the neighbour cells in one of adjacent diagonal directions.
+        //Maintain the cardinal priority: the rules apply only if the cell in the other cardinal direction adjacent to the diagonal is unlit
+        bvec4 equalsAdjacentCornerPrioritized1 = b4nd(equalsCorners.zyyz, not(equalsSides.wzyx));
+        bvec4 equalsAdjacentCornerPrioritized2 = b4nd(equalsCorners.xwxw, not(equalsSides.zwxy));
+        res = b4or(res, equalsAdjacentCornerPrioritized1); //I#2
+        res = b4or(res, equalsAdjacentCornerPrioritized2); //I#3
+
+        //Rule I4 (diagonal 90° turn): check both neighbour cells in two opposite diagonal directions.
+        //Maintain the cardinal priority: the rule applies only if the cells in the lateral cardinal directions are unlit
+        bvec4 equalsOppositeCorners = b4nd(equalsCorners.yzzy, equalsCorners.wxwx);
+        bvec4 notEqualsLateralSides = b4nd(not(equalsSides.zzxx), not(equalsSides.wwyy));
+        bvec4 beam90DegreeTurn      = b4nd(equalsOppositeCorners, notEqualsLateralSides);
+        res = b4or(res, beam90DegreeTurn); //I#4
+        
+        //Rule I5 (cardinal beam continuation): check the neighbour cell in the opposite cardinal direction.
+        //Mind the possible direction change: the rule applies only if the cells in two lateral cardinal directions are unlit
+        bvec4 beamContinuesIntertial = b4nd(notEqualsLateralSides, equalsSides.yxwz);
+        res = b4or(res, beamContinuesIntertial); //I#5
+
+        //Rule I6 (lone diamond): a lit cell with no lit neighbours has a diamond shape
+        bool loneDiamond = all(not(equalsSides)) && all(not(equalsCorners));
         bvec4 loneDiamondVec = bvec4(loneDiamond);
-
-        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.xyzw)                                                                                                                                                                                              ); //I#1
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.zyyz), notEqual(cellValueVec, cellNeighbours.SidesValues.wzyx)                                                                                                                             )); //I#2
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xwxw), notEqual(cellValueVec, cellNeighbours.SidesValues.zwxy)                                                                                                                             )); //I#3
-        res = b4or(res, b4nd(b4nd(equal(cellValueVec, cellNeighbours.CornersValues.yzzy), equal(cellValueVec, cellNeighbours.CornersValues.wxwx)), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.zzxx), notEqual(cellValueVec, cellNeighbours.SidesValues.wwyy)))); //I#4
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.SidesValues.yxwz), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.zzxx), notEqual(cellValueVec, cellNeighbours.SidesValues.wwyy))                                                                )); //I#5
-        res = b4or(res, loneDiamondVec                                                                                                                                                                                                                                    ); //I#6
+        res = b4or(res, loneDiamondVec); //I#6;
 
         return res;
     }
 
-    bvec4 regYHorizontalRule(CellNeighbourValues cellNeighbours)
+    bvec4 regionYHorizontalRule(bvec4 equalsSides, bvec4 equalsCorners)
     {
         bvec4 res = bvec4(false);
 
-        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
-        
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.xyxy  )                                                          ); //Y#1
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.zzww))); //Y#2
+        //Rule Y1: check the neighbour cell in the corresponding cardinal direction
+        res = b4or(res, equalsSides.xyxy); //Y#1
+
+        //Rule Y2: check the neighbour cell in the corresponding diagonal direction
+        //Maintain the cardinal priority: the rule applies only if the cell in the other cardinal direction adjacent to the diagonal is unlit
+        bvec4 beamContinues = b4nd(equalsCorners, not(equalsSides.zzww));
+        res = b4or(res, beamContinues); //Y#2
 
         return res;
     }
 
-    bvec4 regYVerticalRule(CellNeighbourValues cellNeighbours)
+    bvec4 regionYVerticalRule(bvec4 equalsSides, bvec4 equalsCorners)
     {
         bvec4 res = bvec4(false);
 
-        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
-        
-        res = b4or(res,      equal(cellValueVec, cellNeighbours.SidesValues.zzww  )                                                          ); //Y#1
-        res = b4or(res, b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), notEqual(cellValueVec, cellNeighbours.SidesValues.xyxy))); //Y#2
+        //Rule Y1: check the neighbour cell in the corresponding cardinal direction
+        res = b4or(res, equalsSides.zzww); //Y#1
+
+        //Rule Y2: check the neighbour cell in the corresponding diagonal direction
+        //Maintain the cardinal priority: the rule applies only if the cell in the other cardinal direction adjacent to the diagonal is unlit
+        bvec4 beamContinues = b4nd(equalsCorners, not(equalsSides.xyxy));
+        res = b4or(res, beamContinues); //Y#2
 
         return res;
     }
 
-    bvec4 regVRule(CellNeighbourValues cellNeighbours)
+    bvec4 regionVRule(bvec4 equalsSides, bvec4 equalsCorners)
     {
-        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
-        return b4nd(equal(cellValueVec, cellNeighbours.CornersValues.xyzw), b4nd(notEqual(cellValueVec, cellNeighbours.SidesValues.xyxy), notEqual(cellValueVec, cellNeighbours.SidesValues.zzww))); //V#1
+        //Rule V: check the neighbour cell in the corresponding diagonal direction
+        //Maintain the cardinal priority: the rule applies only if the cell in the adjacent cardinal directions are unlit
+        bvec4 notEqualsAdjacentSides = b4nd(not(equalsSides.xyxy), not(equalsSides.zzww));
+        return b4nd(equalsCorners, notEqualsAdjacentSides); //V#1
     }
 
     RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
@@ -1984,60 +2017,82 @@ function createBeamsShaderProgram(context, vertexShader)
         bvec4 insideSides   = bvec4(cellCoord.x <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y <= 0.0f, cellCoord.y >= 0.0f);
         bvec4 insideCorners = b4nd(insideSides.xyxy, insideSides.zzww);
 
-        //Fix for 1 pixel off. To make it work, x == 0 and y == 0 pixels shouldn't be considered part of beam (or else single pixel artifacts will appear)
-        //For even cell sizes, region inside diamond should be a bit smaller to compensate
+        //Fix for 1 pixel off. To make it work, x == 0 and y == 0 pixels shouldn't be considered a part of beam (or else single pixel artifacts will appear)
+        //For even cell sizes, region inside the diamond should be a bit smaller to compensate
         bool insideCentralDiamond   = (absCellCoord.x + absCellCoord.y <= diamondRadius - 1.0f * float((gCellSize % 2 == 0) && ((gFlags & FLAG_NO_GRID) != 0)));
         bool outsideCentralDiamond  = (absCellCoord.x + absCellCoord.y >= diamondRadius + 1.0f * float(gCellSize % 2 == 0));
 
-        bool insideVerticalBeam   = absCellCoord.x <= 0.707f * float(cellSizeCorrected) / 2.0f;
-        bool insideHorizontalBeam = absCellCoord.y <= 0.707f * float(cellSizeCorrected) / 2.0f;
+        bool insideVerticalBeam   = absCellCoord.x <= 0.707f * float(cellSizeCorrected) * 0.5f;
+        bool insideHorizontalBeam = absCellCoord.y <= 0.707f * float(cellSizeCorrected) * 0.5f;
 
-        bvec4 insideBeams = b4nd(bvec4(bvec2(insideHorizontalBeam), bvec2(insideVerticalBeam)), insideSides);
+        bvec2 insideHalfBeamsHorizontal = b2nd(bvec2(insideHorizontalBeam), insideSides.xy);
+        bvec2 insideHalfBeamsVertical   = b2nd(bvec2(insideVerticalBeam),   insideSides.zw);
+        bvec4 insideHalfBeams           = bvec4(insideHalfBeamsHorizontal,  insideHalfBeamsVertical);
+
+        bool insideBothBeams = insideHorizontalBeam && insideVerticalBeam;
+        bool outsideBeams    = !insideHorizontalBeam && !insideVerticalBeam;
+        
+        bool insideBeamEnds   = !insideBothBeams && !outsideBeams;
+        bool insideBeamWedges = insideBeamEnds && !insideCentralDiamond;
+
+        bvec4 insideBeamEndsSided = b4nd(insideHalfBeams, insideSides);
+
+        bool insideHorizontalBeamWedges = insideHorizontalBeam && insideBeamWedges;
+        bool insideVerticalBeamWedges   = insideVerticalBeam   && insideBeamWedges;
+
+        bool insideCentralSquareCorners = !insideCentralDiamond && insideBothBeams;
+        bool insideDiamondCorners       = insideCentralDiamond  && insideBeamEnds;
+
 
         RegionInfo result;
 
         result.OutsideCentralDiamond = outsideCentralDiamond;
 
-        result.InsideGRegion = insideCentralDiamond && insideHorizontalBeam && insideVerticalBeam; //G
+        result.InsideGRegion = insideCentralDiamond && insideBothBeams;
         
-        result.InsideBRegion = b4nd(b4nd(insideBeams.xyxy, insideBeams.zzww), bvec4(!insideCentralDiamond)); //B-A, B-B, B-D, B-C
+        result.InsideBRegion = b4nd(bvec4(insideCentralSquareCorners), insideCorners);       //B-A, B-B, B-D, B-C
 
-        result.InsideIRegion = b4nd(b4nd(not(insideBeams.zzxx), not(insideBeams.wwyy)), b4nd(insideBeams.xyzw, bvec4(insideCentralDiamond))); //I-D, I-B, I-A, I-C
-        
-        result.InsideYHorizontalRegion = b4nd(b4nd(insideBeams.xyxy, not(insideBeams.zzww)), b4nd(bvec4(!insideCentralDiamond), insideSides.zzww)); //Y-H, Y-C, Y-G, Y-D
-        result.InsideYVerticalRegion   = b4nd(b4nd(insideBeams.zzww, not(insideBeams.xyxy)), b4nd(bvec4(!insideCentralDiamond), insideSides.xyxy)); //Y-A, Y-B, Y-F, Y-E
-        
-        result.InsideVRegion = b4nd(b4nd(not(insideBeams.xyxy), not(insideBeams.zzww)), b4nd(insideSides.xyxy, insideSides.zzww)); //V-A, V-B, V-D, V-C
+        result.InsideIRegion = b4nd(bvec4(insideDiamondCorners), insideBeamEndsSided); //I-D, I-B, I-A, I-C
+
+        result.InsideYHorizontalRegion = b4nd(bvec4(insideHorizontalBeamWedges), insideCorners); //Y-H, Y-C, Y-G, Y-D
+        result.InsideYVerticalRegion   = b4nd(bvec4(insideVerticalBeamWedges),   insideCorners); //Y-A, Y-B, Y-F, Y-E
+
+        result.InsideVRegion = b4nd(bvec4(outsideBeams), insideCorners); //V-A, V-B, V-D, V-C
 
         return result;
     }
 
     uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
+        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
+
+        bvec4 equalsSides   = equal(cellValueVec, cellNeighbours.SidesValues);
+        bvec4 equalsCorners = equal(cellValueVec, cellNeighbours.CornersValues);
+
         uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours)) * cellNeighbours.SidesValues.zzww;
-        emptyCornerCandidate      *= uint(regionInfo.OutsideCentralDiamond); //Fix for 1 pixel offset beforehand 
+        emptyCornerCandidate      *= uint(regionInfo.OutsideCentralDiamond); //Fix for 1 pixel offset 
 
-        uvec4 regionBCandidate = uvec4(regBRule(cellNeighbours)) * cellNeighbours.CellValue;
-        uvec4 regionICandidate = uvec4(regIRule(cellNeighbours)) * cellNeighbours.CellValue;
+        uvec4 regionBCandidate = uvec4(regionBRule(equalsSides, equalsCorners)) * cellNeighbours.CellValue;
+        uvec4 regionICandidate = uvec4(regionIRule(equalsSides, equalsCorners)) * cellNeighbours.CellValue;
 
-        uvec4 regionYHorizontalCandidate = uvec4(regYHorizontalRule(cellNeighbours))   * cellNeighbours.CellValue;
-        uvec4 regionYVerticalCandidate   = uvec4(regYVerticalRule(cellNeighbours)) * cellNeighbours.CellValue;
+        uvec4 regionYHorizontalCandidate = uvec4(regionYHorizontalRule(equalsSides, equalsCorners)) * cellNeighbours.CellValue;
+        uvec4 regionYVerticalCandidate   = uvec4(regionYVerticalRule(equalsSides, equalsCorners)) * cellNeighbours.CellValue;
 
-        uvec4 regionVCandidate = uvec4(regVRule(cellNeighbours)) * cellNeighbours.CellValue;
+        uvec4 regionVCandidate = uvec4(regionVRule(equalsSides, equalsCorners)) * cellNeighbours.CellValue;
 
         uvec4 resB           = max(regionBCandidate,           emptyCornerCandidate);
-        uvec4 resYTopRight   = max(regionYHorizontalCandidate, emptyCornerCandidate);
-        uvec4 resYBottomLeft = max(regionYVerticalCandidate,   emptyCornerCandidate);
+        uvec4 resYHorizontal = max(regionYHorizontalCandidate, emptyCornerCandidate);
+        uvec4 resYVertical   = max(regionYVerticalCandidate,   emptyCornerCandidate);
         uvec4 resV           = max(regionVCandidate,           emptyCornerCandidate);
 
-        uint regionPower = uint(regionInfo.InsideGRegion)         *        cellNeighbours.CellValue;
-        regionPower     += udot(uvec4(regionInfo.InsideBRegion),           resB);
-        regionPower     += udot(uvec4(regionInfo.InsideIRegion),           regionICandidate); 
-        regionPower     += udot(uvec4(regionInfo.InsideYHorizontalRegion), resYTopRight);
-        regionPower     += udot(uvec4(regionInfo.InsideYVerticalRegion),   resYBottomLeft); 
-        regionPower     += udot(uvec4(regionInfo.InsideVRegion),           resV);
+        uint result = uint(regionInfo.InsideGRegion) * cellNeighbours.CellValue;
+        result     += udot(uvec4(regionInfo.InsideBRegion),           resB);
+        result     += udot(uvec4(regionInfo.InsideIRegion),           regionICandidate); 
+        result     += udot(uvec4(regionInfo.InsideYHorizontalRegion), resYHorizontal);
+        result     += udot(uvec4(regionInfo.InsideYVerticalRegion),   resYVertical);
+        result     += udot(uvec4(regionInfo.InsideVRegion),           resV);
 
-        return regionPower;
+        return result;
     }
     `;
 
