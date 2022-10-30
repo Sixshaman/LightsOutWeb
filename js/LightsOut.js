@@ -2188,7 +2188,7 @@ function createChainsShaderProgram(context, vertexShader)
         bvec4 InsideFreeCorners;
         bvec4 InsideSlimEdgesHorizontal;
         bvec4 InsideSlimEdgesVertical;
-        bvec2 InsideCenterLinks;
+        bvec2 InsideCircleLinks;
         bool  InsideBothLinks;
         bool  InsideFreeCircle;
         bool  OutsideCircle;
@@ -2199,36 +2199,66 @@ function createChainsShaderProgram(context, vertexShader)
         return equal(edgeValue.xyxy, edgeValue.zzww);
     }
 
-    bvec4 cornerRule(CellNeighbourValues cellNeighbours)
+    bvec4 cornerRule(bvec4 equalsSides, bvec4 equalsCorners)
     {
         bvec4 res = bvec4(false);
-        
-        uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
 
-        res = b4or(res, equal(cellValueVec, cellNeighbours.CornersValues.xyzw));
-        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.xyxy));
-        res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.zzww));
+        res = b4or(res, equalsCorners);
+        res = b4or(res, equalsSides.xyxy);
+        res = b4or(res, equalsSides.zzww);
 
         return res;
     }
 
-    bvec2 linkRule(uvec4 edgeValue)
+    bvec2 linkRule(uint cellValue, uvec4 edgeValue)
     {
-        return equal(edgeValue.xz, edgeValue.yw);
+        uvec2 cellValueVec = uvec2(cellValue);
+
+        bvec2 res = bvec2(true);
+        res       = b2nd(res, equal(edgeValue.xz, edgeValue.yw));
+        res       = b2nd(res, notEqual(edgeValue.xz, edgeValue.zx));
+        res       = b2nd(res, notEqual(edgeValue.yw, edgeValue.wy));
+        res       = b2nd(res, notEqual(edgeValue.xz, cellValueVec));
+
+        return res;
     }
 
-    bvec4 slimEdgeRule(uint cellValue, uvec4 edge2Value)
+    bvec4 slimEdgeHorizontalRule(bvec4 equalsSides, bvec4 equalsCorners, bvec4 equalsSides2)
     {
-        uvec4 cellValueVec = uvec4(cellValue);
-        return equal(cellValueVec, edge2Value.xyzw);
+        bvec4 equalsAdjacentSides = b4or(equalsSides.xyxy, equalsSides.zzww);
+        bvec4 equalsAdjacentCells = b4or(equalsCorners, equalsAdjacentSides);
+
+        bvec4 equalsDistantSides = b4nd(equalsSides2.xyxy, not(equalsCorners.zwxy));
+
+        return b4or(equalsAdjacentCells, equalsDistantSides);
+    }
+
+    bvec4 slimEdgeEmptyHorizontalRule(bvec2 equalsOppositeSides, bvec4 equalsLateralSides)
+    {
+        return b4nd(equalsOppositeSides.xxxx, not(equalsLateralSides.zwxy));
+    }
+
+    bvec4 slimEdgeVerticalRule(bvec4 equalsSides, bvec4 equalsCorners, bvec4 equalsSides2)
+    {
+        bvec4 equalsAdjacentSides = b4or(equalsSides.xyxy, equalsSides.zzww);
+        bvec4 equalsAdjacentCells = b4or(equalsCorners, equalsAdjacentSides);
+
+        bvec4 equalsDistantSides = b4nd(equalsSides2.zzww, not(equalsCorners.yxwz));
+
+        return b4or(equalsAdjacentCells, equalsDistantSides);
+    }
+
+    bvec4 slimEdgeEmptyVerticalRule(bvec2 equalsOppositeSides, bvec4 equalsLateralSides)
+    {
+        return b4nd(equalsOppositeSides.yyyy, not(equalsLateralSides.yxwz));
     }
 
     RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
     {
         int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
 
-        mediump float circleRadius    = float(cellSizeCorrected) / 2.0f;
-        mediump float circleRadiusBig = float(cellSizeCorrected - 1);
+        mediump float circleRadius    = float(cellSizeCorrected) * 0.5f;
+        mediump float circleRadiusBig = float(cellSizeCorrected) * 0.9f;
 
         mediump vec2 cellCoordLeft   = cellCoord + vec2(float( cellSizeCorrected),              0.0f);
         mediump vec2 cellCoordRight  = cellCoord + vec2(float(-cellSizeCorrected),              0.0f);
@@ -2246,62 +2276,76 @@ function createChainsShaderProgram(context, vertexShader)
         bool insideLinkHorizontal = !insideCircleBigTop  && !insideCircleBigBottom;
         bool insideLinkVertical   = !insideCircleBigLeft && !insideCircleBigRight;
 
-        bvec2 insideLink      = bvec2(insideLinkHorizontal, insideLinkVertical);
-        bool  insideBothLinks = insideLinkVertical && insideLinkHorizontal;
+        bool  insideCircleLinkHorizontal = insideLinkHorizontal && !insideLinkVertical   && insideCircle;
+        bool  insideCircleLinkVertical   = insideLinkVertical   && !insideLinkHorizontal && insideCircle;
 
-        bool insideTopLeft     = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
-        bool insideTopRight    = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-        bool insideBottomLeft  = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
-        bool insideBottomRight = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
+        bool insideTopLeft     = cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
+        bool insideTopRight    = cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
+        bool insideBottomLeft  = cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
+        bool insideBottomRight = cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
 
-        bvec4 insideCircleBig = bvec4(insideCircleBigLeft, insideCircleBigRight, insideCircleBigTop, insideCircleBigBottom);
-        bvec4 insideCorner    = bvec4(insideTopLeft,       insideTopRight,       insideBottomLeft,   insideBottomRight);
+        bvec4 insideCorners      = bvec4(insideTopLeft, insideTopRight, insideBottomLeft, insideBottomRight);
+        bvec4 insideRoundCorners = b4nd(insideCorners, bvec4(!insideCircle));
+
+        bool outsideLinks = !insideLinkHorizontal && !insideLinkVertical;
 
 
         RegionInfo result;
 
-        result.InsideFreeCorners = b4nd(insideCorner, bvec4(!insideLinkHorizontal && !insideLinkVertical));
+        result.InsideFreeCorners = b4nd(insideRoundCorners, bvec4(outsideLinks));
         
-        result.InsideSlimEdgesHorizontal = b4nd(insideLink.xxxx, insideCorner.xyzw);
-        result.InsideSlimEdgesVertical   = b4nd(insideLink.yyyy, insideCorner.xyzw);
+        result.InsideSlimEdgesHorizontal = b4nd(bvec4(insideLinkHorizontal), insideRoundCorners);
+        result.InsideSlimEdgesVertical   = b4nd(bvec4(insideLinkVertical),   insideRoundCorners);
 
-        result.InsideCenterLinks = b2nd(insideLink, b2nd(bvec2(insideCircle), bvec2(!insideBothLinks)));
-        result.InsideBothLinks   = insideBothLinks;
+        result.InsideCircleLinks = bvec2(insideCircleLinkHorizontal, insideCircleLinkVertical);
+        result.InsideBothLinks   = insideLinkHorizontal && insideLinkVertical;
 
-        result.InsideFreeCircle = insideCircle && !insideLinkVertical && !insideLinkHorizontal;
-
-        result.OutsideCircle = outsideCircle;
+        result.InsideFreeCircle = insideCircle && outsideLinks;
+        result.OutsideCircle    = outsideCircle;
 
         return result;
     }
 
     uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours)
     {
-        uint centerCandidate = cellNeighbours.CellValue;
+        uvec4 cellValueVec        = uvec4(cellNeighbours.CellValue);
+        bvec4 equalsSides         = equal(cellValueVec, cellNeighbours.SidesValues);
+        bvec4 equalsCorners       = equal(cellValueVec, cellNeighbours.CornersValues);
+        bvec4 equalsSides2        = equal(cellValueVec, cellNeighbours.Sides2Values);
+        bvec2 equalsOppositeSides = equal(cellNeighbours.SidesValues.xz, cellNeighbours.SidesValues.yw);
+        bvec4 equalsLateralSides  = equal(cellNeighbours.SidesValues.xyxy, cellNeighbours.SidesValues.zzww);
 
         uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.zzww;
-        uvec4 cornerCandidate      = uvec4(cornerRule(cellNeighbours)) * cellNeighbours.CellValue;
+        uvec4 cornerCandidate      = uvec4(cornerRule(equalsSides, equalsCorners)) * cellNeighbours.CellValue;
 
         emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
+        uvec4 resCorner = max(cornerCandidate, emptyCornerCandidate);
 
-        uvec2 linkCandidate     = uvec2(linkRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.xz;
-        uvec4 slimEdgeCandidate = uvec4(slimEdgeRule(cellNeighbours.CellValue, cellNeighbours.Sides2Values)) * uvec4(cellNeighbours.CellValue);
+        uvec4 slimEdgeFilledHorizontalCandidate = uvec4(slimEdgeHorizontalRule(equalsSides, equalsCorners, equalsSides2)) * cellNeighbours.CellValue;
+        uvec4 slimEdgeEmptyHorizontalCandidate  = uvec4(slimEdgeEmptyHorizontalRule(equalsOppositeSides, equalsLateralSides)) * cellNeighbours.SidesValues.xyxy;
 
-        uvec4 resCorner               = max(cornerCandidate, emptyCornerCandidate);
-        uvec4 resSlimCornerHorizontal = max(resCorner.xyzw, slimEdgeCandidate.xyxy);
-        uvec4 resSlimCornerVertical   = max(resCorner.xyzw, slimEdgeCandidate.zzww);
+        uvec4 resSlimEdgeHorizontal = max(slimEdgeFilledHorizontalCandidate, slimEdgeEmptyHorizontalCandidate);
+        resSlimEdgeHorizontal = max(resSlimEdgeHorizontal, resCorner);
 
-        uvec2 resLink     = max(linkCandidate, uvec2(centerCandidate));
-        uint  resMidLinks = max(resLink.x,     resLink.y);
+        uvec4 slimEdgeFilledVerticalCandidate = uvec4(slimEdgeVerticalRule(equalsSides, equalsCorners, equalsSides2)) * cellNeighbours.CellValue;
+        uvec4 slimEdgeEmptyVerticalCandidate  = uvec4(slimEdgeEmptyVerticalRule(equalsOppositeSides, equalsLateralSides)) * cellNeighbours.SidesValues.zzww;
 
-        uint regionPower =       uint(regionInfo.InsideFreeCircle)    *      cellNeighbours.CellValue;
-        regionPower     += udot(uvec4(regionInfo.InsideFreeCorners),         resCorner);
-        regionPower     += udot(uvec4(regionInfo.InsideSlimEdgesHorizontal), resSlimCornerHorizontal); 
-        regionPower     += udot(uvec4(regionInfo.InsideSlimEdgesVertical),   resSlimCornerVertical);
-        regionPower     += udot(uvec2(regionInfo.InsideCenterLinks),         resLink); 
-        regionPower     +=       uint(regionInfo.InsideBothLinks)     *      resMidLinks;
+        uvec4 resSlimEdgeVertical = max(slimEdgeFilledVerticalCandidate, slimEdgeEmptyVerticalCandidate);
+        resSlimEdgeVertical = max(resSlimEdgeVertical, resCorner);
 
-        return regionPower;
+        uvec2 linkCandidate = uvec2(linkRule(cellNeighbours.CellValue, cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.xz;
+
+        uvec2 resLink     = max(linkCandidate, uvec2(cellNeighbours.CellValue));
+        uint  resMidLinks = max(resLink.x, resLink.y);
+
+        uint result =       uint(regionInfo.InsideFreeCircle)    *      cellNeighbours.CellValue;
+        result     += udot(uvec4(regionInfo.InsideFreeCorners),         resCorner);
+        result     += udot(uvec4(regionInfo.InsideSlimEdgesHorizontal), resSlimEdgeHorizontal); 
+        result     += udot(uvec4(regionInfo.InsideSlimEdgesVertical),   resSlimEdgeVertical);
+        result     += udot(uvec2(regionInfo.InsideCircleLinks),         resLink); 
+        result     +=       uint(regionInfo.InsideBothLinks)     *      resMidLinks;
+
+        return result;
     }
     `;
 
