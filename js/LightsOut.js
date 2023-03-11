@@ -992,20 +992,6 @@ function addBoard(boardLeft, boardRight, domainSize)
     return resBoard;
 }
 
-//Adds boardRight to boardLeft component-wise in-place, without allocating new memory
-function addBoardInPlace(boardLeft, boardRight, domainSize)
-{
-    if(boardLeft.length !== boardRight.length)
-    {
-        return;
-    }
-
-    for(let i = 0; i < boardLeft.length; i++)
-    {
-        boardLeft[i] = (boardLeft[i] + boardRight[i]) % domainSize;
-    }
-}
-
 //Multiplies boardLeft by a fixed value component-wise and returns a new board containing the result
 function mulBoard(board, mulValue, domainSize)
 {
@@ -1039,20 +1025,6 @@ function mulComponentWiseBoard(boardLeft, boardRight, domainSize)
     }
 
     return resBoard;
-}
-
-//Multiplies boardLeft by boardRight component-wise in-place, without allocating new memory
-function mulComponentWiseBoardInPlace(boardLeft, boardRight, domainSize)
-{
-    if(boardLeft.length !== boardRight.length)
-    {
-        return;
-    }
-
-    for(let i = 0; i < boardLeft.length; i++)
-    {
-        boardLeft[i] = (boardLeft[i] * boardRight[i]) % domainSize;
-    }
 }
 
 //For domainSize == 2 calculates this binary function:
