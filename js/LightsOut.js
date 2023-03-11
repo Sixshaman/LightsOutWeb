@@ -1386,6 +1386,11 @@ uint udot(uvec2 a, uvec2 b)
     return a.x * b.x + a.y * b.y;
 }
 
+int idot(ivec2 a, ivec2 b)
+{
+    return a.x * b.x + a.y * b.y;
+}
+
 //Vectorized form of the ternary operator
 uvec4 select(uvec4 a, uvec4 b, bvec4 mask)
 {
@@ -1847,15 +1852,24 @@ function createCirclesShaderProgam(context, vertexShader)
 
     RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize, uint cellType)
     {
-        int cellSizeMin = min(cellSize.x, cellSize.y);
-        mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
-
-        mediump float circleRadius = float(cellSizeMin - 1) / 2.0f;
-
+        ivec2 cellSizeHalf = cellSize / 2;
+        ivec2 circleRadius = cellSizeHalf;
+        ivec2 cellCoordAdjusted = cellCoord - cellSizeHalf;
+        
+        //Make the coordinate "0" only available on even cell sizes
+        ivec2 zero           = ivec2(0, 0);
+        bvec2 onPositiveHalf = greaterThanEqual(cellCoordAdjusted, zero);
+        bvec2 evenCellSize   = equal(cellSize % 2, zero);
+        cellCoordAdjusted    = cellCoordAdjusted + ivec2(b2nd(onPositiveHalf, evenCellSize));
+    
+        //Ellipse is defined as x^2 * b^2 + y^2 * a^2 <= a^2 * b^2
+        ivec2 coordSq  = cellCoordAdjusted * cellCoordAdjusted;
+        ivec2 radiusSq = circleRadius * circleRadius;
+    
         RegionInfo regionInfo;
-        regionInfo.OnSides      = bvec4(cellCoordFrac.x <= 0.0f, cellCoordFrac.x >= 0.0f, cellCoordFrac.y <= 0.0f, cellCoordFrac.y >= 0.0f);
-        regionInfo.InsideCircle = dot(cellCoordFrac, cellCoordFrac) <= circleRadius * circleRadius;
-
+        regionInfo.OnSides      = bvec4(cellCoordAdjusted.x <= 0, cellCoordAdjusted.x >= 0, cellCoordAdjusted.y <= 0, cellCoordAdjusted.y >= 0);
+        regionInfo.InsideCircle = idot(coordSq, radiusSq.yx) <= radiusSq.x * radiusSq.y;
+    
         return regionInfo;
     }
 
