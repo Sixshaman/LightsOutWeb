@@ -72,31 +72,6 @@ function flatCellIndex(gameSize, x, y)
     return y * gameSize + x;
 }
 
-//Computes the size of the canvas for the given board size (gameSize x gameSize). 
-//The size is calculated in a way such that every cell is of the same size cellSize.
-//If grid is used, the size of the canvas adjusts to fit the grid
-function canvasSizeFromGameSize(gameSize, cellSize, useGrid)
-{
-    let res = {width: 0, height: 0};
-
-    if(useGrid)
-    {
-        //Grid is used: each cell has 1 pixel wide border on left and top edges. This border is included in cellSize.
-        //Cells don't have the right and bottom borders - instead, left border of the right cell and top border of the bottom cell is used.
-        //The only exception is the rightmost and bottommost cells - they need explicit 1 pixel wide border.
-        res.width  = gameSize * cellSize + 1;
-        res.height = gameSize * cellSize + 1;       
-    }
-    else
-    {
-        //Grid is not used - canvas is just the multiple of the cell size
-        res.width  = gameSize * cellSize;
-        res.height = gameSize * cellSize; 
-    }
-
-    return res;
-}
-
 //Gets 2-dimensional cell index from a canvas point (x, y) for the given board size (gameSize x gameSize) and canvas size (canvasWidth x canvasHeight).
 function boardPointFromCanvasPoint(x, y, gameSize, canvasWidth, canvasHeight, useGrid)
 {
@@ -3136,7 +3111,7 @@ function main()
 
     gridCheckBox.onclick = function()
     {
-        setGridVisible(gridCheckBox.checked);
+        requestRedraw();
         updateAddressBar(20);
     };
 
@@ -3586,14 +3561,13 @@ function main()
     const minimumDomainSize = 2;
     const maximumDomainSize = 255;
 
-    const canvasContainerWidth  = canvasContainer.clientWidth;
-    const canvasContainerHeight = canvasContainer.clientHeight;
+    const canvasWidth  = canvas.width;
+    const canvasHeight = canvas.height;
 
-    const canvasSize = Math.max(canvasContainerWidth, canvasContainerHeight);
+    const canvasSize = Math.min(canvasWidth, canvasHeight);
 
-    let currentViewportWidth  = canvasContainerWidth;
-    let currentViewportHeight = canvasContainerHeight;
-
+    let currentViewportWidth  = canvasSize;
+    let currentViewportHeight = canvasSize;
 
     let currentAnimationFrame = 0;
 
@@ -3756,16 +3730,6 @@ function main()
         }
 
         currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
-
-        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, gridCheckBox.checked);
-        currentViewportWidth  = newCanvasSize.width;
-        currentViewportHeight = newCanvasSize.height;
-
-        canvas.width        = currentViewportWidth;
-        canvas.height       = currentViewportHeight;
-        canvas.clientWidth  = currentViewportWidth;
-        canvas.clientHeight = currentViewportHeight;
-
         updateBoardLikeTexture(gl, currentGameBoard, currentGameSize, boardTexture);
 
         updateViewport();
@@ -5042,23 +5006,6 @@ function main()
         requestRedraw();
     }
 
-    function setGridVisible(visible)
-    {
-        let newCanvasSize = canvasSizeFromGameSize(currentGameSize, currentCellSize, visible);
-        currentCellSize   = Math.ceil(canvasSize / currentGameSize) - 1;
-
-        currentViewportWidth  = newCanvasSize.width;
-        currentViewportHeight = newCanvasSize.height;
-
-        canvas.width        = currentViewportWidth;
-        canvas.height       = currentViewportHeight;
-        canvas.clientWidth  = currentViewportWidth;
-        canvas.clientHeight = currentViewportHeight;
-
-        updateViewport();
-        requestRedraw();
-    }
-
     function updateViewport()
     {
         gl.viewport(0, 0, currentViewportWidth, currentViewportHeight); //Very careful here. 
@@ -6198,8 +6145,6 @@ function main()
         changeDomainSize(domainSize);
 
         gridCheckBox.checked = showGrid;
-        setGridVisible(showGrid);
-        
         requestRedraw();
     }
 
