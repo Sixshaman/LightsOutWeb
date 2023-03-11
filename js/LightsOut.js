@@ -1212,6 +1212,12 @@ const uint SquareTopology          = 0u;
 const uint TorusTopology           = 1u;
 const uint ProjectivePlaneTopology = 2u;
 
+struct FragmentCellInfo
+{
+    ivec2 IntegerCoord;
+    ivec2 Id;
+};
+
 struct CellSidesInfo
 {
     ivec2 LeftCellId;
@@ -1252,9 +1258,20 @@ uint GetTopology()
     return uint((gFlags & MASK_TOPOLOGY) >> 3);
 }
 
-bool IsInsideCell(ivec2 screenPos)
+bool IsInsideCell(ivec2 integerCellCoord)
 {
-    return ((gFlags & FLAG_NO_GRID) != 0) || ((screenPos.x % gCellSize != 0) && (screenPos.y % gCellSize != 0));
+    return (integerCellCoord.x != -1) && (integerCellCoord.y != -1);
+}
+
+FragmentCellInfo CalcCellInfo(ivec2 screenPos)
+{
+    bool gridVisible = ((gFlags & FLAG_NO_GRID) == 0);
+
+    FragmentCellInfo cellInfo;
+    cellInfo.Id           = screenPos / gCellSize;
+    cellInfo.IntegerCoord = screenPos % gCellSize - ivec2(int(gridVisible));
+
+    return cellInfo;
 }
 
 //GLSL operator && doesn't work on per-component basis :(
@@ -1635,26 +1652,25 @@ void main(void)
 {
     ivec2 screenPos = ivec2(int(gl_FragCoord.x), gImageHeight - int(gl_FragCoord.y) - 1);
 
-    if(IsInsideCell(screenPos))
+    FragmentCellInfo cellInfo = CalcCellInfo(screenPos);
+    if(IsInsideCell(cellInfo.IntegerCoord))
     {
-        highp  ivec2 cellId = screenPos / ivec2(gCellSize);
-        mediump vec2 cellCoord = (vec2(screenPos.xy) - vec2(cellId * ivec2(gCellSize)) - vec2(gCellSize - int((gFlags & FLAG_NO_GRID) != 0)) / 2.0f);
-
         mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
+        mediump vec2 cellCoord = vec2(cellInfo.IntegerCoord) - 0.5f * vec2(float(gCellSize), float(gCellSize));
         RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
 
-        CellSidesInfo   sidesInfo   = GetSidesState(cellId);
-        CellCornersInfo cornersInfo = GetCornersState(cellId);
-        CellSides2Info  sides2Info  = GetSides2State(cellId);
+        CellSidesInfo   sidesInfo   = GetSidesState(cellInfo.Id);
+        CellCornersInfo cornersInfo = GetCornersState(cellInfo.Id);
+        CellSides2Info  sides2Info  = GetSides2State(cellInfo.Id);
 
-        CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gBoard);
+        CellNeighbourValues cellBoardNeighbours = GetCellNeighbourValues(cellInfo.Id, sidesInfo, cornersInfo, sides2Info, gBoard);
         uint regionBoardValue = CalculateRegionValue(regionInfo, cellBoardNeighbours);
         outColor = mix(gColorNone, gColorEnabled, float(regionBoardValue) * domainFactor);
 
         if((gFlags & FLAG_SHOW_SOLUTION) != 0)
         {
-            CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gSolution);
+            CellNeighbourValues cellSolutionNeighbours = GetCellNeighbourValues(cellInfo.Id, sidesInfo, cornersInfo, sides2Info, gSolution);
             uint regionSolutionValue = CalculateRegionValue(regionInfo, cellSolutionNeighbours);
             outColor = mix(outColor, gColorSolved, float(regionSolutionValue) * domainFactor);
         }
@@ -1663,7 +1679,7 @@ void main(void)
             lowp vec4 colorStable = vec4(1.0f, 1.0f, 1.0f, 1.0f) - gColorEnabled;
             colorStable.a = 1.0f;
 
-            CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellId, sidesInfo, cornersInfo, sides2Info, gStability);
+            CellNeighbourValues cellStableNeighbours = GetCellNeighbourValues(cellInfo.Id, sidesInfo, cornersInfo, sides2Info, gStability);
             uint regionStabilityValue = CalculateRegionValue(regionInfo, cellStableNeighbours);
             outColor = mix(outColor, colorStable, float(regionStabilityValue) * domainFactor);
         }
