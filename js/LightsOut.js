@@ -1220,11 +1220,17 @@ const uint SquareTopology          = 0u;
 const uint TorusTopology           = 1u;
 const uint ProjectivePlaneTopology = 2u;
 
+const uint CellTypeSmall = 0u;
+const uint CellTypeWide  = 1u;
+const uint CellTypeTall  = 2u;
+const uint CellTypeBig   = 3u;
+
 struct FragmentCellInfo
 {
     ivec2 Coord;
     ivec2 Size;
     ivec2 Id;
+    uint  Type;
 };
 
 struct CellSidesInfo
@@ -1267,9 +1273,9 @@ uint GetTopology()
     return uint((gFlags & MASK_TOPOLOGY) >> 3);
 }
 
-bool IsInsideCell(ivec2 integerCellCoord)
+bool IsInsideCell(ivec2 cellCoord)
 {
-    return (integerCellCoord.x != -1) && (integerCellCoord.y != -1);
+    return (cellCoord.x != -1) && (cellCoord.y != -1);
 }
 
 FragmentCellInfo CalcCellInfo(ivec2 screenPos)
@@ -1330,6 +1336,26 @@ FragmentCellInfo CalcCellInfo(ivec2 screenPos)
     cellInfo.Coord = coordAdjusted - idAdjusted * cellSize - ivec2(int(gridVisible));
     cellInfo.Size  = cellSize - ivec2(int(gridVisible));
     cellInfo.Id    = idOffset + idAdjusted;
+    
+    bool wide = (cellInfo.Id.x >= smallLeftCellCount) && (cellInfo.Id.x < (smallLeftCellCount + wideCellCount));
+    bool tall = (cellInfo.Id.y >= smallTopCellCount)  && (cellInfo.Id.y < (smallTopCellCount  + tallCellCount));
+
+    if(wide && tall)
+    {
+        cellInfo.Type = CellTypeBig;
+    }
+    else if(wide)
+    {
+        cellInfo.Type = CellTypeWide;
+    }
+    else if(tall)
+    {
+        cellInfo.Type = CellTypeTall;
+    }
+    else
+    {
+        cellInfo.Type = CellTypeSmall;
+    }
 
     return cellInfo;
 }
@@ -1717,7 +1743,7 @@ void main(void)
     {
         mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
-        RegionInfo regionInfo = CalculateRegionInfo(cellInfo.Coord, cellInfo.Size);
+        RegionInfo regionInfo = CalculateRegionInfo(cellInfo.Coord, cellInfo.Size, cellInfo.Type);
 
         CellSidesInfo   sidesInfo   = GetSidesState(cellInfo.Id);
         CellCornersInfo cornersInfo = GetCornersState(cellInfo.Id);
@@ -1783,7 +1809,7 @@ function createSquaresShaderProgram(context, vertexShader)
         int Unused;
     };
 
-    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize, uint cellType)
     {
         RegionInfo unused;
         return unused;
@@ -1819,7 +1845,7 @@ function createCirclesShaderProgam(context, vertexShader)
         return equal(cellValueVec, sidesValues);
     }
 
-    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize, uint cellType)
     {
         int cellSizeMin = min(cellSize.x, cellSize.y);
         mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
@@ -1873,7 +1899,7 @@ function createDiamondsShaderProgram(context, vertexShader)
         return equal(uvec4(cellValue), cornerValue);
     }
 
-    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize, uint cellType)
     {
         int cellSizeMin = min(cellSize.x, cellSize.y);
         mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
@@ -2055,7 +2081,7 @@ function createBeamsShaderProgram(context, vertexShader)
         return b4nd(equalsCorners, notEqualsAdjacentSides); //V#1
     }
 
-    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize, uint cellType)
     {
         int cellSizeMin = min(cellSize.x, cellSize.y);
         mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
@@ -2183,7 +2209,7 @@ function createRaindropsShaderProgram(context, vertexShader)
         return res;
     }
 
-    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize, uint cellType)
     {
         int cellSizeMin = min(cellSize.x, cellSize.y);
         mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
@@ -2303,7 +2329,7 @@ function createChainsShaderProgram(context, vertexShader)
         return b4nd(equalsOppositeSides.yyyy, not(equalsLateralSides.yxwz));
     }
 
-    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize, uint cellType)
     {
         int cellSizeMin = min(cellSize.x, cellSize.y);
         mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
