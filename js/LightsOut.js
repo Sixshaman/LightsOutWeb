@@ -98,11 +98,10 @@ function canvasSizeFromGameSize(gameSize, cellSize, useGrid)
 }
 
 //Gets 2-dimensional cell index from a canvas point (x, y) for the given board size (gameSize x gameSize) and canvas size (canvasWidth x canvasHeight).
-//Since the actual board has dynamic size and is centered on a statically sized canvas, offsets: (canvasOffsetX, canvasOffsetY) are added.
-function boardPointFromCanvasPoint(x, y, gameSize, canvasOffsetX, canvasOffsetY, canvasWidth, canvasHeight, useGrid)
+function boardPointFromCanvasPoint(x, y, gameSize, canvasWidth, canvasHeight, useGrid)
 {
     let res = {xBoard: -1, yBoard: -1};
-    if((x - canvasOffsetX) > canvasWidth || (y - canvasOffsetY) > canvasHeight)
+    if(x > canvasWidth || y > canvasHeight)
     {
         return res;
     }
@@ -121,8 +120,8 @@ function boardPointFromCanvasPoint(x, y, gameSize, canvasOffsetX, canvasOffsetY,
         stepY = Math.floor(canvasHeight / gameSize);
     }
 
-    res.xBoard = Math.floor((x - canvasOffsetX) / stepX);
-    res.yBoard = Math.floor((y - canvasOffsetY) / stepY);
+    res.xBoard = Math.floor(x / stepX);
+    res.yBoard = Math.floor(y / stepY);
 
     return res;
 }
@@ -1201,8 +1200,6 @@ uniform lowp vec4 gColorBetween;
 
 uniform int gImageWidth;
 uniform int gImageHeight;
-uniform int gViewportOffsetX;
-uniform int gViewportOffsetY;
 
 uniform int gBoardSize;
 uniform int gCellSize;
@@ -1636,7 +1633,7 @@ CellNeighbourValues GetCellNeighbourValues(ivec2 cellId, CellSidesInfo sidesInfo
 
 void main(void)
 {
-    ivec2 screenPos = ivec2(int(gl_FragCoord.x) - gViewportOffsetX, gImageHeight - int(gl_FragCoord.y) - 1 + gViewportOffsetY);
+    ivec2 screenPos = ivec2(int(gl_FragCoord.x), gImageHeight - int(gl_FragCoord.y) - 1);
 
     if(IsInsideCell(screenPos))
     {
@@ -3581,8 +3578,6 @@ function main()
     let currentViewportWidth  = canvasContainerWidth;
     let currentViewportHeight = canvasContainerHeight;
 
-    let currentViewportOffsetX = 0;
-    let currentViewportOffsetY = 0;
 
     let currentAnimationFrame = 0;
 
@@ -3804,7 +3799,7 @@ function main()
 
     function clickAtPoint(x, y, isConstruct)
     {
-        let boardPoint = boardPointFromCanvasPoint(x, y, currentGameSize, currentViewportOffsetX, currentViewportOffsetY, currentViewportWidth, currentViewportHeight, gridCheckBox.checked);
+        let boardPoint = boardPointFromCanvasPoint(x, y, currentGameSize, currentViewportWidth, currentViewportHeight, gridCheckBox.checked);
 
         let modX = boardPoint.xBoard;
         let modY = boardPoint.yBoard;
@@ -5050,8 +5045,7 @@ function main()
 
     function updateViewport()
     {
-        currentViewportOffsetY = (canvas.height - currentViewportHeight);                                         //If I don't do this, the image will be from bottom to top
-        gl.viewport(currentViewportOffsetX, currentViewportOffsetY, currentViewportWidth, currentViewportHeight); //Very careful here. 
+        gl.viewport(0, 0, currentViewportWidth, currentViewportHeight); //Very careful here. 
     }
 
     function nextTick()
@@ -5916,10 +5910,8 @@ function main()
                 glRow.uniform1i(rowShaderVariables.DomainSizeUniformLocation, currentDomainSize);
                 glRow.uniform1i(rowShaderVariables.FlagsUniformLocation,      drawFlags);
 
-                glRow.uniform1i(rowShaderVariables.CanvasWidthUniformLocation,     canvasRow.width);
-                glRow.uniform1i(rowShaderVariables.CanvasHeightUniformLocation,    canvasRow.height);
-                glRow.uniform1i(rowShaderVariables.ViewportXOffsetUniformLocation, 0);
-                glRow.uniform1i(rowShaderVariables.ViewportYOffsetUniformLocation, 0);
+                glRow.uniform1i(rowShaderVariables.CanvasWidthUniformLocation,  canvasRow.width);
+                glRow.uniform1i(rowShaderVariables.CanvasHeightUniformLocation, canvasRow.height);
 
                 glRow.uniform4f(rowShaderVariables.ColorNoneUniformLocation,    currentColorUnlit[0],   currentColorUnlit[1],   currentColorUnlit[2],   currentColorUnlit[3]);
                 glRow.uniform4f(rowShaderVariables.ColorEnabledUniformLocation, currentColorLit[0],     currentColorLit[1],     currentColorLit[2],     currentColorLit[3]);
@@ -6236,10 +6228,8 @@ function main()
             DomainSizeUniformLocation: context.getUniformLocation(shaderProgram, "gDomainSize"),
             FlagsUniformLocation:      context.getUniformLocation(shaderProgram, "gFlags"),
     
-            CanvasWidthUniformLocation:     context.getUniformLocation(shaderProgram, "gImageWidth"),
-            CanvasHeightUniformLocation:    context.getUniformLocation(shaderProgram, "gImageHeight"),
-            ViewportXOffsetUniformLocation: context.getUniformLocation(shaderProgram, "gViewportOffsetX"),
-            ViewportYOffsetUniformLocation: context.getUniformLocation(shaderProgram, "gViewportOffsetY"),
+            CanvasWidthUniformLocation:  context.getUniformLocation(shaderProgram, "gImageWidth"),
+            CanvasHeightUniformLocation: context.getUniformLocation(shaderProgram, "gImageHeight"),
     
             ColorNoneUniformLocation:    context.getUniformLocation(shaderProgram, "gColorNone"),
             ColorEnabledUniformLocation: context.getUniformLocation(shaderProgram, "gColorEnabled"),
@@ -6362,10 +6352,8 @@ function main()
         gl.uniform1i(drawShaderVariables.DomainSizeUniformLocation, currentDomainSize);
         gl.uniform1i(drawShaderVariables.FlagsUniformLocation,      drawFlags);
 
-        gl.uniform1i(drawShaderVariables.CanvasWidthUniformLocation,     currentViewportWidth);
-        gl.uniform1i(drawShaderVariables.CanvasHeightUniformLocation,    currentViewportHeight);
-        gl.uniform1i(drawShaderVariables.ViewportXOffsetUniformLocation, currentViewportOffsetX);
-        gl.uniform1i(drawShaderVariables.ViewportYOffsetUniformLocation, currentViewportOffsetY);
+        gl.uniform1i(drawShaderVariables.CanvasWidthUniformLocation,  currentViewportWidth);
+        gl.uniform1i(drawShaderVariables.CanvasHeightUniformLocation, currentViewportHeight);
 
         gl.uniform4f(drawShaderVariables.ColorNoneUniformLocation,    currentColorUnlit[0],   currentColorUnlit[1],   currentColorUnlit[2],   currentColorUnlit[3]);
         gl.uniform4f(drawShaderVariables.ColorEnabledUniformLocation, currentColorLit[0],     currentColorLit[1],     currentColorLit[2],     currentColorLit[3]);
@@ -6394,10 +6382,8 @@ function main()
         gl.uniform1i(drawShaderVariables.DomainSizeUniformLocation, null);
         gl.uniform1i(drawShaderVariables.FlagsUniformLocation,      null);
 
-        gl.uniform1i(drawShaderVariables.CanvasWidthUniformLocation,     null);
-        gl.uniform1i(drawShaderVariables.CanvasHeightUniformLocation,    null);
-        gl.uniform1i(drawShaderVariables.ViewportXOffsetUniformLocation, null);
-        gl.uniform1i(drawShaderVariables.ViewportYOffsetUniformLocation, null);
+        gl.uniform1i(drawShaderVariables.CanvasWidthUniformLocation,  null);
+        gl.uniform1i(drawShaderVariables.CanvasHeightUniformLocation, null);
 
         gl.uniform4f(drawShaderVariables.ColorNoneUniformLocation,    0, 0, 0, 0);
         gl.uniform4f(drawShaderVariables.ColorEnabledUniformLocation, 0, 0, 0, 0);
