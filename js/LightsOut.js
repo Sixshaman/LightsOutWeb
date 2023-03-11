@@ -73,32 +73,65 @@ function flatCellIndex(gameSize, x, y)
 }
 
 //Gets 2-dimensional cell index from a canvas point (x, y) for the given board size (gameSize x gameSize) and canvas size (canvasWidth x canvasHeight).
-function boardPointFromCanvasPoint(x, y, gameSize, canvasWidth, canvasHeight, useGrid)
+//Since the actual board has dynamic size and is centered on a statically sized canvas, offsets: (canvasOffsetX, canvasOffsetY) are added.
+function boardPointFromCanvasPoint(x, y, gameSize, viewportWidth, viewportHeight, canvasWidth, canvasHeight, useGrid)
 {
-    let res = {xBoard: -1, yBoard: -1};
-    if(x > canvasWidth || y > canvasHeight)
-    {
-        return res;
-    }
+    let xCorrected = x * (viewportWidth  / canvasWidth);
+    let yCorrected = y * (viewportHeight / canvasHeight);
 
-    let stepX = 1;
-    let stepY = 1;
+    let widthAdjusted  = viewportWidth;
+    let heightAdjusted = viewportHeight;
 
     if(useGrid)
     {
-        stepX = Math.floor((canvasWidth  + 1) / gameSize);
-        stepY = Math.floor((canvasHeight + 1) / gameSize);
+        widthAdjusted  = widthAdjusted  - 1;
+        heightAdjusted = heightAdjusted - 1;
+    }
+
+    let smallCellWidth  = Math.floor(widthAdjusted  / gameSize);
+    let smallCellHeight = Math.floor(heightAdjusted / gameSize);
+
+    let widerCellCount      = widthAdjusted  - smallCellWidth  * gameSize;
+    let tallerCellCount     = heightAdjusted - smallCellHeight * gameSize;
+
+    let thinnerCellHalfCount = Math.floor((gameSize - widerCellCount)  / 2);
+    let shorterCellHalfCount = Math.floor((gameSize - tallerCellCount) / 2);
+
+    let leftThinnerCellPartWidth = smallCellWidth  * thinnerCellHalfCount;
+    let topShorterCellPartHeight = smallCellHeight * shorterCellHalfCount;
+
+    let widerCellPartWidth   = (smallCellWidth  + 1) * widerCellCount;
+    let tallerCellPartHeight = (smallCellHeight + 1) * tallerCellCount;
+
+    let idX = 0;
+    if(xCorrected <= leftThinnerCellPartWidth)
+    {
+        idX = Math.floor(xCorrected / smallCellWidth);
+    }
+    else if(xCorrected <= leftThinnerCellPartWidth + widerCellPartWidth)
+    {
+        idX = thinnerCellHalfCount + Math.floor((xCorrected - leftThinnerCellPartWidth) / (smallCellWidth + 1));
     }
     else
     {
-        stepX = Math.floor(canvasWidth  / gameSize);
-        stepY = Math.floor(canvasHeight / gameSize);
+        idX = thinnerCellHalfCount + widerCellCount + Math.floor((xCorrected - leftThinnerCellPartWidth - widerCellPartWidth) / smallCellWidth);
     }
 
-    res.xBoard = Math.floor(x / stepX);
-    res.yBoard = Math.floor(y / stepY);
+    let idY = 0;
+    if(yCorrected <= topShorterCellPartHeight)
+    {
+        idY = Math.floor(yCorrected / smallCellHeight);
+    }
+    else if(yCorrected <= topShorterCellPartHeight + tallerCellPartHeight)
+    {
+        idY = shorterCellHalfCount + Math.floor((yCorrected - topShorterCellPartHeight) / (smallCellHeight + 1));
+    }
+    else
+    {
+        idY = shorterCellHalfCount + tallerCellCount + Math.floor((yCorrected - topShorterCellPartHeight - tallerCellPartHeight) / smallCellHeight);
+    }
 
-    return res;
+    return {x: idX, y: idY};
 }
 
 //Returns the position in string "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-+"
@@ -1189,7 +1222,8 @@ const uint ProjectivePlaneTopology = 2u;
 
 struct FragmentCellInfo
 {
-    ivec2 IntegerCoord;
+    ivec2 Coord;
+    ivec2 Size;
     ivec2 Id;
 };
 
@@ -1242,9 +1276,60 @@ FragmentCellInfo CalcCellInfo(ivec2 screenPos)
 {
     bool gridVisible = ((gFlags & FLAG_NO_GRID) == 0);
 
+    int widthAdjusted  = gImageWidth  - int(gridVisible);
+    int heightAdjusted = gImageHeight - int(gridVisible);
+
+    int wideCellCount = widthAdjusted  % gCellSize;
+    int tallCellCount = heightAdjusted % gCellSize;
+
+    int smallLeftCellCount = (gBoardSize - wideCellCount) / 2;
+    int smallTopCellCount  = (gBoardSize - tallCellCount) / 2;
+
+
+    int leftSmallZoneWidth  = smallLeftCellCount * gCellSize;
+    int centerWideZoneWidth = wideCellCount * (gCellSize + 1);
+
+    int topSmallZoneHeight   = smallTopCellCount * gCellSize;
+    int centerTallZoneHeight = tallCellCount * (gCellSize + 1);
+
+    ivec2 coordAdjusted = screenPos;
+    ivec2 idOffset      = ivec2(0, 0);
+    ivec2 cellSize      = ivec2(gCellSize, gCellSize);
+
+    if(coordAdjusted.x >= leftSmallZoneWidth)
+    {
+        idOffset.x      += smallLeftCellCount;
+        coordAdjusted.x -= leftSmallZoneWidth;
+        cellSize.x      += 1;
+
+        if(coordAdjusted.x >= centerWideZoneWidth)
+        {
+            idOffset.x      += wideCellCount;
+            coordAdjusted.x -= centerWideZoneWidth;
+            cellSize.x      -= 1;
+        }
+    }
+
+    if(coordAdjusted.y >= topSmallZoneHeight)
+    {
+        idOffset.y      += smallTopCellCount;
+        coordAdjusted.y -= topSmallZoneHeight;
+        cellSize.y      += 1;
+
+        if(coordAdjusted.y >= centerTallZoneHeight)
+        {
+            idOffset.y      += tallCellCount;
+            coordAdjusted.y -= centerTallZoneHeight;
+            cellSize.y      -= 1;
+        }
+    }
+
+    ivec2 idAdjusted = coordAdjusted / cellSize;
+
     FragmentCellInfo cellInfo;
-    cellInfo.Id           = screenPos / gCellSize;
-    cellInfo.IntegerCoord = screenPos % gCellSize - ivec2(int(gridVisible));
+    cellInfo.Coord = coordAdjusted - idAdjusted * cellSize - ivec2(int(gridVisible));
+    cellInfo.Size  = cellSize - ivec2(int(gridVisible));
+    cellInfo.Id    = idOffset + idAdjusted;
 
     return cellInfo;
 }
@@ -1628,11 +1713,11 @@ void main(void)
     ivec2 screenPos = ivec2(int(gl_FragCoord.x), gImageHeight - int(gl_FragCoord.y) - 1);
 
     FragmentCellInfo cellInfo = CalcCellInfo(screenPos);
-    if(IsInsideCell(cellInfo.IntegerCoord))
+    if(IsInsideCell(cellInfo.Coord))
     {
         mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
-        mediump vec2 cellCoord = vec2(cellInfo.IntegerCoord) - 0.5f * vec2(float(gCellSize), float(gCellSize));
+        mediump vec2 cellCoord = vec2(cellInfo.Coord) - 0.5f * vec2(cellInfo.Size);
         RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
 
         CellSidesInfo   sidesInfo   = GetSidesState(cellInfo.Id);
@@ -3781,26 +3866,23 @@ function main()
     {
         let boardPoint = boardPointFromCanvasPoint(x, y, currentGameSize, currentViewportWidth, currentViewportHeight, gridCheckBox.checked);
 
-        let modX = boardPoint.xBoard;
-        let modY = boardPoint.yBoard;
-
         if(isConstruct)
         {
-            makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
+            makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, boardPoint.x, boardPoint.y);
         }
         else
         {
             if(currentWorkingMode === WorkingModes.LitBoardClickRule)
             {
-                currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, modX, modY, currentTopology);
+                currentGameBoard = makeTurn(currentGameBoard, currentGameClickRule, currentClickRuleSize, currentGameSize, currentDomainSize, boardPoint.x, boardPoint.y, currentTopology);
             }
             else if(currentWorkingMode == WorkingModes.LitBoardMatrix)
             {
-                currentGameBoard = makeTurnMatrix(currentGameBoard, currentGameMatrix, currentGameSize, currentDomainSize, modX, modY);
+                currentGameBoard = makeTurnMatrix(currentGameBoard, currentGameMatrix, currentGameSize, currentDomainSize, boardPoint.x, boardPoint.y);
             }
             else if(currentWorkingMode === WorkingModes.ConstructClickRule)
             {
-                makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, modX, modY);
+                makeConstructTurn(currentGameBoard, currentGameSize, currentDomainSize, boardPoint.x, boardPoint.y);
             }
         }
 
