@@ -1717,8 +1717,7 @@ void main(void)
     {
         mediump float domainFactor = 1.0f / float(gDomainSize - 1);
 
-        mediump vec2 cellCoord = vec2(cellInfo.Coord) - 0.5f * vec2(cellInfo.Size);
-        RegionInfo regionInfo = CalculateRegionInfo(cellCoord);
+        RegionInfo regionInfo = CalculateRegionInfo(cellInfo.Coord, cellInfo.Size);
 
         CellSidesInfo   sidesInfo   = GetSidesState(cellInfo.Id);
         CellCornersInfo cornersInfo = GetCornersState(cellInfo.Id);
@@ -1784,7 +1783,7 @@ function createSquaresShaderProgram(context, vertexShader)
         int Unused;
     };
 
-    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
     {
         RegionInfo unused;
         return unused;
@@ -1820,14 +1819,16 @@ function createCirclesShaderProgam(context, vertexShader)
         return equal(cellValueVec, sidesValues);
     }
 
-    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
     {
-        int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
-        mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
+        int cellSizeMin = min(cellSize.x, cellSize.y);
+        mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
+
+        mediump float circleRadius = float(cellSizeMin - 1) / 2.0f;
 
         RegionInfo regionInfo;
-        regionInfo.OnSides      = bvec4(cellCoord.x <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y <= 0.0f, cellCoord.y >= 0.0f);
-        regionInfo.InsideCircle = dot(cellCoord, cellCoord) <= circleRadius * circleRadius;
+        regionInfo.OnSides      = bvec4(cellCoordFrac.x <= 0.0f, cellCoordFrac.x >= 0.0f, cellCoordFrac.y <= 0.0f, cellCoordFrac.y >= 0.0f);
+        regionInfo.InsideCircle = dot(cellCoordFrac, cellCoordFrac) <= circleRadius * circleRadius;
 
         return regionInfo;
     }
@@ -1872,23 +1873,25 @@ function createDiamondsShaderProgram(context, vertexShader)
         return equal(uvec4(cellValue), cornerValue);
     }
 
-    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
     {
-        int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
-        mediump float diamondRadius = float(cellSizeCorrected) / 2.0f;
+        int cellSizeMin = min(cellSize.x, cellSize.y);
+        mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
+
+        mediump float diamondRadius = float(cellSizeMin) / 2.0f;
 
         //Fix for 1-pixel error.
         //For empty corners to match neighbour diamonds, we should draw them with the diamond radius smaller by 1 unit.
         //With grid visible, this method produces 1-pixel "hole" artifacts. To counteract it, we make the diamond greater by 0.5 units.
 
-        bool insideDiamond   = abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius + 0.5f * float((gFlags & FLAG_NO_GRID) == 0);
-        bool insideDiamondSm = abs(cellCoord.x) + abs(cellCoord.y) <= diamondRadius - 1.0f;
-        bool outsideDiamond  = abs(cellCoord.x) + abs(cellCoord.y) >= diamondRadius + 0.5f * float((gFlags & FLAG_NO_GRID) == 0);
+        bool insideDiamond   = abs(cellCoordFrac.x) + abs(cellCoordFrac.y) <= diamondRadius + 0.5f * float((gFlags & FLAG_NO_GRID) == 0);
+        bool insideDiamondSm = abs(cellCoordFrac.x) + abs(cellCoordFrac.y) <= diamondRadius - 1.0f;
+        bool outsideDiamond  = abs(cellCoordFrac.x) + abs(cellCoordFrac.y) >= diamondRadius + 0.5f * float((gFlags & FLAG_NO_GRID) == 0);
 
-        bool insideTopLeft     = cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
-        bool insideTopRight    = cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-        bool insideBottomLeft  = cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
-        bool insideBottomRight = cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
+        bool insideTopLeft     = cellCoordFrac.x <= 0.0f && cellCoordFrac.y <= 0.0f;
+        bool insideTopRight    = cellCoordFrac.x >= 0.0f && cellCoordFrac.y <= 0.0f;
+        bool insideBottomLeft  = cellCoordFrac.x <= 0.0f && cellCoordFrac.y >= 0.0f;
+        bool insideBottomRight = cellCoordFrac.x >= 0.0f && cellCoordFrac.y >= 0.0f;
         
         bvec4 insideCorners = bvec4(insideTopLeft, insideTopRight, insideBottomLeft, insideBottomRight);
 
@@ -2052,14 +2055,15 @@ function createBeamsShaderProgram(context, vertexShader)
         return b4nd(equalsCorners, notEqualsAdjacentSides); //V#1
     }
 
-    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
     {
-        int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+        int cellSizeMin = min(cellSize.x, cellSize.y);
+        mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
 
-        mediump vec2 absCellCoord = abs(cellCoord);
-        mediump float diamondRadius = float(cellSizeCorrected) / 2.0f;
+        mediump vec2 absCellCoord = abs(cellCoordFrac);
+        mediump float diamondRadius = float(cellSizeMin) / 2.0f;
 
-        bvec4 insideSides   = bvec4(cellCoord.x <= 0.0f, cellCoord.x >= 0.0f, cellCoord.y <= 0.0f, cellCoord.y >= 0.0f);
+        bvec4 insideSides   = bvec4(cellCoordFrac.x <= 0.0f, cellCoordFrac.x >= 0.0f, cellCoordFrac.y <= 0.0f, cellCoordFrac.y >= 0.0f);
         bvec4 insideCorners = b4nd(insideSides.xyxy, insideSides.zzww);
 
         //Fix for 1 pixel off. To make it work, x == 0 and y == 0 pixels shouldn't be considered a part of beam (or else single pixel artifacts will appear)
@@ -2067,8 +2071,8 @@ function createBeamsShaderProgram(context, vertexShader)
         bool insideCentralDiamond   = (absCellCoord.x + absCellCoord.y <= diamondRadius - 1.0f * float((gCellSize % 2 == 0) && ((gFlags & FLAG_NO_GRID) != 0)));
         bool outsideCentralDiamond  = (absCellCoord.x + absCellCoord.y >= diamondRadius + 1.0f * float(gCellSize % 2 == 0));
 
-        bool insideVerticalBeam   = absCellCoord.x <= 0.707f * float(cellSizeCorrected) * 0.5f;
-        bool insideHorizontalBeam = absCellCoord.y <= 0.707f * float(cellSizeCorrected) * 0.5f;
+        bool insideVerticalBeam   = absCellCoord.x <= 0.707f * float(cellSizeMin) * 0.5f;
+        bool insideHorizontalBeam = absCellCoord.y <= 0.707f * float(cellSizeMin) * 0.5f;
 
         bvec2 insideHalfBeamsHorizontal = b2nd(bvec2(insideHorizontalBeam), insideSides.xy);
         bvec2 insideHalfBeamsVertical   = b2nd(bvec2(insideVerticalBeam),   insideSides.zw);
@@ -2179,19 +2183,20 @@ function createRaindropsShaderProgram(context, vertexShader)
         return res;
     }
 
-    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
     {
-        int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+        int cellSizeMin = min(cellSize.x, cellSize.y);
+        mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
 
-        mediump float circleRadius = float(cellSizeCorrected - 1) / 2.0f;
+        mediump float circleRadius = float(cellSizeMin - 1) / 2.0f;
 
-        bool insideCircle  = (dot(cellCoord, cellCoord) < (circleRadius * circleRadius));
-        bool outsideCircle = (dot(cellCoord, cellCoord) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
+        bool insideCircle  = (dot(cellCoordFrac, cellCoordFrac) < (circleRadius * circleRadius));
+        bool outsideCircle = (dot(cellCoordFrac, cellCoordFrac) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
 
-        bool insideTopLeft     = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
-        bool insideTopRight    = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-        bool insideBottomLeft  = !insideCircle && cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
-        bool insideBottomRight = !insideCircle && cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
+        bool insideTopLeft     = !insideCircle && cellCoordFrac.x <= 0.0f && cellCoordFrac.y <= 0.0f;
+        bool insideTopRight    = !insideCircle && cellCoordFrac.x >= 0.0f && cellCoordFrac.y <= 0.0f;
+        bool insideBottomLeft  = !insideCircle && cellCoordFrac.x <= 0.0f && cellCoordFrac.y >= 0.0f;
+        bool insideBottomRight = !insideCircle && cellCoordFrac.x >= 0.0f && cellCoordFrac.y >= 0.0f;
 
         RegionInfo result;
 
@@ -2298,20 +2303,21 @@ function createChainsShaderProgram(context, vertexShader)
         return b4nd(equalsOppositeSides.yyyy, not(equalsLateralSides.yxwz));
     }
 
-    RegionInfo CalculateRegionInfo(mediump vec2 cellCoord)
+    RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize)
     {
-        int cellSizeCorrected = gCellSize - int((gFlags & FLAG_NO_GRID) == 0);
+        int cellSizeMin = min(cellSize.x, cellSize.y);
+        mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
 
-        mediump float circleRadius    = float(cellSizeCorrected) * 0.5f;
-        mediump float circleRadiusBig = float(cellSizeCorrected) * 0.9f;
+        mediump float circleRadius    = float(cellSizeMin) * 0.5f;
+        mediump float circleRadiusBig = float(cellSizeMin) * 0.9f;
 
-        mediump vec2 cellCoordLeft   = cellCoord + vec2(float( cellSizeCorrected),              0.0f);
-        mediump vec2 cellCoordRight  = cellCoord + vec2(float(-cellSizeCorrected),              0.0f);
-        mediump vec2 cellCoordTop    = cellCoord + vec2(             0.0f, float( cellSizeCorrected));
-        mediump vec2 cellCoordBottom = cellCoord + vec2(             0.0f, float(-cellSizeCorrected));
+        mediump vec2 cellCoordLeft   = cellCoordFrac + vec2(float( cellSizeMin),              0.0f);
+        mediump vec2 cellCoordRight  = cellCoordFrac + vec2(float(-cellSizeMin),              0.0f);
+        mediump vec2 cellCoordTop    = cellCoordFrac + vec2(             0.0f, float( cellSizeMin));
+        mediump vec2 cellCoordBottom = cellCoordFrac + vec2(             0.0f, float(-cellSizeMin));
 
-        bool insideCircle  = (dot(cellCoord, cellCoord) < circleRadius          * circleRadius);
-        bool outsideCircle = (dot(cellCoord, cellCoord) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
+        bool insideCircle  = (dot(cellCoordFrac, cellCoordFrac) < circleRadius          * circleRadius);
+        bool outsideCircle = (dot(cellCoordFrac, cellCoordFrac) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
 
         bool insideCircleBigLeft   = (dot(  cellCoordLeft,   cellCoordLeft) < (circleRadiusBig) * (circleRadiusBig));
         bool insideCircleBigRight  = (dot( cellCoordRight,  cellCoordRight) < (circleRadiusBig) * (circleRadiusBig));
@@ -2324,10 +2330,10 @@ function createChainsShaderProgram(context, vertexShader)
         bool  insideCircleLinkHorizontal = insideLinkHorizontal && !insideLinkVertical   && insideCircle;
         bool  insideCircleLinkVertical   = insideLinkVertical   && !insideLinkHorizontal && insideCircle;
 
-        bool insideTopLeft     = cellCoord.x <= 0.0f && cellCoord.y <= 0.0f;
-        bool insideTopRight    = cellCoord.x >= 0.0f && cellCoord.y <= 0.0f;
-        bool insideBottomLeft  = cellCoord.x <= 0.0f && cellCoord.y >= 0.0f;
-        bool insideBottomRight = cellCoord.x >= 0.0f && cellCoord.y >= 0.0f;
+        bool insideTopLeft     = cellCoordFrac.x <= 0.0f && cellCoordFrac.y <= 0.0f;
+        bool insideTopRight    = cellCoordFrac.x >= 0.0f && cellCoordFrac.y <= 0.0f;
+        bool insideBottomLeft  = cellCoordFrac.x <= 0.0f && cellCoordFrac.y >= 0.0f;
+        bool insideBottomRight = cellCoordFrac.x >= 0.0f && cellCoordFrac.y >= 0.0f;
 
         bvec4 insideCorners      = bvec4(insideTopLeft, insideTopRight, insideBottomLeft, insideBottomRight);
         bvec4 insideRoundCorners = b4nd(insideCorners, bvec4(!insideCircle));
