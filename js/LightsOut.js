@@ -2660,63 +2660,84 @@ function createRaindropsShaderProgram(context, vertexShader)
     struct RegionInfo
     {
         bvec4 InsideCorners;
+        bvec4 InsideEmptyCorners;
         bool  InsideCircle;
-        bool  OutsideCircle;
     };
-
+    
     bvec4 emptyCornerRule(uvec4 edgeValue)
     {
         return equal(edgeValue.xyxy, edgeValue.zzww);
     }
-
+    
     bvec4 cornerRule(CellNeighbourValues cellNeighbours)
     {
         bvec4 res = bvec4(false);
-
+    
         uvec4 cellValueVec = uvec4(cellNeighbours.CellValue);
         
         res = b4or(res, equal(cellValueVec, cellNeighbours.CornersValues.xyzw));
         res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.xyxy));
         res = b4or(res, equal(cellValueVec, cellNeighbours.SidesValues.zzww));
-
+    
         return res;
     }
-
+    
     RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize, uint cellType)
     {
-        int cellSizeMin = min(cellSize.x, cellSize.y);
-        mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
-
-        mediump float circleRadius = float(cellSizeMin - 1) / 2.0f;
-
-        bool insideCircle  = (dot(cellCoordFrac, cellCoordFrac) < (circleRadius * circleRadius));
-        bool outsideCircle = (dot(cellCoordFrac, cellCoordFrac) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
-
-        bool insideTopLeft     = !insideCircle && cellCoordFrac.x <= 0.0f && cellCoordFrac.y <= 0.0f;
-        bool insideTopRight    = !insideCircle && cellCoordFrac.x >= 0.0f && cellCoordFrac.y <= 0.0f;
-        bool insideBottomLeft  = !insideCircle && cellCoordFrac.x <= 0.0f && cellCoordFrac.y >= 0.0f;
-        bool insideBottomRight = !insideCircle && cellCoordFrac.x >= 0.0f && cellCoordFrac.y >= 0.0f;
-
+        ivec2 cellSizeHalf = cellSize / 2;
+        ivec2 cellCoordAdjusted = cellCoord - cellSizeHalf;
+    
+        //Make the coordinate "0" only available on even cell sizes
+        ivec2 zero           = ivec2(0, 0);
+        bvec2 onPositiveHalf = greaterThanEqual(cellCoordAdjusted, zero);
+        bvec2 evenCellSize   = equal(cellSize % 2, zero);
+        cellCoordAdjusted    = cellCoordAdjusted + ivec2(b2nd(onPositiveHalf, evenCellSize));
+    
+        ivec2 biggerCircleRadiusOffset = ivec2(b2nd(not(evenCellSize), bvec2((gFlags & FLAG_NO_GRID) != 0)));
+        
+        ivec2 circleRadius       = ivec2(cellSizeHalf.x + 1, cellSizeHalf.y + 1);
+        ivec2 biggerCircleRadius = circleRadius - biggerCircleRadiusOffset;
+    
+        //Ellipse is defined as x^2 * b^2 + y^2 * a^2 <= a^2 * b^2
+        ivec2 coordSq        = cellCoordAdjusted * cellCoordAdjusted;
+        ivec2 radiusSq       = circleRadius * circleRadius;
+        ivec2 biggerRadiusSq = biggerCircleRadius * biggerCircleRadius;
+        
+        bool insideCircle       = idot(coordSq, radiusSq.yx)       <= radiusSq.x * radiusSq.y;
+        bool insideBiggerCircle = idot(coordSq, biggerRadiusSq.yx) <= biggerRadiusSq.x * biggerRadiusSq.y;
+        
+        bool insideTopLeft     = cellCoordAdjusted.x <= 0 && cellCoordAdjusted.y <= 0;
+        bool insideTopRight    = cellCoordAdjusted.x >= 0 && cellCoordAdjusted.y <= 0;
+        bool insideBottomLeft  = cellCoordAdjusted.x <= 0 && cellCoordAdjusted.y >= 0;
+        bool insideBottomRight = cellCoordAdjusted.x >= 0 && cellCoordAdjusted.y >= 0;
+    
+        bvec4 insideCorners = bvec4(insideTopLeft, insideTopRight, insideBottomLeft, insideBottomRight);
+    
         RegionInfo result;
-
-        result.InsideCorners = bvec4(insideTopLeft, insideTopRight, insideBottomLeft, insideBottomRight);
-
+    
+        result.InsideCorners      = b4nd(insideCorners, bvec4(!insideCircle));
+        result.InsideEmptyCorners = b4nd(insideCorners, bvec4(!insideBiggerCircle));
+    
         result.InsideCircle  = insideCircle;
-        result.OutsideCircle = outsideCircle;
-
+    
         return result;
     }
-
+    
     uint CalculateRegionValue(RegionInfo regionInfo, CellNeighbourValues cellNeighbours, uint cellType)
     {
         uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.zzww;
         uvec4 cornerCandidate      = uvec4(cornerRule(cellNeighbours)) * cellNeighbours.CellValue;
-
-        emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
-
-        uvec4 resCorner = max(emptyCornerCandidate, cornerCandidate);
-
-        return cellNeighbours.CellValue * uint(regionInfo.InsideCircle) + udot(resCorner, uvec4(regionInfo.InsideCorners));
+    
+        uint resFilledCorner = udot(cornerCandidate * uvec4(regionInfo.InsideCorners), uvec4(1u));
+        uint resEmptyCorner  = udot(emptyCornerCandidate * uvec4(regionInfo.InsideEmptyCorners), uvec4(1u));
+    
+        uint resCircle = cellNeighbours.CellValue * uint(regionInfo.InsideCircle);
+        uint resFilled = max(resCircle, resFilledCorner);
+    
+        resFilled      *= uint(resEmptyCorner <= resFilled);
+        resEmptyCorner *= uint(resFilled == 0u);
+    
+        return max(resFilledCorner, resCircle) + resEmptyCorner;
     }
     `;
 
