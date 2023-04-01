@@ -2755,13 +2755,13 @@ function createChainsShaderProgram(context, vertexShader)
     `
     struct RegionInfo
     {
-        bvec4 InsideFreeCorners;
+        bvec4 InsideFilledCorners;
+        bvec4 InsideEmptyCorners;
         bvec4 InsideSlimEdgesHorizontal;
         bvec4 InsideSlimEdgesVertical;
-        bvec2 InsideCircleLinks;
-        bool  InsideBothLinks;
-        bool  InsideFreeCircle;
-        bool  OutsideCircle;
+        bool  InsideCircleLinkHorizontal;
+        bool  InsideCircleLinkVertical;
+        bool  InsideCircle;
     };
 
     bvec4 emptyCornerRule(uvec4 edgeValue)
@@ -2780,20 +2780,29 @@ function createChainsShaderProgram(context, vertexShader)
         return res;
     }
 
-    bvec2 linkRule(uint cellValue, uvec4 edgeValue)
+    bool emptyHorizontalLinkRule(uint cellValue, uvec4 edgeValue)
     {
-        uvec2 cellValueVec = uvec2(cellValue);
-
-        bvec2 res = bvec2(true);
-        res       = b2nd(res, equal(edgeValue.xz, edgeValue.yw));
-        res       = b2nd(res, notEqual(edgeValue.xz, edgeValue.zx));
-        res       = b2nd(res, notEqual(edgeValue.yw, edgeValue.wy));
-        res       = b2nd(res, notEqual(edgeValue.xz, cellValueVec));
+        bool res = true;
+        res = res && (edgeValue.x == edgeValue.y);
+        res = res && (edgeValue.x != edgeValue.z);
+        res = res && (edgeValue.y != edgeValue.w);
+        res = res && (edgeValue.x != cellValue);
 
         return res;
     }
 
-    bvec4 slimEdgeHorizontalRule(bvec4 equalsSides, bvec4 equalsCorners, bvec4 equalsSides2)
+    bool emptyVerticalLinkRule(uint cellValue, uvec4 edgeValue)
+    {
+        bool res = true;
+        res = res && (edgeValue.z == edgeValue.w);
+        res = res && (edgeValue.x != edgeValue.z);
+        res = res && (edgeValue.y != edgeValue.w);
+        res = res && (edgeValue.z != cellValue);
+
+        return res;
+    }
+
+    bvec4 slimEdgeFilledHorizontalRule(bvec4 equalsSides, bvec4 equalsCorners, bvec4 equalsSides2)
     {
         bvec4 equalsAdjacentSides = b4or(equalsSides.xyxy, equalsSides.zzww);
         bvec4 equalsAdjacentCells = b4or(equalsCorners, equalsAdjacentSides);
@@ -2808,7 +2817,7 @@ function createChainsShaderProgram(context, vertexShader)
         return b4nd(equalsOppositeSides.xxxx, not(equalsLateralSides.zwxy));
     }
 
-    bvec4 slimEdgeVerticalRule(bvec4 equalsSides, bvec4 equalsCorners, bvec4 equalsSides2)
+    bvec4 slimEdgeFilledVerticalRule(bvec4 equalsSides, bvec4 equalsCorners, bvec4 equalsSides2)
     {
         bvec4 equalsAdjacentSides = b4or(equalsSides.xyxy, equalsSides.zzww);
         bvec4 equalsAdjacentCells = b4or(equalsCorners, equalsAdjacentSides);
@@ -2825,54 +2834,76 @@ function createChainsShaderProgram(context, vertexShader)
 
     RegionInfo CalculateRegionInfo(ivec2 cellCoord, ivec2 cellSize, uint cellType)
     {
-        int cellSizeMin = min(cellSize.x, cellSize.y);
-        mediump vec2 cellCoordFrac = vec2(cellCoord) - 0.5f * vec2(cellSize);
+        ivec2 cellSizeHalf      = cellSize / 2;
+        ivec2 cellCoordAdjusted = cellCoord - cellSizeHalf;
+        
+        //Make the coordinate "0" only available on even cell sizes
+        ivec2 zero           = ivec2(0, 0);
+        bvec2 onPositiveHalf = greaterThanEqual(cellCoordAdjusted, zero);
+        bvec2 evenCellSize   = equal(cellSize % 2, zero);
+        cellCoordAdjusted    = cellCoordAdjusted + ivec2(b2nd(onPositiveHalf, evenCellSize));
+        
+        ivec2 emptyCornerCircleRadiusOffset = ivec2(b2nd(not(evenCellSize), bvec2((gFlags & FLAG_NO_GRID) != 0)));
+        
+        ivec2 circleRadius            = ivec2(cellSizeHalf.x + 1, cellSizeHalf.y + 1);
+        ivec2 emptyCornerCircleRadius = circleRadius - emptyCornerCircleRadiusOffset;
+        ivec2 circleRadiusBig         = ivec2(vec2(cellSizeHalf) * 1.75f);
 
-        mediump float circleRadius    = float(cellSizeMin) * 0.5f;
-        mediump float circleRadiusBig = float(cellSizeMin) * 0.9f;
+        ivec2 bigCircleOffset = ivec2(vec2(cellSizeHalf) * 2.0f);
 
-        mediump vec2 cellCoordLeft   = cellCoordFrac + vec2(float( cellSizeMin),              0.0f);
-        mediump vec2 cellCoordRight  = cellCoordFrac + vec2(float(-cellSizeMin),              0.0f);
-        mediump vec2 cellCoordTop    = cellCoordFrac + vec2(             0.0f, float( cellSizeMin));
-        mediump vec2 cellCoordBottom = cellCoordFrac + vec2(             0.0f, float(-cellSizeMin));
+        ivec2 cellCoordLeft   = cellCoordAdjusted + ivec2( bigCircleOffset.x,               0);
+        ivec2 cellCoordRight  = cellCoordAdjusted + ivec2(-bigCircleOffset.x,               0);
+        ivec2 cellCoordTop    = cellCoordAdjusted + ivec2(                 0,  bigCircleOffset.y);
+        ivec2 cellCoordBottom = cellCoordAdjusted + ivec2(                 0, -bigCircleOffset.y);
 
-        bool insideCircle  = (dot(cellCoordFrac, cellCoordFrac) < circleRadius          * circleRadius);
-        bool outsideCircle = (dot(cellCoordFrac, cellCoordFrac) > (circleRadius + 1.0f) * (circleRadius + 1.0f));
+        //Ellipse is defined as x^2 * b^2 + y^2 * a^2 <= a^2 * b^2
+        ivec2 coordSq             = cellCoordAdjusted * cellCoordAdjusted;
+        ivec2 radiusSq            = circleRadius * circleRadius;
+        ivec2 emptyCornerRadiusSq = emptyCornerCircleRadius * emptyCornerCircleRadius;
+        ivec2 bigRadiusSq         = circleRadiusBig * circleRadiusBig;
 
-        bool insideCircleBigLeft   = (dot(  cellCoordLeft,   cellCoordLeft) < (circleRadiusBig) * (circleRadiusBig));
-        bool insideCircleBigRight  = (dot( cellCoordRight,  cellCoordRight) < (circleRadiusBig) * (circleRadiusBig));
-        bool insideCircleBigTop    = (dot(   cellCoordTop,    cellCoordTop) < (circleRadiusBig) * (circleRadiusBig));
-        bool insideCircleBigBottom = (dot(cellCoordBottom, cellCoordBottom) < (circleRadiusBig) * (circleRadiusBig));
+        bool insideCircle            = idot(coordSq, radiusSq.yx)            <= radiusSq.x * radiusSq.y;
+        bool insideEmptyCornerCircle = idot(coordSq, emptyCornerRadiusSq.yx) <= emptyCornerRadiusSq.x * emptyCornerRadiusSq.y;
+
+        ivec2 bigLeftCoordSq   = cellCoordLeft   * cellCoordLeft;
+        ivec2 bigRightCoordSq  = cellCoordRight  * cellCoordRight;
+        ivec2 bigTopCoordSq    = cellCoordTop    * cellCoordTop;
+        ivec2 bigBottomCoordSq = cellCoordBottom * cellCoordBottom;
+
+        bool insideCircleBigLeft   = idot(bigLeftCoordSq,   bigRadiusSq.yx) <= bigRadiusSq.x * bigRadiusSq.y;
+        bool insideCircleBigRight  = idot(bigRightCoordSq,  bigRadiusSq.yx) <= bigRadiusSq.x * bigRadiusSq.y;
+        bool insideCircleBigTop    = idot(bigTopCoordSq,    bigRadiusSq.yx) <= bigRadiusSq.x * bigRadiusSq.y;
+        bool insideCircleBigBottom = idot(bigBottomCoordSq, bigRadiusSq.yx) <= bigRadiusSq.x * bigRadiusSq.y;
 
         bool insideLinkHorizontal = !insideCircleBigTop  && !insideCircleBigBottom;
         bool insideLinkVertical   = !insideCircleBigLeft && !insideCircleBigRight;
+        
+        //Link takes at least two or three central pixels
+        insideLinkHorizontal = insideLinkHorizontal || abs(cellCoordAdjusted.y) <= 1;
+        insideLinkVertical   = insideLinkVertical   || abs(cellCoordAdjusted.x) <= 1;
 
-        bool  insideCircleLinkHorizontal = insideLinkHorizontal && !insideLinkVertical   && insideCircle;
-        bool  insideCircleLinkVertical   = insideLinkVertical   && !insideLinkHorizontal && insideCircle;
+        bool insideTopLeft     = cellCoordAdjusted.x <= 0 && cellCoordAdjusted.y <= 0;
+        bool insideTopRight    = cellCoordAdjusted.x >= 0 && cellCoordAdjusted.y <= 0;
+        bool insideBottomLeft  = cellCoordAdjusted.x <= 0 && cellCoordAdjusted.y >= 0;
+        bool insideBottomRight = cellCoordAdjusted.x >= 0 && cellCoordAdjusted.y >= 0;
 
-        bool insideTopLeft     = cellCoordFrac.x <= 0.0f && cellCoordFrac.y <= 0.0f;
-        bool insideTopRight    = cellCoordFrac.x >= 0.0f && cellCoordFrac.y <= 0.0f;
-        bool insideBottomLeft  = cellCoordFrac.x <= 0.0f && cellCoordFrac.y >= 0.0f;
-        bool insideBottomRight = cellCoordFrac.x >= 0.0f && cellCoordFrac.y >= 0.0f;
-
-        bvec4 insideCorners      = bvec4(insideTopLeft, insideTopRight, insideBottomLeft, insideBottomRight);
-        bvec4 insideRoundCorners = b4nd(insideCorners, bvec4(!insideCircle));
-
-        bool outsideLinks = !insideLinkHorizontal && !insideLinkVertical;
-
+        bvec4 insideCorners       = bvec4(insideTopLeft, insideTopRight, insideBottomLeft, insideBottomRight);
+        bvec4 insideFilledCorners = b4nd(insideCorners, bvec4(!insideCircle));
+        bvec4 insideEmptyCorners  = b4nd(insideCorners, bvec4(!insideEmptyCornerCircle));
+        
 
         RegionInfo result;
 
-        result.InsideFreeCorners = b4nd(insideRoundCorners, bvec4(outsideLinks));
+        result.InsideFilledCorners = insideFilledCorners;
+        result.InsideEmptyCorners  = insideEmptyCorners;
         
-        result.InsideSlimEdgesHorizontal = b4nd(bvec4(insideLinkHorizontal), insideRoundCorners);
-        result.InsideSlimEdgesVertical   = b4nd(bvec4(insideLinkVertical),   insideRoundCorners);
+        result.InsideSlimEdgesHorizontal = b4nd(bvec4(insideLinkHorizontal), insideFilledCorners);
+        result.InsideSlimEdgesVertical   = b4nd(bvec4(insideLinkVertical),   insideFilledCorners);
 
-        result.InsideCircleLinks = bvec2(insideCircleLinkHorizontal, insideCircleLinkVertical);
-        result.InsideBothLinks   = insideLinkHorizontal && insideLinkVertical;
+        result.InsideCircleLinkHorizontal = insideLinkHorizontal && insideCircle;
+        result.InsideCircleLinkVertical   = insideLinkVertical && insideCircle;
 
-        result.InsideFreeCircle = insideCircle && outsideLinks;
-        result.OutsideCircle    = outsideCircle;
+        result.InsideCircle = insideCircle;
 
         return result;
     }
@@ -2886,37 +2917,46 @@ function createChainsShaderProgram(context, vertexShader)
         bvec2 equalsOppositeSides = equal(cellNeighbours.SidesValues.xz, cellNeighbours.SidesValues.yw);
         bvec4 equalsLateralSides  = equal(cellNeighbours.SidesValues.xyxy, cellNeighbours.SidesValues.zzww);
 
-        uvec4 emptyCornerCandidate = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.zzww;
-        uvec4 cornerCandidate      = uvec4(cornerRule(equalsSides, equalsCorners)) * cellNeighbours.CellValue;
+        uvec4 filledCornerCandidate = uvec4(cornerRule(equalsSides, equalsCorners)) * cellNeighbours.CellValue;
+        uvec4 emptyCornerCandidate  = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.zzww;
 
-        emptyCornerCandidate = uint(regionInfo.OutsideCircle) * emptyCornerCandidate;
-        uvec4 resCorner = max(cornerCandidate, emptyCornerCandidate);
+        uvec4 slimEdgeFilledHorizontalCandidate = uvec4(slimEdgeFilledHorizontalRule(equalsSides, equalsCorners, equalsSides2)) * cellNeighbours.CellValue;
+        uvec4 slimEdgeFilledVerticalCandidate   = uvec4(slimEdgeFilledVerticalRule(equalsSides, equalsCorners, equalsSides2)) * cellNeighbours.CellValue;
 
-        uvec4 slimEdgeFilledHorizontalCandidate = uvec4(slimEdgeHorizontalRule(equalsSides, equalsCorners, equalsSides2)) * cellNeighbours.CellValue;
-        uvec4 slimEdgeEmptyHorizontalCandidate  = uvec4(slimEdgeEmptyHorizontalRule(equalsOppositeSides, equalsLateralSides)) * cellNeighbours.SidesValues.xyxy;
+        uvec4 slimEdgeEmptyHorizontalCandidate = uvec4(slimEdgeEmptyHorizontalRule(equalsOppositeSides, equalsLateralSides)) * cellNeighbours.SidesValues.x;
+        uvec4 slimEdgeEmptyVerticalCandidate   = uvec4(slimEdgeEmptyVerticalRule(equalsOppositeSides, equalsLateralSides)) * cellNeighbours.SidesValues.z;
 
-        uvec4 resSlimEdgeHorizontal = max(slimEdgeFilledHorizontalCandidate, slimEdgeEmptyHorizontalCandidate);
-        resSlimEdgeHorizontal = max(resSlimEdgeHorizontal, resCorner);
+        uint emptyHorizontalLinkCandidate = uint(emptyHorizontalLinkRule(cellNeighbours.CellValue, cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.x;
+        uint emptyVerticalLinkCandidate   = uint(emptyVerticalLinkRule(cellNeighbours.CellValue, cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.z;
 
-        uvec4 slimEdgeFilledVerticalCandidate = uvec4(slimEdgeVerticalRule(equalsSides, equalsCorners, equalsSides2)) * cellNeighbours.CellValue;
-        uvec4 slimEdgeEmptyVerticalCandidate  = uvec4(slimEdgeEmptyVerticalRule(equalsOppositeSides, equalsLateralSides)) * cellNeighbours.SidesValues.zzww;
+        uint resultFilledCircle = uint(regionInfo.InsideCircle) * cellNeighbours.CellValue;
+        
+        uint resultFilledCorner = udot(uvec4(regionInfo.InsideFilledCorners), filledCornerCandidate);
+        uint resultEmptyCorner  = udot(uvec4(regionInfo.InsideEmptyCorners),  emptyCornerCandidate);
+        
+        uint resultFilledSlimEdge = 0u;
+        resultFilledSlimEdge += udot(uvec4(regionInfo.InsideSlimEdgesHorizontal), slimEdgeFilledHorizontalCandidate);
+        resultFilledSlimEdge += udot(uvec4(regionInfo.InsideSlimEdgesVertical),   slimEdgeFilledVerticalCandidate);
+        
+        uint resultEmptySlimEdge = 0u;
+        resultEmptySlimEdge += udot(uvec4(regionInfo.InsideSlimEdgesHorizontal), slimEdgeEmptyHorizontalCandidate);
+        resultEmptySlimEdge += udot(uvec4(regionInfo.InsideSlimEdgesVertical),   slimEdgeEmptyVerticalCandidate);
+        
+        uint resultHorizontalLink = uint(regionInfo.InsideCircleLinkHorizontal) * emptyHorizontalLinkCandidate;
+        uint resultVerticalLink   = uint(regionInfo.InsideCircleLinkVertical)   * emptyVerticalLinkCandidate;
+        
+        
+        resultFilledSlimEdge *= uint(resultFilledCorner < resultFilledSlimEdge && resultEmptyCorner < resultFilledSlimEdge);
+        resultEmptySlimEdge  *= uint(resultFilledCorner < resultEmptySlimEdge  && resultEmptyCorner < resultEmptySlimEdge);
+        
+        resultFilledCorner *= uint(resultEmptySlimEdge == 0u && resultFilledSlimEdge == 0u && resultEmptyCorner <= resultFilledCorner);
+        resultEmptyCorner  *= uint(resultFilledCorner  == 0u && resultFilledSlimEdge == 0u && resultFilledCircle < resultEmptyCorner);
+        
+        resultHorizontalLink *= uint(resultFilledCircle < resultHorizontalLink && resultVerticalLink   < resultHorizontalLink);
+        resultVerticalLink   *= uint(resultFilledCircle < resultVerticalLink   && resultHorizontalLink < resultVerticalLink);
+        resultFilledCircle   *= uint(resultHorizontalLink == 0u && resultVerticalLink == 0u);
 
-        uvec4 resSlimEdgeVertical = max(slimEdgeFilledVerticalCandidate, slimEdgeEmptyVerticalCandidate);
-        resSlimEdgeVertical = max(resSlimEdgeVertical, resCorner);
-
-        uvec2 linkCandidate = uvec2(linkRule(cellNeighbours.CellValue, cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.xz;
-
-        uvec2 resLink     = max(linkCandidate, uvec2(cellNeighbours.CellValue));
-        uint  resMidLinks = max(resLink.x, resLink.y);
-
-        uint result =       uint(regionInfo.InsideFreeCircle)    *      cellNeighbours.CellValue;
-        result     += udot(uvec4(regionInfo.InsideFreeCorners),         resCorner);
-        result     += udot(uvec4(regionInfo.InsideSlimEdgesHorizontal), resSlimEdgeHorizontal); 
-        result     += udot(uvec4(regionInfo.InsideSlimEdgesVertical),   resSlimEdgeVertical);
-        result     += udot(uvec2(regionInfo.InsideCircleLinks),         resLink); 
-        result     +=       uint(regionInfo.InsideBothLinks)     *      resMidLinks;
-
-        return result;
+        return resultFilledCircle + resultFilledCorner + resultEmptyCorner + resultFilledSlimEdge + resultEmptySlimEdge + resultHorizontalLink + resultVerticalLink;
     }
     `;
 
