@@ -74,11 +74,8 @@ function flatCellIndex(gameSize, x, y)
 
 //Gets 2-dimensional cell index from a canvas point (x, y) for the given board size (gameSize x gameSize) and canvas size (canvasWidth x canvasHeight).
 //Since the actual board has dynamic size and is centered on a statically sized canvas, offsets: (canvasOffsetX, canvasOffsetY) are added.
-function boardPointFromCanvasPoint(x, y, gameSize, viewportWidth, viewportHeight, canvasWidth, canvasHeight, useGrid)
+function boardPointFromCanvasPoint(canvasX, canvasY, gameSize, viewportWidth, viewportHeight, useGrid)
 {
-    let xCorrected = x * (viewportWidth  / canvasWidth);
-    let yCorrected = y * (viewportHeight / canvasHeight);
-
     let widthAdjusted  = viewportWidth;
     let heightAdjusted = viewportHeight;
 
@@ -104,31 +101,31 @@ function boardPointFromCanvasPoint(x, y, gameSize, viewportWidth, viewportHeight
     let tallerCellPartHeight = (smallCellHeight + 1) * tallerCellCount;
 
     let idX = 0;
-    if(xCorrected <= leftThinnerCellPartWidth)
+    if(canvasX <= leftThinnerCellPartWidth)
     {
-        idX = Math.floor(xCorrected / smallCellWidth);
+        idX = Math.floor(canvasX / smallCellWidth);
     }
-    else if(xCorrected <= leftThinnerCellPartWidth + widerCellPartWidth)
+    else if(canvasX <= leftThinnerCellPartWidth + widerCellPartWidth)
     {
-        idX = thinnerCellHalfCount + Math.floor((xCorrected - leftThinnerCellPartWidth) / (smallCellWidth + 1));
+        idX = thinnerCellHalfCount + Math.floor((canvasX - leftThinnerCellPartWidth) / (smallCellWidth + 1));
     }
     else
     {
-        idX = thinnerCellHalfCount + widerCellCount + Math.floor((xCorrected - leftThinnerCellPartWidth - widerCellPartWidth) / smallCellWidth);
+        idX = thinnerCellHalfCount + widerCellCount + Math.floor((canvasX - leftThinnerCellPartWidth - widerCellPartWidth) / smallCellWidth);
     }
 
     let idY = 0;
-    if(yCorrected <= topShorterCellPartHeight)
+    if(canvasY <= topShorterCellPartHeight)
     {
-        idY = Math.floor(yCorrected / smallCellHeight);
+        idY = Math.floor(canvasY / smallCellHeight);
     }
-    else if(yCorrected <= topShorterCellPartHeight + tallerCellPartHeight)
+    else if(canvasY <= topShorterCellPartHeight + tallerCellPartHeight)
     {
-        idY = shorterCellHalfCount + Math.floor((yCorrected - topShorterCellPartHeight) / (smallCellHeight + 1));
+        idY = shorterCellHalfCount + Math.floor((canvasY - topShorterCellPartHeight) / (smallCellHeight + 1));
     }
     else
     {
-        idY = shorterCellHalfCount + tallerCellCount + Math.floor((yCorrected - topShorterCellPartHeight - tallerCellPartHeight) / smallCellHeight);
+        idY = shorterCellHalfCount + tallerCellCount + Math.floor((canvasY - topShorterCellPartHeight - tallerCellPartHeight) / smallCellHeight);
     }
 
     return {x: idX, y: idY};
