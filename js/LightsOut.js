@@ -1902,12 +1902,11 @@ function createDiamondsShaderProgram(context, vertexShader)
     {
         int   CharacteristicValue;
         int   DiamondRadius;
-        int   SmallerDiamondRadius;
         bool  CellClassEven;
         bvec4 InsideSides;
+        bvec2 InsideZeroLayer;
     };
 
-    //Calculated from RegionInfo using additional information about neighbours
     struct PureRegionInfo
     {
         bvec4 InsideFilledCorners;
@@ -1931,12 +1930,6 @@ function createDiamondsShaderProgram(context, vertexShader)
         ivec2 cellCoordAdjusted = cellCoord - cellSizeHalf;
 
         int diamondRadius = min(cellSizeHalf.x, cellSizeHalf.y) + 1;
-        
-        //Fix for 1-pixel error with grid
-        //To make empty corners match neighbour diamonds, draw them with the diamond radius smaller by 1 unit.
-        //Without grid, we don't have to worry about ths
-        bool gridVisible = ((gFlags & FLAG_NO_GRID) == 0);
-        int smallerDiamondRadius = diamondRadius + int(gridVisible);
 
         //Cell class even: small cells have even size
         //Cell class odd: small cells have odd size
@@ -1964,12 +1957,15 @@ function createDiamondsShaderProgram(context, vertexShader)
         bvec4 insideSides = bvec4(cellCoordAdjusted.x <= 0, cellCoordAdjusted.x >= 0, 
                                 cellCoordAdjusted.y <= 0, cellCoordAdjusted.y >= 0);
 
+        bvec2 insideZeroLayer = bvec2(cellCoordAdjusted.y == 0, cellCoordAdjusted.x == 0);
+
         RegionInfo regionInfo;
-        regionInfo.CharacteristicValue  = characteristicValue;
-        regionInfo.DiamondRadius        = diamondRadius;
-        regionInfo.SmallerDiamondRadius = smallerDiamondRadius;
-        regionInfo.CellClassEven        = cellClassEven;
-        regionInfo.InsideSides          = insideSides;
+        regionInfo.CharacteristicValue = characteristicValue;
+        regionInfo.DiamondRadius       = diamondRadius;
+        regionInfo.CellClassEven       = cellClassEven;
+        regionInfo.InsideSides         = insideSides;
+        regionInfo.InsideZeroLayer     = insideZeroLayer;
+
         return regionInfo;
     }
 
@@ -2000,7 +1996,7 @@ function createDiamondsShaderProgram(context, vertexShader)
                 bool isWide = (cellType == CellTypeWide);
                 bool isTall = (cellType == CellTypeTall);
                 
-                bvec4 insideSidesNonZero = not(regionInfo.InsideSides.yxwz);
+                bvec4 insideSidesNonZero = b4nd(regionInfo.InsideSides, not(regionInfo.InsideZeroLayer.yyxx));
                 bvec4 insideSideWithFilledCorners = b4nd(insideSidesNonZero, cornerSidesEmpty);
 
                 bvec4 sidesMask = bvec4(isWide, isWide, isTall, isTall);
@@ -2012,8 +2008,17 @@ function createDiamondsShaderProgram(context, vertexShader)
             {
                 if(numberOfEqualCorners == 1)
                 {
+                    bvec4 insideCorners = b4nd(regionInfo.InsideSides.xyxy, regionInfo.InsideSides.zzww);
+                    
+                    bvec4 lateralSidesEqual = equal(cellNeighbours.SidesValues.xyxy, cellNeighbours.SidesValues.zzww);
+                    bvec4 cellCornerSidesEqual = equal(uvec4(cellNeighbours.CellValue), cellNeighbours.SidesValues.xyxy);
+                    bvec4 cellLateralSidesEqual = b4nd(lateralSidesEqual, cellCornerSidesEqual);
+                    
                     bvec4 insideSideWithFilledCorners = b4nd(regionInfo.InsideSides, cornerSidesEmpty);
-                    characteristicOffset = idot(ivec4(insideSideWithFilledCorners), ivec4(1));
+                    bvec4 insideCornerWithEqualSides = b4nd(insideCorners, cellLateralSidesEqual);
+                    
+                    characteristicOffset += idot(ivec4(insideSideWithFilledCorners), ivec4(1));
+                    characteristicOffset -= idot(ivec4(insideCornerWithEqualSides),  ivec4(1));
                 }
                 else
                 {
@@ -2039,23 +2044,35 @@ function createDiamondsShaderProgram(context, vertexShader)
                 
                 bvec4 sidesMask = bvec4(isWide, isWide, isTall, isTall);
                 insideNonFilledCorners = b4nd(insideNonFilledCorners, sidesMask);
+                
+                bvec4 lateralSidesEqual     = equal(cellNeighbours.SidesValues.xyxy, cellNeighbours.SidesValues.zzww);
+                bvec4 cellCornerSidesEqual  = equal(uvec4(cellNeighbours.CellValue), cellNeighbours.SidesValues.xyxy);
+                bvec4 cellLateralSidesEqual = b4nd(lateralSidesEqual, cellCornerSidesEqual);
 
-                characteristicOffset = idot(ivec4(insideNonFilledCorners), ivec4(1));
+                bvec4 insideSidesNonZero = b4nd(regionInfo.InsideSides, not(regionInfo.InsideZeroLayer.yyxx));
+                bvec4 insideCornersNonZero = b4nd(insideSidesNonZero.xyxy, insideSidesNonZero.zzww);
+                bvec4 insideNonZeroCornerWithLateralSides = b4nd(insideCornersNonZero, cellLateralSidesEqual);
+
+                bvec2 insideSideCenter     = b2nd(regionInfo.InsideSides.zx, regionInfo.InsideSides.wy);
+                bvec4 insideSideCenterHalf = b4nd(regionInfo.InsideZeroLayer.xxyy, insideSidesNonZero);
+                
+                bvec4 cellBothLateralSidesEqual = b4nd(cellLateralSidesEqual.zyyz, cellLateralSidesEqual.xwxw);
+                bvec4 insideSideCenterWithBothLateralSides = b4nd(cellBothLateralSidesEqual, insideSideCenterHalf);
+        
+                characteristicOffset += idot(ivec4(insideNonFilledCorners),               ivec4(1));
+                characteristicOffset -= idot(ivec4(insideNonZeroCornerWithLateralSides),  ivec4(1));
+                characteristicOffset -= idot(ivec4(insideSideCenterWithBothLateralSides), ivec4(1));
             }
             else if(cellType == CellTypeBig)
             {
-                if(numberOfEqualCorners == 1)
-                {
-                    bvec4 insideSideWithNonFilledCorners = b4nd(regionInfo.InsideSides, cornerSidesEmpty);
-                    characteristicOffset = idot(ivec4(insideSideWithNonFilledCorners), ivec4(1));
-                }
-                else if(numberOfEqualCorners >= 2)
-                {
-                    bvec4 insideCorners = b4nd(regionInfo.InsideSides.xyxy, regionInfo.InsideSides.zzww);
-                    bvec4 insideNonFilledCorners = b4nd(insideCorners, not(cornersEqual));
-                    
-                    characteristicOffset = idot(ivec4(insideNonFilledCorners), ivec4(1));
-                }
+                bvec4 insideCorners = b4nd(regionInfo.InsideSides.xyxy, regionInfo.InsideSides.zzww);
+
+                bvec4 lateralSidesEqual     = equal(cellNeighbours.SidesValues.xyxy, cellNeighbours.SidesValues.zzww);
+                bvec4 cellCornerSidesEqual  = equal(uvec4(cellNeighbours.CellValue), cellNeighbours.SidesValues.xyxy);
+                bvec4 cellLateralSidesEqual = b4nd(lateralSidesEqual, cellCornerSidesEqual);
+
+                bvec4 insideCornerWithDifferentLateralSides = b4nd(insideCorners, not(cellLateralSidesEqual));
+                characteristicOffset = idot(ivec4(insideCornerWithDifferentLateralSides), ivec4(1));
             }   
         }
 
@@ -2064,16 +2081,17 @@ function createDiamondsShaderProgram(context, vertexShader)
 
     int JitterDiamondEmpty(RegionInfo regionInfo, CellNeighbourValues cellNeighbours, uint cellType)
     {
+        int characteristicOffset = 0;
+            
         //Increase the radius of empty corners equal to the value of the cell
         //to avoid "gaps" between the central diamond and empty corners on odd cell sizes
         bvec4 lateralSidesEqual = equal(cellNeighbours.SidesValues.xyxy, cellNeighbours.SidesValues.zzww);
-        bvec4 cellSidesEqual = equal(uvec4(cellNeighbours.CellValue), cellNeighbours.SidesValues.xyxy);
-        bvec4 needEmptyCornerCorrection = b4nd(lateralSidesEqual, cellSidesEqual);
+        bvec4 cellCornerSidesEqual = equal(uvec4(cellNeighbours.CellValue), cellNeighbours.SidesValues.xyxy);
+        bvec4 needEmptyCornerCorrection = b4nd(lateralSidesEqual, cellCornerSidesEqual);
         
         bvec4 insideCorners = b4nd(regionInfo.InsideSides.xyxy, regionInfo.InsideSides.zzww);
         bvec4 emptyCornerCorrectRule = b4nd(needEmptyCornerCorrection, insideCorners);
         
-        int characteristicOffset = 0;
         if(any(emptyCornerCorrectRule))
         {
             characteristicOffset = 1;
@@ -2082,13 +2100,19 @@ function createDiamondsShaderProgram(context, vertexShader)
         {
             characteristicOffset = 0;
         }
-        else if(!regionInfo.CellClassEven)
+        
+        if(!regionInfo.CellClassEven)
         {
-            //Otherwise, on odd cell sizes decrease the corner size
-            //to avoid 1-pixel "jumps"
-            characteristicOffset = -1;   
+            //Oon odd cell sizes decrease the corner size to avoid 1-pixel "jumps"
+            characteristicOffset -= 1;   
         }
         
+        //Fix for 1-pixel error with grid
+        //To make empty corners match neighbour diamonds, draw them with the diamond radius smaller by 1 unit.
+        //Without grid, we don't have to worry about ths
+        bool gridVisible = ((gFlags & FLAG_NO_GRID) == 0);
+        characteristicOffset += int(!gridVisible);
+
         return regionInfo.CharacteristicValue + characteristicOffset;
     }
 
@@ -2100,7 +2124,7 @@ function createDiamondsShaderProgram(context, vertexShader)
         int characteristicSmall = JitterDiamondEmpty(regionInfo, cellNeighbours, cellType);
             
         bool insideDiamond   = characteristicBig   < regionInfo.DiamondRadius;
-        bool insideDiamondSm = characteristicSmall < regionInfo.SmallerDiamondRadius;
+        bool insideDiamondSm = characteristicSmall < regionInfo.DiamondRadius;
         
         PureRegionInfo pureRegionInfo;
         pureRegionInfo.InsideEmptyCorners  = b4nd(bvec4(!insideDiamondSm), insideCorners);
@@ -2116,20 +2140,15 @@ function createDiamondsShaderProgram(context, vertexShader)
         uvec4 emptyCornerCandidate  = uvec4(emptyCornerRule(cellNeighbours.SidesValues)) * cellNeighbours.SidesValues.zzww;
         uvec4 filledCornerCandidate = uvec4(filledCornerRule(cellNeighbours.CellValue, cellNeighbours.CornersValues)) * cellNeighbours.CellValue;
 
-        bvec4 selectMask = greaterThan(emptyCornerCandidate, filledCornerCandidate);
-        selectMask = b4nd(selectMask, pureRegionInfo.InsideEmptyCorners);
+        uint resultEmptyCorner  = udot(uvec4(pureRegionInfo.InsideEmptyCorners),  emptyCornerCandidate);
+        uint resultFilledCorner = udot(uvec4(pureRegionInfo.InsideFilledCorners), filledCornerCandidate);
 
-        uvec4 cornerCandidate  = select(emptyCornerCandidate, filledCornerCandidate, selectMask);
-        uvec4 cornerRegionRule = select(uvec4(pureRegionInfo.InsideEmptyCorners), uvec4(pureRegionInfo.InsideFilledCorners), selectMask);
+        resultFilledCorner *= uint(resultEmptyCorner <= resultFilledCorner);
+        resultEmptyCorner  *= uint(resultFilledCorner == 0u);
 
-        //Allow a fragment to be inside at most 1 of corner regions
-        bvec4 cornerRegionRuleMask = bvec4(true, !bool(cornerRegionRule.x), !any(bvec2(cornerRegionRule.xy)), !any(bvec3(cornerRegionRule.xyz)));
-        cornerRegionRule = cornerRegionRule * uvec4(cornerRegionRuleMask);
+        uint resultDiamond = cellNeighbours.CellValue * uint(pureRegionInfo.InsideDiamond);
 
-        uint resCorner  = udot(cornerCandidate, cornerRegionRule);
-        uint resDiamond = cellNeighbours.CellValue * uint(pureRegionInfo.InsideDiamond);
-
-        return max(resCorner, resDiamond);
+        return resultDiamond + resultEmptyCorner + resultFilledCorner; 
     }
     `;
 
