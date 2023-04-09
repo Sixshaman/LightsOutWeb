@@ -72,8 +72,7 @@ function flatCellIndex(gameSize, x, y)
     return y * gameSize + x;
 }
 
-//Gets 2-dimensional cell index from a canvas point (x, y) for the given board size (gameSize x gameSize) and canvas size (canvasWidth x canvasHeight).
-//Since the actual board has dynamic size and is centered on a statically sized canvas, offsets: (canvasOffsetX, canvasOffsetY) are added.
+//Gets 2-dimensional cell index from a canvas point (x, y) for the given board size (gameSize x gameSize) and canvas size (viewportWidth x viewportHeight).
 function boardPointFromCanvasPoint(canvasX, canvasY, gameSize, viewportWidth, viewportHeight, useGrid)
 {
     let widthAdjusted  = viewportWidth;
@@ -4161,6 +4160,32 @@ function main()
         }
     }
 
+    const boardResizeObserver = new ResizeObserver((entries) => 
+    {
+        const canvasStyle  = getComputedStyle(canvas);
+        const marginLeft   = parseInt(canvasStyle.marginLeft);
+        const marginRight  = parseInt(canvasStyle.marginRight);
+        const marginTop    = parseInt(canvasStyle.marginTop);
+        const marginBottom = parseInt(canvasStyle.marginBottom);
+
+        let newCanvasSize = Math.min(entries[0].contentRect.width - marginLeft - marginRight, entries[0].contentRect.height - marginTop - marginBottom);
+
+        canvas.width  = newCanvasSize;
+        canvas.height = newCanvasSize;
+
+        canvasSize = newCanvasSize;
+
+        currentViewportWidth  = newCanvasSize;
+        currentViewportHeight = newCanvasSize;
+
+        currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
+        
+        updateViewport();
+        requestRedraw();
+    });
+
+    boardResizeObserver.observe(canvasContainer);
+
     let BoardGenModes =
     {
         GenFullRandom: 1, //Generate a random board
@@ -4228,10 +4253,7 @@ function main()
     const minimumDomainSize = 2;
     const maximumDomainSize = 255;
 
-    const canvasWidth  = canvas.width;
-    const canvasHeight = canvas.height;
-
-    const canvasSize = Math.min(canvasWidth, canvasHeight);
+    let canvasSize = Math.min(canvas.width, canvas.height);
 
     let currentViewportWidth  = canvasSize;
     let currentViewportHeight = canvasSize;
