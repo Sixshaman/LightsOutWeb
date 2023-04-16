@@ -4170,6 +4170,20 @@ function main()
 
         let newCanvasSize = Math.min(entries[0].contentRect.width - marginLeft - marginRight, entries[0].contentRect.height - marginTop - marginBottom);
 
+        //Add magnetic effect to the canvas
+        let gridOffset = gridCheckBox.checked ? 1 : 0;
+
+        let tryCellSize = Math.ceil((newCanvasSize - gridOffset) / currentGameSize) - 1;
+        let magneticEffectRadius = tryCellSize / 4;
+
+        let goodCanvasSize = currentGameSize * tryCellSize + gridOffset;
+        if(Math.abs(newCanvasSize - goodCanvasSize) < magneticEffectRadius)
+        {
+            newCanvasSize = goodCanvasSize;
+        }
+
+        currentCellSize = tryCellSize;
+
         canvas.width  = newCanvasSize;
         canvas.height = newCanvasSize;
 
@@ -4177,8 +4191,6 @@ function main()
 
         currentViewportWidth  = newCanvasSize;
         currentViewportHeight = newCanvasSize;
-
-        currentCellSize = Math.ceil(canvasSize / currentGameSize) - 1;
         
         updateViewport();
         requestRedraw();
